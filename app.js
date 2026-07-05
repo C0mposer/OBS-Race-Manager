@@ -1,8 +1,8 @@
 const STAGE = { width: 1920, height: 1080 };
 const MANAGED_PREFIX = "ORM__";
-const MAX_RUNNERS = 12;
-const RUNNER_PARTS = ["Feed", "Border", "Name"];
-const GLOBAL_PARTS = ["Background", "TimerBorder", "TimerText"];
+const MAX_RUNNERS = 20;
+const RUNNER_PARTS = ["Feed", "Border", "Name", "Finish"];
+const GLOBAL_PARTS = ["Background", "TitleBar", "TimerBorder", "TimerText"];
 const NAME_FONT_HEIGHT_RATIO = 0.48;
 const COMMON_FONT_FACES = [
   "Segoe UI",
@@ -34,7 +34,8 @@ const COMMON_FONT_FACES = [
 ];
 const DEFAULT_PANEL_GEOMETRY = {
   feed: { x: 0.042, y: 0.054, width: 0.916, height: 0.726 },
-  name: { x: 0.042, y: 0.81, width: 0.916, height: 0.14 }
+  name: { x: 0.042, y: 0.81, width: 0.916, height: 0.14 },
+  finish: { x: 0.76, y: 0.84, width: 0.18, height: 0.08 }
 };
 const DEFAULT_TIMER_BORDER = {
   enabled: true,
@@ -47,8 +48,10 @@ const DEFAULT_ELEMENTS = {
   feed: true,
   feedBorder: true,
   name: true,
+  titleBar: false,
   timerBorder: true,
-  builtInTimer: false
+  builtInTimer: true,
+  finishedTime: true
 };
 const DEFAULT_TIMER_TEXT = {
   fontFamily: "Segoe UI",
@@ -69,6 +72,21 @@ const DEFAULT_TIMER_TEXT = {
   elapsedMs: 0,
   startedAt: 0
 };
+const DEFAULT_FINISHED_TIME = {
+  fontFamily: "Segoe UI",
+  fontSize: 34,
+  color: "#f0b84a",
+  align: "right",
+  lockToNameplate: true,
+  strokeEnabled: false,
+  strokeColor: "#000000",
+  strokeWidth: 2,
+  shadowEnabled: true,
+  shadowColor: "#000000",
+  shadowBlur: 8,
+  shadowX: 0,
+  shadowY: 2
+};
 const BORDER_PRESETS = {
   graphite: {
     mode: "solid",
@@ -85,7 +103,9 @@ const BORDER_PRESETS = {
     textureImage: "",
     textureScale: 100,
     textureX: 50,
-    textureY: 50
+    textureY: 50,
+    textureScrollX: 0,
+    textureScrollY: 0
   },
   neon: {
     mode: "gradient",
@@ -102,7 +122,9 @@ const BORDER_PRESETS = {
     textureImage: "",
     textureScale: 100,
     textureX: 50,
-    textureY: 50
+    textureY: 50,
+    textureScrollX: 0,
+    textureScrollY: 0
   },
   gold: {
     mode: "gradient",
@@ -119,7 +141,9 @@ const BORDER_PRESETS = {
     textureImage: "",
     textureScale: 100,
     textureX: 50,
-    textureY: 50
+    textureY: 50,
+    textureScrollX: 0,
+    textureScrollY: 0
   },
   broadcast: {
     mode: "gradient",
@@ -136,7 +160,9 @@ const BORDER_PRESETS = {
     textureImage: "",
     textureScale: 100,
     textureX: 50,
-    textureY: 50
+    textureY: 50,
+    textureScrollX: 0,
+    textureScrollY: 0
   }
 };
 
@@ -146,6 +172,9 @@ const state = {
     timerHeight: 130,
     margin: 36,
     gap: 20,
+    viewMode: "edit",
+    layerLock: false,
+    snapEnabled: true,
     animationMs: 360,
     animationFps: 60,
     animationStyle: "moveFade",
@@ -157,6 +186,7 @@ const state = {
       enabled: false,
       slots: "",
       showOthers: true,
+      disableSmallNameplates: false,
       side: "bottom",
       stackOrder: "horizontal",
       mainScale: 78,
@@ -164,6 +194,38 @@ const state = {
       gap: 20
     },
     timerText: { ...DEFAULT_TIMER_TEXT },
+    finishedTime: { ...DEFAULT_FINISHED_TIME },
+    raceInfo: {
+      title: "Race Title",
+      subtitle: "Game - Category",
+      fontFamily: "Segoe UI",
+      fontSize: 34,
+      textColor: "#ffffff",
+      plateImage: "",
+      plateBackgroundColor: "#10161a",
+      plateBackgroundOpacity: 84,
+      plateBorderColor: "#ffffff",
+      plateBorderOpacity: 14,
+      plateBorderWidth: 1,
+      plateRadius: 8,
+      platePaddingX: 18,
+      plateFillMode: "solid",
+      plateGradientFrom: "#10161a",
+      plateGradientTo: "#26343b",
+      plateGradientAngle: 135,
+      plateAnimateGradientAngle: false,
+      plateGradientAngleSpeed: 45,
+      plateTextureImage: "",
+      plateTextureScale: 100,
+      plateTextureX: 50,
+      plateTextureY: 50,
+      plateTextureScrollX: 0,
+      plateTextureScrollY: 0,
+      plateMode: "generated",
+      showBox: true,
+      showBorder: true,
+      rect: { x: 0.28, y: 0.024, width: 0.44, height: 0.065 }
+    },
     panelGeometry: structuredClone(DEFAULT_PANEL_GEOMETRY),
     timerBorder: { ...DEFAULT_TIMER_BORDER },
     nameplate: {
@@ -179,6 +241,18 @@ const state = {
       plateRadius: 10,
       platePaddingX: 10,
       badgeColor: "#f0b84a",
+      plateFillMode: "solid",
+      plateGradientFrom: "#070a0c",
+      plateGradientTo: "#1f2d34",
+      plateGradientAngle: 135,
+      plateAnimateGradientAngle: false,
+      plateGradientAngleSpeed: 45,
+      plateTextureImage: "",
+      plateTextureScale: 100,
+      plateTextureX: 50,
+      plateTextureY: 50,
+      plateTextureScrollX: 0,
+      plateTextureScrollY: 0,
       textX: 0,
       textY: 0,
       plateMode: "generated",
@@ -199,11 +273,13 @@ const state = {
     borderModeSource: "generated",
     borderStyles: {
       feed: structuredClone(BORDER_PRESETS.graphite),
-      timer: structuredClone(BORDER_PRESETS.graphite)
+      timer: structuredClone(BORDER_PRESETS.graphite),
+      title: structuredClone(BORDER_PRESETS.graphite)
     },
     borderImages: {
       feed: "",
-      timer: ""
+      timer: "",
+      title: ""
     },
     borderStyle: structuredClone(BORDER_PRESETS.graphite),
     borderImage: "",
@@ -220,13 +296,14 @@ const history = {
   lastPointerSnapshot: null
 };
 const selection = {
-  kind: ""
+  kind: "",
+  activePanel: "layout"
 };
 const obsBridge = {
   client: null,
   connected: false,
   connecting: false,
-  sceneName: "ORM__RaceMaster",
+  sceneName: "ORM__Default",
   itemIds: new Map(),
   autoApply: true,
   animateLayout: true,
@@ -235,7 +312,8 @@ const obsBridge = {
   pendingApply: false,
   opacitySupported: false,
   lastRects: new Map(),
-  lastVisibility: new Map()
+  lastVisibility: new Map(),
+  lastSceneItemEnabled: new Map()
 };
 let previewRefreshFrame = 0;
 let previewRefreshTimer = 0;
@@ -268,9 +346,13 @@ function createRunner(slot, name, source, active, crop) {
     active,
     name,
     source,
+    feedMode: "live",
     placement: slot,
     done: false,
     finalTimeMs: null,
+    finalTimeText: "",
+    audioMuted: false,
+    audioVolume: 100,
     crop,
     collapsed: false
   };
@@ -325,6 +407,7 @@ function startTimerPreviewTicker() {
       return;
     }
     applyTimerTextPreviewGeometry();
+    renderControlMode();
   }, 200);
 }
 
@@ -357,25 +440,25 @@ function timerTextColor() {
 }
 
 function timerTextShadowCss(config, scale = 1) {
+  const value = timerTextShadowValue(config, scale);
+  const shadow = value === "none" ? "text-shadow:none;" : `text-shadow:${value};`;
+  return `${shadow}${nativeTextStrokeCss(config, scale)}`;
+}
+
+function timerTextShadowValue(config, scale = 1) {
   const shadows = [];
-  if (config.strokeEnabled && Number(config.strokeWidth) > 0) {
-    const width = Math.min(10, Math.max(1, Math.round(Number(config.strokeWidth))));
-    for (let radius = 1; radius <= width; radius += 1) {
-      const offset = radius * scale;
-      shadows.push(`${offset}px 0 0 ${config.strokeColor}`);
-      shadows.push(`${-offset}px 0 0 ${config.strokeColor}`);
-      shadows.push(`0 ${offset}px 0 ${config.strokeColor}`);
-      shadows.push(`0 ${-offset}px 0 ${config.strokeColor}`);
-      shadows.push(`${offset}px ${offset}px 0 ${config.strokeColor}`);
-      shadows.push(`${-offset}px ${offset}px 0 ${config.strokeColor}`);
-      shadows.push(`${offset}px ${-offset}px 0 ${config.strokeColor}`);
-      shadows.push(`${-offset}px ${-offset}px 0 ${config.strokeColor}`);
-    }
-  }
   if (config.shadowEnabled) {
     shadows.push(`${Number(config.shadowX) * scale}px ${Number(config.shadowY) * scale}px ${Number(config.shadowBlur) * scale}px ${config.shadowColor}`);
   }
-  return shadows.length > 0 ? `text-shadow:${shadows.join(",")};` : "text-shadow:none;";
+  return shadows.length > 0 ? shadows.join(",") : "none";
+}
+
+function nativeTextStrokeCss(config, scale = 1) {
+  if (!config.strokeEnabled || Number(config.strokeWidth) <= 0) {
+    return "-webkit-text-stroke:0 transparent;paint-order:normal;";
+  }
+  const width = Math.max(0, Number(config.strokeWidth) || 0) * scale;
+  return `-webkit-text-stroke:${width}px ${config.strokeColor};paint-order:stroke fill;-webkit-font-smoothing:antialiased;text-rendering:geometricPrecision;`;
 }
 
 function bindElements() {
@@ -383,6 +466,9 @@ function bindElements() {
   els.runnerLayer = document.getElementById("runnerLayer");
   els.stage = document.getElementById("stage");
   els.stageWrap = document.querySelector(".stage-wrap");
+  els.snapGuideV = document.getElementById("snapGuideV");
+  els.snapGuideH = document.getElementById("snapGuideH");
+  els.titleBarPreview = document.getElementById("titleBarPreview");
   els.timerBorder = document.getElementById("timerBorder");
   els.timerTextPreview = document.getElementById("timerTextPreview");
   els.activeCount = document.getElementById("activeCount");
@@ -418,6 +504,7 @@ function bindElements() {
   els.spotlightEnabled = document.getElementById("spotlightEnabled");
   els.spotlightSlots = document.getElementById("spotlightSlots");
   els.spotlightShowOthers = document.getElementById("spotlightShowOthers");
+  els.spotlightDisableSmallNameplates = document.getElementById("spotlightDisableSmallNameplates");
   els.spotlightSide = document.getElementById("spotlightSide");
   els.spotlightStackOrder = document.getElementById("spotlightStackOrder");
   els.spotlightMainScale = document.getElementById("spotlightMainScale");
@@ -444,14 +531,66 @@ function bindElements() {
   els.nameY = document.getElementById("nameY");
   els.nameW = document.getElementById("nameW");
   els.nameH = document.getElementById("nameH");
+  els.finishX = document.getElementById("finishX");
+  els.finishY = document.getElementById("finishY");
+  els.finishW = document.getElementById("finishW");
+  els.finishH = document.getElementById("finishH");
   els.timerBorderEnabled = document.getElementById("timerBorderEnabled");
+  els.layerLockEnabled = document.getElementById("layerLockEnabled");
+  els.snapEnabled = document.getElementById("snapEnabled");
   els.feedVisible = document.getElementById("feedVisible");
   els.feedBorderVisible = document.getElementById("feedBorderVisible");
   els.nameVisible = document.getElementById("nameVisible");
+  els.finishedTimeVisible = document.getElementById("finishedTimeVisible");
+  els.titleBarVisible = document.getElementById("titleBarVisible");
   els.timerX = document.getElementById("timerX");
   els.timerY = document.getElementById("timerY");
   els.timerW = document.getElementById("timerW");
   els.timerH = document.getElementById("timerH");
+  els.titleX = document.getElementById("titleX");
+  els.titleY = document.getElementById("titleY");
+  els.titleW = document.getElementById("titleW");
+  els.titleH = document.getElementById("titleH");
+  els.raceInfoEnabled = document.getElementById("raceInfoEnabled");
+  els.raceTitle = document.getElementById("raceTitle");
+  els.raceSubtitle = document.getElementById("raceSubtitle");
+  els.raceInfoFont = document.getElementById("raceInfoFont");
+  els.raceInfoFontChoices = document.getElementById("raceInfoFontChoices");
+  els.raceInfoFontBrowser = document.getElementById("raceInfoFontBrowser");
+  els.raceInfoBrowseFonts = document.getElementById("raceInfoBrowseFonts");
+  els.raceInfoFontSize = document.getElementById("raceInfoFontSize");
+  els.raceInfoTextColor = document.getElementById("raceInfoTextColor");
+  els.raceInfoPlateMode = document.getElementById("raceInfoPlateMode");
+  els.raceInfoPlateImage = document.getElementById("raceInfoPlateImage");
+  els.clearRaceInfoPlateImage = document.getElementById("clearRaceInfoPlateImage");
+  els.raceInfoShowBox = document.getElementById("raceInfoShowBox");
+  els.raceInfoShowBorder = document.getElementById("raceInfoShowBorder");
+  els.raceInfoPlateBackgroundColor = document.getElementById("raceInfoPlateBackgroundColor");
+  els.raceInfoPlateFillMode = document.getElementById("raceInfoPlateFillMode");
+  els.raceInfoPlateGradientFrom = document.getElementById("raceInfoPlateGradientFrom");
+  els.raceInfoPlateGradientTo = document.getElementById("raceInfoPlateGradientTo");
+  els.raceInfoPlateGradientAngle = document.getElementById("raceInfoPlateGradientAngle");
+  els.raceInfoPlateGradientAngleSlider = document.getElementById("raceInfoPlateGradientAngleSlider");
+  els.raceInfoPlateAnimateGradientAngle = document.getElementById("raceInfoPlateAnimateGradientAngle");
+  els.raceInfoPlateGradientAngleSpeed = document.getElementById("raceInfoPlateGradientAngleSpeed");
+  els.raceInfoPlateGradientAngleSpeedValue = document.getElementById("raceInfoPlateGradientAngleSpeedValue");
+  els.raceInfoPlateGradientSpeedRow = document.getElementById("raceInfoPlateGradientSpeedRow");
+  els.raceInfoPlateTextureImage = document.getElementById("raceInfoPlateTextureImage");
+  els.clearRaceInfoPlateTextureImage = document.getElementById("clearRaceInfoPlateTextureImage");
+  els.raceInfoPlateTextureScale = document.getElementById("raceInfoPlateTextureScale");
+  els.raceInfoPlateTextureScaleValue = document.getElementById("raceInfoPlateTextureScaleValue");
+  els.raceInfoPlateTextureX = document.getElementById("raceInfoPlateTextureX");
+  els.raceInfoPlateTextureY = document.getElementById("raceInfoPlateTextureY");
+  els.raceInfoPlateTextureScrollX = document.getElementById("raceInfoPlateTextureScrollX");
+  els.raceInfoPlateTextureScrollXValue = document.getElementById("raceInfoPlateTextureScrollXValue");
+  els.raceInfoPlateTextureScrollY = document.getElementById("raceInfoPlateTextureScrollY");
+  els.raceInfoPlateTextureScrollYValue = document.getElementById("raceInfoPlateTextureScrollYValue");
+  els.raceInfoPlateBackgroundOpacity = document.getElementById("raceInfoPlateBackgroundOpacity");
+  els.raceInfoPlateBorderColor = document.getElementById("raceInfoPlateBorderColor");
+  els.raceInfoPlateBorderOpacity = document.getElementById("raceInfoPlateBorderOpacity");
+  els.raceInfoPlateBorderWidth = document.getElementById("raceInfoPlateBorderWidth");
+  els.raceInfoPlateRadius = document.getElementById("raceInfoPlateRadius");
+  els.raceInfoPlatePaddingX = document.getElementById("raceInfoPlatePaddingX");
   els.nameFont = document.getElementById("nameFont");
   els.nameFontChoices = document.getElementById("nameFontChoices");
   els.nameFontBrowser = document.getElementById("nameFontBrowser");
@@ -468,6 +607,25 @@ function bindElements() {
   els.nameShowBox = document.getElementById("nameShowBox");
   els.nameShowBorder = document.getElementById("nameShowBorder");
   els.namePlateBackgroundColor = document.getElementById("namePlateBackgroundColor");
+  els.namePlateFillMode = document.getElementById("namePlateFillMode");
+  els.namePlateGradientFrom = document.getElementById("namePlateGradientFrom");
+  els.namePlateGradientTo = document.getElementById("namePlateGradientTo");
+  els.namePlateGradientAngle = document.getElementById("namePlateGradientAngle");
+  els.namePlateGradientAngleSlider = document.getElementById("namePlateGradientAngleSlider");
+  els.namePlateAnimateGradientAngle = document.getElementById("namePlateAnimateGradientAngle");
+  els.namePlateGradientAngleSpeed = document.getElementById("namePlateGradientAngleSpeed");
+  els.namePlateGradientAngleSpeedValue = document.getElementById("namePlateGradientAngleSpeedValue");
+  els.namePlateGradientSpeedRow = document.getElementById("namePlateGradientSpeedRow");
+  els.namePlateTextureImage = document.getElementById("namePlateTextureImage");
+  els.clearNamePlateTextureImage = document.getElementById("clearNamePlateTextureImage");
+  els.namePlateTextureScale = document.getElementById("namePlateTextureScale");
+  els.namePlateTextureScaleValue = document.getElementById("namePlateTextureScaleValue");
+  els.namePlateTextureX = document.getElementById("namePlateTextureX");
+  els.namePlateTextureY = document.getElementById("namePlateTextureY");
+  els.namePlateTextureScrollX = document.getElementById("namePlateTextureScrollX");
+  els.namePlateTextureScrollXValue = document.getElementById("namePlateTextureScrollXValue");
+  els.namePlateTextureScrollY = document.getElementById("namePlateTextureScrollY");
+  els.namePlateTextureScrollYValue = document.getElementById("namePlateTextureScrollYValue");
   els.namePlateBackgroundOpacity = document.getElementById("namePlateBackgroundOpacity");
   els.namePlateBorderColor = document.getElementById("namePlateBorderColor");
   els.namePlateBorderOpacity = document.getElementById("namePlateBorderOpacity");
@@ -482,6 +640,23 @@ function bindElements() {
   els.nameShadowBlur = document.getElementById("nameShadowBlur");
   els.nameShadowX = document.getElementById("nameShadowX");
   els.nameShadowY = document.getElementById("nameShadowY");
+  els.finishLockToNameplate = document.getElementById("finishLockToNameplate");
+  els.finishFont = document.getElementById("finishFont");
+  els.finishFontChoices = document.getElementById("finishFontChoices");
+  els.finishFontBrowser = document.getElementById("finishFontBrowser");
+  els.finishBrowseFonts = document.getElementById("finishBrowseFonts");
+  els.finishFontSize = document.getElementById("finishFontSize");
+  els.finishFontSizeValue = document.getElementById("finishFontSizeValue");
+  els.finishColor = document.getElementById("finishColor");
+  els.finishAlign = document.getElementById("finishAlign");
+  els.finishStrokeEnabled = document.getElementById("finishStrokeEnabled");
+  els.finishStrokeColor = document.getElementById("finishStrokeColor");
+  els.finishStrokeWidth = document.getElementById("finishStrokeWidth");
+  els.finishShadowEnabled = document.getElementById("finishShadowEnabled");
+  els.finishShadowColor = document.getElementById("finishShadowColor");
+  els.finishShadowBlur = document.getElementById("finishShadowBlur");
+  els.finishShadowX = document.getElementById("finishShadowX");
+  els.finishShadowY = document.getElementById("finishShadowY");
   els.backgroundImage = document.getElementById("backgroundImage");
   els.borderImage = document.getElementById("borderImage");
   els.borderTarget = document.getElementById("borderTarget");
@@ -503,6 +678,10 @@ function bindElements() {
   els.borderTextureScaleValue = document.getElementById("borderTextureScaleValue");
   els.borderTextureX = document.getElementById("borderTextureX");
   els.borderTextureY = document.getElementById("borderTextureY");
+  els.borderTextureScrollX = document.getElementById("borderTextureScrollX");
+  els.borderTextureScrollXValue = document.getElementById("borderTextureScrollXValue");
+  els.borderTextureScrollY = document.getElementById("borderTextureScrollY");
+  els.borderTextureScrollYValue = document.getElementById("borderTextureScrollYValue");
   els.borderLineWidth = document.getElementById("borderLineWidth");
   els.borderRadius = document.getElementById("borderRadius");
   els.createBorderDetails = document.getElementById("createBorderDetails");
@@ -524,13 +703,42 @@ function bindElements() {
   els.redoAction = document.getElementById("redoAction");
   els.saveProject = document.getElementById("saveProject");
   els.loadProject = document.getElementById("loadProject");
+  els.viewEditMode = document.getElementById("viewEditMode");
+  els.viewControlMode = document.getElementById("viewControlMode");
+  els.resetAllFinishes = document.getElementById("resetAllFinishes");
+  els.raceControlPanel = document.getElementById("raceControlPanel");
+  els.controlTimerReadout = document.getElementById("controlTimerReadout");
+  els.controlTimerStart = document.getElementById("controlTimerStart");
+  els.controlTimerStop = document.getElementById("controlTimerStop");
+  els.controlTimerReset = document.getElementById("controlTimerReset");
+  els.controlApplyObs = document.getElementById("controlApplyObs");
+  els.controlRepairObs = document.getElementById("controlRepairObs");
+  els.controlExitSpotlight = document.getElementById("controlExitSpotlight");
+  els.controlRunnerList = document.getElementById("controlRunnerList");
 }
 
 function bindGlobalControls() {
+  bindApplicationMenus();
   els.undoAction.addEventListener("click", undo);
   els.redoAction.addEventListener("click", redo);
   els.saveProject.addEventListener("click", saveProject);
   els.loadProject.addEventListener("change", loadProjectFromFile);
+  els.viewEditMode.addEventListener("click", () => setViewMode("edit"));
+  els.viewControlMode.addEventListener("click", () => setViewMode("control"));
+  els.resetAllFinishes.addEventListener("click", resetAllFinishes);
+  els.controlTimerStart.addEventListener("click", startBuiltInTimer);
+  els.controlTimerStop.addEventListener("click", stopBuiltInTimer);
+  els.controlTimerReset.addEventListener("click", resetBuiltInTimer);
+  els.controlApplyObs.addEventListener("click", () => applyLayoutToObs({ reason: "manual-layout", refreshInputs: true, forceAnimate: true }));
+  els.controlRepairObs.addEventListener("click", createOrRepairObsScene);
+  els.controlExitSpotlight.addEventListener("click", () => {
+    pushHistory("exit spotlight");
+    state.layout.spotlight.enabled = false;
+    syncGlobalControlsFromState();
+    update();
+    scheduleObsApply("spotlight", 0);
+  });
+  els.controlRunnerList.addEventListener("click", handleControlRunnerAction);
   els.settingsTabs.addEventListener("click", handleSettingsTabClick);
   document.addEventListener("keydown", handleHotkeys);
   els.connectObs.addEventListener("click", connectObs);
@@ -560,6 +768,56 @@ function bindGlobalControls() {
     update();
     scheduleObsApply("timerText", 80);
   });
+  els.layerLockEnabled.addEventListener("change", (event) => {
+    pushHistory("layer lock");
+    state.layout.layerLock = event.target.checked;
+    update();
+  });
+  els.snapEnabled.addEventListener("change", (event) => {
+    pushHistory("snap enabled");
+    state.layout.snapEnabled = event.target.checked;
+    update();
+  });
+  for (const input of [els.titleBarVisible, els.raceInfoEnabled]) {
+    input.addEventListener("change", (event) => {
+      pushHistory("title visibility");
+      state.layout.elements.titleBar = event.target.checked;
+      syncGlobalControlsFromState();
+      update();
+      scheduleObsApply("raceInfo", 80);
+    });
+  }
+  for (const [input, key] of [
+    [els.raceTitle, "title"],
+    [els.raceSubtitle, "subtitle"],
+    [els.raceInfoFont, "fontFamily"],
+    [els.raceInfoTextColor, "textColor"]
+  ]) {
+    input.addEventListener("input", () => {
+      beginContinuousHistory(`race-info-${key}`);
+      state.layout.raceInfo[key] = input.value;
+      update();
+      scheduleObsApply("raceInfo", 100);
+    });
+    input.addEventListener("change", endContinuousHistory);
+  }
+  els.raceInfoFontBrowser.addEventListener("change", (event) => {
+    if (!event.target.value) return;
+    pushHistory("race info font browser");
+    state.layout.raceInfo.fontFamily = event.target.value;
+    syncGlobalControlsFromState();
+    update();
+    scheduleObsApply("raceInfo", 100);
+  });
+  els.raceInfoBrowseFonts.addEventListener("click", browseInstalledFonts);
+  els.raceInfoFontSize.addEventListener("input", () => {
+    beginContinuousHistory("race info font size");
+    state.layout.raceInfo.fontSize = Number(els.raceInfoFontSize.value);
+    update();
+    scheduleObsApply("raceInfo", 100);
+  });
+  els.raceInfoFontSize.addEventListener("change", endContinuousHistory);
+  bindRaceInfoPlateControls();
   els.timerStart.addEventListener("click", startBuiltInTimer);
   els.timerStop.addEventListener("click", stopBuiltInTimer);
   els.timerReset.addEventListener("click", resetBuiltInTimer);
@@ -592,18 +850,20 @@ function bindGlobalControls() {
     scheduleObsApply("timerText", 120);
   });
   els.timerFontSize.addEventListener("pointerdown", () => beginContinuousHistory("timer font size"));
+  els.timerFontSize.addEventListener("focus", () => beginContinuousHistory("timer font size"));
   els.timerFontSize.addEventListener("change", endContinuousHistory);
   for (const [input, key] of [
     [els.timerIdleColor, "idleColor"],
     [els.timerStoppedColor, "stoppedColor"],
     [els.timerRunningColor, "runningColor"]
   ]) {
-    input.addEventListener("change", () => {
-      pushHistory(`timer-${key}`);
+    input.addEventListener("pointerdown", () => beginContinuousHistory(`timer-${key}`));
+    input.addEventListener("input", () => {
       state.layout.timerText[key] = input.value;
       update();
-      scheduleObsApply("timerText", 120);
+      scheduleObsApply("timerText", 80);
     });
+    input.addEventListener("change", endContinuousHistory);
   }
   for (const [input, key] of [
     [els.timerStrokeWidth, "strokeWidth"],
@@ -623,12 +883,13 @@ function bindGlobalControls() {
     [els.timerStrokeColor, "strokeColor"],
     [els.timerShadowColor, "shadowColor"]
   ]) {
-    input.addEventListener("change", () => {
-      pushHistory(`timer-${key}`);
+    input.addEventListener("pointerdown", () => beginContinuousHistory(`timer-${key}`));
+    input.addEventListener("input", () => {
       state.layout.timerText[key] = input.value;
       update();
-      scheduleObsApply("timerText", 120);
+      scheduleObsApply("timerText", 80);
     });
+    input.addEventListener("change", endContinuousHistory);
   }
   for (const [input, key] of [
     [els.timerStrokeEnabled, "strokeEnabled"],
@@ -659,6 +920,12 @@ function bindGlobalControls() {
     state.layout.spotlight.showOthers = event.target.checked;
     update();
     scheduleObsApply("spotlight", 120);
+  });
+  els.spotlightDisableSmallNameplates.addEventListener("change", (event) => {
+    pushHistory("spotlight small nameplates");
+    state.layout.spotlight.disableSmallNameplates = event.target.checked;
+    update();
+    scheduleObsApply("spotlight-nameplates", 120);
   });
   els.spotlightSide.addEventListener("change", (event) => {
     pushHistory("spotlight side");
@@ -732,6 +999,7 @@ function bindGlobalControls() {
 
   bindGeometryInputs();
   bindNameplateControls();
+  bindFinishedTimeControls();
   bindBorderStyleControls();
   bindPreviewDragging();
   setActiveSettingsPanel("layout");
@@ -780,6 +1048,37 @@ function bindGlobalControls() {
   });
 }
 
+function bindApplicationMenus() {
+  const menus = Array.from(document.querySelectorAll(".menu"));
+  for (const menu of menus) {
+    const summary = menu.querySelector("summary");
+    summary.addEventListener("click", (event) => {
+      event.preventDefault();
+      const willOpen = !menu.open;
+      closeApplicationMenus();
+      menu.open = willOpen;
+    });
+
+    menu.addEventListener("click", (event) => {
+      if (event.target.closest("summary")) return;
+      if (event.target.closest("button, .menu-file-item")) {
+        window.setTimeout(closeApplicationMenus, 0);
+      }
+    });
+  }
+
+  document.addEventListener("pointerdown", (event) => {
+    if (event.target.closest(".menu-bar")) return;
+    closeApplicationMenus();
+  });
+}
+
+function closeApplicationMenus() {
+  for (const menu of document.querySelectorAll(".menu[open]")) {
+    menu.open = false;
+  }
+}
+
 function bindGeometryInputs() {
   const bindings = [
     [els.feedX, () => state.layout.panelGeometry.feed, "x", "geometry"],
@@ -790,6 +1089,14 @@ function bindGeometryInputs() {
     [els.nameY, () => state.layout.panelGeometry.name, "y", "geometry"],
     [els.nameW, () => state.layout.panelGeometry.name, "width", "geometry"],
     [els.nameH, () => state.layout.panelGeometry.name, "height", "geometry"],
+    [els.finishX, () => state.layout.panelGeometry.finish, "x", "finishGeometry"],
+    [els.finishY, () => state.layout.panelGeometry.finish, "y", "finishGeometry"],
+    [els.finishW, () => state.layout.panelGeometry.finish, "width", "finishGeometry"],
+    [els.finishH, () => state.layout.panelGeometry.finish, "height", "finishGeometry"],
+    [els.titleX, () => state.layout.raceInfo.rect, "x", "raceInfo"],
+    [els.titleY, () => state.layout.raceInfo.rect, "y", "raceInfo"],
+    [els.titleW, () => state.layout.raceInfo.rect, "width", "raceInfo"],
+    [els.titleH, () => state.layout.raceInfo.rect, "height", "raceInfo"],
     [els.timerX, () => state.layout.timerBorder, "x", "timerBorder"],
     [els.timerY, () => state.layout.timerBorder, "y", "timerBorder"],
     [els.timerW, () => state.layout.timerBorder, "width", "timerBorder"],
@@ -820,13 +1127,136 @@ function bindGeometryInputs() {
   for (const [input, key, reason] of [
     [els.feedVisible, "feed", "feed-visible"],
     [els.feedBorderVisible, "feedBorder", "feed-border-visible"],
-    [els.nameVisible, "name", "name-visible"]
+    [els.nameVisible, "name", "name-visible"],
+    [els.finishedTimeVisible, "finishedTime", "finish-visible"]
   ]) {
     input.addEventListener("change", () => {
       pushHistory(reason);
       state.layout.elements[key] = input.checked;
       update();
       scheduleObsApply(reason, 120);
+    });
+  }
+}
+
+function bindRaceInfoPlateControls() {
+  const numberBindings = [
+    [els.raceInfoPlateBackgroundOpacity, "plateBackgroundOpacity", null, ""],
+    [els.raceInfoPlateBorderOpacity, "plateBorderOpacity", null, ""],
+    [els.raceInfoPlateBorderWidth, "plateBorderWidth", null, ""],
+    [els.raceInfoPlateRadius, "plateRadius", null, ""],
+    [els.raceInfoPlatePaddingX, "platePaddingX", null, ""],
+    [els.raceInfoPlateGradientAngle, "plateGradientAngle", null, ""],
+    [els.raceInfoPlateGradientAngleSlider, "plateGradientAngle", null, ""],
+    [els.raceInfoPlateGradientAngleSpeed, "plateGradientAngleSpeed", els.raceInfoPlateGradientAngleSpeedValue, " deg/s"],
+    [els.raceInfoPlateTextureScale, "plateTextureScale", els.raceInfoPlateTextureScaleValue, "%"],
+    [els.raceInfoPlateTextureX, "plateTextureX", null, ""],
+    [els.raceInfoPlateTextureY, "plateTextureY", null, ""],
+    [els.raceInfoPlateTextureScrollX, "plateTextureScrollX", els.raceInfoPlateTextureScrollXValue, " px/s"],
+    [els.raceInfoPlateTextureScrollY, "plateTextureScrollY", els.raceInfoPlateTextureScrollYValue, " px/s"]
+  ];
+
+  els.raceInfoPlateMode.addEventListener("change", (event) => {
+    pushHistory("race info plate mode");
+    state.layout.raceInfo.plateMode = event.target.value;
+    syncRaceInfoControlsFromState();
+    update();
+    scheduleObsApply("raceInfo", 120);
+  });
+
+  els.raceInfoPlateFillMode.addEventListener("change", (event) => {
+    pushHistory("race info plate fill mode");
+    state.layout.raceInfo.plateFillMode = event.target.value;
+    syncRaceInfoControlsFromState();
+    update();
+    scheduleObsApply("raceInfo", 120);
+  });
+
+  els.raceInfoPlateAnimateGradientAngle.addEventListener("change", () => {
+    pushHistory("race info gradient animation");
+    state.layout.raceInfo.plateAnimateGradientAngle = els.raceInfoPlateAnimateGradientAngle.checked;
+    syncRaceInfoControlsFromState();
+    update();
+    scheduleObsApply("raceInfo", 120);
+  });
+
+  els.raceInfoPlateTextureImage.addEventListener("change", (event) => {
+    readImageFile(event.target.files?.[0], (dataUrl) => {
+      pushHistory("race info texture image");
+      state.layout.raceInfo.plateTextureImage = dataUrl;
+      state.layout.raceInfo.plateFillMode = "texture";
+      syncRaceInfoControlsFromState();
+      update();
+      scheduleObsApply("raceInfo", 250);
+    });
+    event.target.value = "";
+  });
+
+  els.clearRaceInfoPlateTextureImage.addEventListener("click", () => {
+    if (!state.layout.raceInfo.plateTextureImage) return;
+    pushHistory("clear race info texture image");
+    state.layout.raceInfo.plateTextureImage = "";
+    syncRaceInfoControlsFromState();
+    update();
+    scheduleObsApply("raceInfo", 120);
+  });
+
+  els.raceInfoPlateImage.addEventListener("change", (event) => {
+    readImageFile(event.target.files?.[0], (dataUrl) => {
+      pushHistory("race info plate image");
+      state.layout.raceInfo.plateImage = dataUrl;
+      state.layout.raceInfo.plateMode = "image";
+      syncRaceInfoControlsFromState();
+      update();
+      scheduleObsApply("raceInfo", 250);
+    });
+    event.target.value = "";
+  });
+
+  els.clearRaceInfoPlateImage.addEventListener("click", () => {
+    if (!state.layout.raceInfo.plateImage) return;
+    pushHistory("clear race info plate image");
+    state.layout.raceInfo.plateImage = "";
+    syncRaceInfoControlsFromState();
+    update();
+    scheduleObsApply("raceInfo", 120);
+  });
+
+  for (const [input, key, output, suffix] of numberBindings) {
+    input.addEventListener("focus", () => beginContinuousHistory(`race-info-${key}`));
+    input.addEventListener("change", endContinuousHistory);
+    input.addEventListener("input", () => {
+      state.layout.raceInfo[key] = Number(input.value);
+      if (output) output.textContent = `${state.layout.raceInfo[key]}${suffix}`;
+      update();
+      scheduleObsApply("raceInfo", 160);
+    });
+  }
+
+  for (const [input, key] of [
+    [els.raceInfoPlateBackgroundColor, "plateBackgroundColor"],
+    [els.raceInfoPlateGradientFrom, "plateGradientFrom"],
+    [els.raceInfoPlateGradientTo, "plateGradientTo"],
+    [els.raceInfoPlateBorderColor, "plateBorderColor"]
+  ]) {
+    input.addEventListener("pointerdown", () => beginContinuousHistory(`race-info-${key}`));
+    input.addEventListener("input", () => {
+      state.layout.raceInfo[key] = input.value;
+      update();
+      scheduleObsApply("raceInfo", 80);
+    });
+    input.addEventListener("change", endContinuousHistory);
+  }
+
+  for (const [input, key] of [
+    [els.raceInfoShowBox, "showBox"],
+    [els.raceInfoShowBorder, "showBorder"]
+  ]) {
+    input.addEventListener("change", () => {
+      pushHistory(`race-info-${key}`);
+      state.layout.raceInfo[key] = input.checked;
+      update();
+      scheduleObsApply("raceInfo", 120);
     });
   }
 }
@@ -843,6 +1273,14 @@ function bindNameplateControls() {
     [els.namePlateBorderWidth, "plateBorderWidth", null, ""],
     [els.namePlateRadius, "plateRadius", null, ""],
     [els.namePlatePaddingX, "platePaddingX", null, ""],
+    [els.namePlateGradientAngle, "plateGradientAngle", null, ""],
+    [els.namePlateGradientAngleSlider, "plateGradientAngle", null, ""],
+    [els.namePlateGradientAngleSpeed, "plateGradientAngleSpeed", els.namePlateGradientAngleSpeedValue, " deg/s"],
+    [els.namePlateTextureScale, "plateTextureScale", els.namePlateTextureScaleValue, "%"],
+    [els.namePlateTextureX, "plateTextureX", null, ""],
+    [els.namePlateTextureY, "plateTextureY", null, ""],
+    [els.namePlateTextureScrollX, "plateTextureScrollX", els.namePlateTextureScrollXValue, " px/s"],
+    [els.namePlateTextureScrollY, "plateTextureScrollY", els.namePlateTextureScrollYValue, " px/s"],
     [els.nameStrokeWidth, "strokeWidth", null, ""],
     [els.nameShadowBlur, "shadowBlur", null, ""],
     [els.nameShadowX, "shadowX", null, ""],
@@ -874,6 +1312,43 @@ function bindNameplateControls() {
     pushHistory("nameplate mode");
     state.layout.nameplate.plateMode = event.target.value;
     syncNameplateModeSections();
+    update();
+    scheduleObsApply("nameplate", 120);
+  });
+
+  els.namePlateFillMode.addEventListener("change", (event) => {
+    pushHistory("nameplate fill mode");
+    state.layout.nameplate.plateFillMode = event.target.value;
+    syncNameplateControlsFromState();
+    update();
+    scheduleObsApply("nameplate", 120);
+  });
+
+  els.namePlateAnimateGradientAngle.addEventListener("change", () => {
+    pushHistory("nameplate gradient animation");
+    state.layout.nameplate.plateAnimateGradientAngle = els.namePlateAnimateGradientAngle.checked;
+    syncNameplateControlsFromState();
+    update();
+    scheduleObsApply("nameplate", 120);
+  });
+
+  els.namePlateTextureImage.addEventListener("change", (event) => {
+    readImageFile(event.target.files?.[0], (dataUrl) => {
+      pushHistory("nameplate texture image");
+      state.layout.nameplate.plateTextureImage = dataUrl;
+      state.layout.nameplate.plateFillMode = "texture";
+      syncNameplateControlsFromState();
+      update();
+      scheduleObsApply("nameplate", 250);
+    });
+    event.target.value = "";
+  });
+
+  els.clearNamePlateTextureImage.addEventListener("click", () => {
+    if (!state.layout.nameplate.plateTextureImage) return;
+    pushHistory("clear nameplate texture image");
+    state.layout.nameplate.plateTextureImage = "";
+    syncNameplateControlsFromState();
     update();
     scheduleObsApply("nameplate", 120);
   });
@@ -913,16 +1388,19 @@ function bindNameplateControls() {
   for (const [input, key] of [
     [els.nameTextColor, "textColor"],
     [els.namePlateBackgroundColor, "plateBackgroundColor"],
+    [els.namePlateGradientFrom, "plateGradientFrom"],
+    [els.namePlateGradientTo, "plateGradientTo"],
     [els.namePlateBorderColor, "plateBorderColor"],
     [els.nameStrokeColor, "strokeColor"],
     [els.nameShadowColor, "shadowColor"]
   ]) {
-    input.addEventListener("change", () => {
-      pushHistory(`nameplate-${key}`);
+    input.addEventListener("pointerdown", () => beginContinuousHistory(`nameplate-${key}`));
+    input.addEventListener("input", () => {
       state.layout.nameplate[key] = input.value;
       update();
-      scheduleObsApply("nameplate", 120);
+      scheduleObsApply("nameplate", 80);
     });
+    input.addEventListener("change", endContinuousHistory);
   }
 
   for (const [input, key] of [
@@ -940,6 +1418,80 @@ function bindNameplateControls() {
   }
 }
 
+function bindFinishedTimeControls() {
+  els.finishFont.addEventListener("change", (event) => {
+    pushHistory("finish font");
+    state.layout.finishedTime.fontFamily = event.target.value;
+    update();
+    scheduleObsApply("finish", 120);
+  });
+  els.finishFont.addEventListener("input", (event) => {
+    state.layout.finishedTime.fontFamily = event.target.value;
+    update();
+    scheduleObsApply("finish", 240);
+  });
+  els.finishFontBrowser.addEventListener("change", (event) => {
+    if (!event.target.value) return;
+    pushHistory("finish font");
+    state.layout.finishedTime.fontFamily = event.target.value;
+    syncFinishedTimeControlsFromState();
+    update();
+    scheduleObsApply("finish", 120);
+  });
+  els.finishBrowseFonts.addEventListener("click", browseInstalledFonts);
+
+  for (const [input, key, output, suffix] of [
+    [els.finishFontSize, "fontSize", els.finishFontSizeValue, " px"],
+    [els.finishStrokeWidth, "strokeWidth", null, ""],
+    [els.finishShadowBlur, "shadowBlur", null, ""],
+    [els.finishShadowX, "shadowX", null, ""],
+    [els.finishShadowY, "shadowY", null, ""]
+  ]) {
+    input.addEventListener("focus", () => beginContinuousHistory(`finish-${key}`));
+    input.addEventListener("change", endContinuousHistory);
+    input.addEventListener("input", () => {
+      state.layout.finishedTime[key] = Number(input.value);
+      if (output) output.textContent = `${state.layout.finishedTime[key]}${suffix}`;
+      update();
+      scheduleObsApply("finish", 120);
+    });
+  }
+
+  for (const [input, key] of [
+    [els.finishColor, "color"],
+    [els.finishStrokeColor, "strokeColor"],
+    [els.finishShadowColor, "shadowColor"]
+  ]) {
+    input.addEventListener("pointerdown", () => beginContinuousHistory(`finish-${key}`));
+    input.addEventListener("input", () => {
+      state.layout.finishedTime[key] = input.value;
+      update();
+      scheduleObsApply("finish", 80);
+    });
+    input.addEventListener("change", endContinuousHistory);
+  }
+
+  for (const [input, key] of [
+    [els.finishLockToNameplate, "lockToNameplate"],
+    [els.finishStrokeEnabled, "strokeEnabled"],
+    [els.finishShadowEnabled, "shadowEnabled"]
+  ]) {
+    input.addEventListener("change", () => {
+      pushHistory(`finish-${key}`);
+      state.layout.finishedTime[key] = input.checked;
+      update();
+      scheduleObsApply("finish", 120);
+    });
+  }
+
+  els.finishAlign.addEventListener("change", () => {
+    pushHistory("finish align");
+    state.layout.finishedTime.align = els.finishAlign.value;
+    update();
+    scheduleObsApply("finish", 120);
+  });
+}
+
 function bindBorderStyleControls() {
   const colorBindings = [
     [els.borderLineColor, "lineColor"],
@@ -955,7 +1507,9 @@ function bindBorderStyleControls() {
     [els.borderRadius, "radius"],
     [els.borderTextureScale, "textureScale"],
     [els.borderTextureX, "textureX"],
-    [els.borderTextureY, "textureY"]
+    [els.borderTextureY, "textureY"],
+    [els.borderTextureScrollX, "textureScrollX"],
+    [els.borderTextureScrollY, "textureScrollY"]
   ];
 
   els.borderTarget.addEventListener("change", () => {
@@ -1019,16 +1573,17 @@ function bindBorderStyleControls() {
   });
 
   for (const [input, key] of colorBindings) {
-    input.addEventListener("change", () => {
-      pushHistory(`border-${key}`);
+    input.addEventListener("pointerdown", () => beginContinuousHistory(`border-${key}`));
+    input.addEventListener("input", () => {
       getEditingBorderStyle()[key] = input.value;
       state.layout.borderPreset = "custom";
       setEditingBorderImage("");
       state.layout.borderModeSource = "generated";
       syncBorderStyleControlsFromState();
       update();
-      scheduleObsApply("border", 120);
+      scheduleObsApply("border", 80);
     });
+    input.addEventListener("change", endContinuousHistory);
   }
 
   for (const [input, key] of numberBindings) {
@@ -1055,6 +1610,7 @@ function bindPreviewDragging() {
   });
 
   els.stage.addEventListener("pointerdown", (event) => {
+    if (state.layout.layerLock || state.layout.viewMode === "control") return;
     const handle = event.target.closest("[data-resize-handle]");
     const target = handle
       ? handle.closest("[data-drag-target]")
@@ -1064,9 +1620,10 @@ function bindPreviewDragging() {
     const kind = handle?.dataset.resizeHandle || target.dataset.dragTarget;
     setSelectedDragTarget(kind);
     const textDrag = kind === "nameText";
-    const rect = textDrag ? getNameTextDragRect() : getDragRect(kind);
+    const rect = textDrag ? getNameTextDragRect() : getDragRect(kind, target);
     const container = getDragContainer(kind, target);
     const sourceSize = textDrag ? getNameTextDragSourceSize(target) : null;
+    const textBounds = textDrag ? getNameTextDragBounds(target) : null;
 
     drag = {
       kind,
@@ -1075,6 +1632,7 @@ function bindPreviewDragging() {
       startY: event.clientY,
       container,
       sourceSize,
+      textBounds,
       original: { ...rect },
       current: { ...rect },
       mode: textDrag ? "moveText" : handle ? "resize" : "move"
@@ -1096,6 +1654,7 @@ function bindPreviewDragging() {
         textX: clampNumber(drag.original.textX + (event.clientX - drag.startX) * scaleX, -500, 500, drag.original.textX),
         textY: clampNumber(drag.original.textY + (event.clientY - drag.startY) * scaleY, -200, 200, drag.original.textY)
       };
+      applySnapToNameText(drag, event);
       paintDragPreview(drag.kind, drag.current);
       return;
     }
@@ -1116,6 +1675,10 @@ function bindPreviewDragging() {
       };
     }
     normalizeGeometryRect(drag.current);
+    applySnapToDragRect(drag, event);
+    if (drag.kind === "finish" && state.layout.finishedTime.lockToNameplate) {
+      normalizeFinishInsideNameplate(drag.current);
+    }
     paintDragPreview(drag.kind, drag.current);
   });
 
@@ -1132,19 +1695,33 @@ function bindPreviewDragging() {
 
   function endPreviewDrag(event) {
     if (!drag || event.pointerId !== drag.pointerId) return;
+    hideSnapGuides();
     const target = els.stage.querySelector(".dragging");
     target?.classList.remove("dragging");
     if (drag.kind === "nameText") {
       state.layout.nameplate.textX = round(drag.current.textX);
       state.layout.nameplate.textY = round(drag.current.textY);
       syncNameplateControlsFromState();
+    } else if (drag.kind === "finish") {
+      Object.assign(state.layout.panelGeometry.finish, storedFinishGeometry(drag.current));
     } else {
       Object.assign(getDragRect(drag.kind), drag.current);
     }
+    const reason = drag.kind === "nameText"
+      ? "nameplate"
+      : drag.kind === "finish"
+        ? "finishGeometry"
+        : drag.kind === "timer"
+          ? "timerBorder"
+          : drag.kind === "title"
+            ? "raceInfo"
+          : drag.kind === "name"
+            ? "geometry"
+            : "drag-end";
     drag = null;
     endContinuousHistory();
     update();
-    scheduleObsApply("drag-end", 0);
+    scheduleObsApply(reason, 0);
   }
 }
 
@@ -1159,7 +1736,7 @@ function focusRunnerName(slot) {
 }
 
 function getDragContainer(kind, target) {
-  if (kind === "timer") return els.stage.getBoundingClientRect();
+  if (kind === "timer" || kind === "title") return els.stage.getBoundingClientRect();
   if (kind === "nameText") return target.closest(".runner-nameplate").getBoundingClientRect();
   return target.closest(".runner-panel").getBoundingClientRect();
 }
@@ -1177,9 +1754,49 @@ function getNameTextDragSourceSize(target) {
   return nameSourceSize(getCurrentRectBySlot().get(slot));
 }
 
-function getDragRect(kind) {
+function getNameTextDragBounds(target) {
+  const plate = target.closest(".runner-nameplate");
+  const visual = plate?.querySelector(".name-visual-text");
+  const sourceSize = getNameTextDragSourceSize(target);
+  if (visual?.getBBox) {
+    try {
+      const box = visual.getBBox();
+      return {
+        x: box.x,
+        y: box.y,
+        width: box.width,
+        height: box.height,
+        sourceWidth: sourceSize.width,
+        sourceHeight: sourceSize.height
+      };
+    } catch {
+      // Fall back to DOM bounds below if SVG layout is not ready.
+    }
+  }
+
+  const plateBox = plate.getBoundingClientRect();
+  const targetBox = target.getBoundingClientRect();
+  const scaleX = sourceSize.width / Math.max(1, plateBox.width);
+  const scaleY = sourceSize.height / Math.max(1, plateBox.height);
+  return {
+    x: (targetBox.left - plateBox.left) * scaleX,
+    y: (targetBox.top - plateBox.top) * scaleY,
+    width: targetBox.width * scaleX,
+    height: targetBox.height * scaleY,
+    sourceWidth: sourceSize.width,
+    sourceHeight: sourceSize.height
+  };
+}
+
+function getDragRect(kind, target = null) {
   if (kind === "feed") return state.layout.panelGeometry.feed;
   if (kind === "name") return state.layout.panelGeometry.name;
+  if (kind === "title") return state.layout.raceInfo.rect;
+  if (kind === "finish") {
+    const slot = Number(target?.closest(".runner-panel")?.dataset.slot);
+    const runner = state.runners.find((candidate) => candidate.slot === slot);
+    return finishGeometry(runner, getCurrentRectBySlot().get(slot));
+  }
   return state.layout.timerBorder;
 }
 
@@ -1197,10 +1814,127 @@ function normalizeGeometryRect(rect) {
   rect.y = Math.max(0, Math.min(1 - rect.height, Number(rect.y)));
 }
 
+function applySnapToDragRect(drag, event) {
+  hideSnapGuides();
+  if (!state.layout.snapEnabled || event.altKey || drag.kind === "finish" && state.layout.finishedTime.lockToNameplate) return;
+  const thresholdX = 8 / Math.max(1, drag.container.width);
+  const thresholdY = 8 / Math.max(1, drag.container.height);
+  const snapX = snapAxis(drag.current, "x", "width", thresholdX);
+  const snapY = snapAxis(drag.current, "y", "height", thresholdY);
+  normalizeGeometryRect(drag.current);
+  showSnapGuidesForContainer(drag.container, snapX, snapY);
+}
+
+function applySnapToNameText(drag, event) {
+  hideSnapGuides();
+  if (!state.layout.snapEnabled || event.altKey || !drag.textBounds) return;
+  const bounds = drag.textBounds;
+  const thresholdX = 8 * bounds.sourceWidth / Math.max(1, drag.container.width);
+  const thresholdY = 8 * bounds.sourceHeight / Math.max(1, drag.container.height);
+  const delta = {
+    x: drag.current.textX - drag.original.textX,
+    y: drag.current.textY - drag.original.textY,
+    width: bounds.width,
+    height: bounds.height
+  };
+  const rect = {
+    x: bounds.x + delta.x,
+    y: bounds.y + delta.y,
+    width: bounds.width,
+    height: bounds.height
+  };
+  const snapX = snapTextAxis(rect, "x", "width", bounds.sourceWidth, thresholdX);
+  const snapY = snapTextAxis(rect, "y", "height", bounds.sourceHeight, thresholdY);
+  if (snapX !== null) drag.current.textX += snapX - rect.x;
+  if (snapY !== null) drag.current.textY += snapY - rect.y;
+
+  const guideX = snapX === null ? null : snapX / bounds.sourceWidth;
+  const guideY = snapY === null ? null : snapY / bounds.sourceHeight;
+  showSnapGuidesForContainer(drag.container, guideX, guideY);
+}
+
+function snapTextAxis(rect, positionKey, sizeKey, sourceSize, threshold) {
+  const start = rect[positionKey];
+  const size = rect[sizeKey];
+  const center = start + size / 2;
+  const end = start + size;
+  const targets = [0, sourceSize / 2, sourceSize];
+  for (const target of targets) {
+    if (Math.abs(start - target) <= threshold) return target;
+    if (Math.abs(center - target) <= threshold) return target - size / 2;
+    if (Math.abs(end - target) <= threshold) return target - size;
+  }
+  return null;
+}
+
+function snapAxis(rect, positionKey, sizeKey, threshold) {
+  const start = rect[positionKey];
+  const size = rect[sizeKey];
+  const center = start + size / 2;
+  const end = start + size;
+  const targets = [0, 0.5, 1];
+  for (const target of targets) {
+    if (Math.abs(start - target) <= threshold) {
+      rect[positionKey] = target;
+      return target;
+    }
+    if (Math.abs(center - target) <= threshold) {
+      rect[positionKey] = target - size / 2;
+      return target;
+    }
+    if (Math.abs(end - target) <= threshold) {
+      rect[positionKey] = target - size;
+      return target;
+    }
+  }
+  return null;
+}
+
+function showSnapGuides(x = null, y = null) {
+  if (x !== null && Number.isFinite(x)) {
+    els.snapGuideV.style.left = `${x * 100}%`;
+    els.snapGuideV.classList.add("active");
+  } else {
+    els.snapGuideV.classList.remove("active");
+  }
+
+  if (y !== null && Number.isFinite(y)) {
+    els.snapGuideH.style.top = `${y * 100}%`;
+    els.snapGuideH.classList.add("active");
+  } else {
+    els.snapGuideH.classList.remove("active");
+  }
+}
+
+function showSnapGuidesForContainer(container, x = null, y = null) {
+  const stage = els.stage.getBoundingClientRect();
+  const normalizedX = x === null ? null : (container.left - stage.left + container.width * x) / Math.max(1, stage.width);
+  const normalizedY = y === null ? null : (container.top - stage.top + container.height * y) / Math.max(1, stage.height);
+  showSnapGuides(normalizedX, normalizedY);
+}
+
+function hideSnapGuides() {
+  els.snapGuideV?.classList.remove("active");
+  els.snapGuideH?.classList.remove("active");
+}
+
 function paintDragPreview(kind, rect) {
   if (kind === "nameText") {
+    const currentX = Number(state.layout.nameplate.textX) || 0;
+    const currentY = Number(state.layout.nameplate.textY) || 0;
+    const deltaX = round(rect.textX - currentX);
+    const deltaY = round(rect.textY - currentY);
     for (const content of els.runnerLayer.querySelectorAll(".name-content")) {
-      content.style.transform = `translate(${round(rect.textX)}px, ${round(rect.textY)}px)`;
+      content.style.transform = nameTextIsUnframed()
+        ? `translate(${round(rect.textX)}px, calc(-50% + ${round(rect.textY)}px))`
+        : `translate(${round(rect.textX)}px, ${round(rect.textY)}px)`;
+    }
+    for (const text of els.runnerLayer.querySelectorAll(".name-visual-text")) {
+      const svg = text.closest("svg");
+      const [, , width, height] = String(svg?.getAttribute("viewBox") || "0 0 0 0").split(/\s+/).map(Number);
+      const anchor = nameTextAnchor({ width: width || 1, height: height || 1 });
+      text.setAttribute("x", round(anchor.x + deltaX));
+      text.setAttribute("y", round(anchor.y + deltaY));
     }
     if (document.activeElement !== els.nameTextX) els.nameTextX.value = round(rect.textX);
     if (document.activeElement !== els.nameTextY) els.nameTextY.value = round(rect.textY);
@@ -1209,10 +1943,16 @@ function paintDragPreview(kind, rect) {
 
   if (kind === "timer") {
     applyNormalizedStyle(els.timerBorder, rect);
+    applyNormalizedStyle(els.timerTextPreview, rect);
     return;
   }
 
-  const selector = kind === "feed" ? ".game-viewport" : ".runner-nameplate";
+  if (kind === "title") {
+    applyNormalizedStyle(els.titleBarPreview, rect);
+    return;
+  }
+
+  const selector = kind === "feed" ? ".game-viewport" : kind === "finish" ? ".runner-finished-time" : ".runner-nameplate";
   for (const element of els.runnerLayer.querySelectorAll(selector)) {
     applyNormalizedStyle(element, rect);
   }
@@ -1290,6 +2030,11 @@ function handleHotkeys(event) {
   const key = event.key.toLowerCase();
   const typing = isTypingTarget(event.target);
 
+  if (event.key === "Escape") {
+    closeApplicationMenus();
+    return;
+  }
+
   if ((event.ctrlKey || event.metaKey) && key === "z" && !event.shiftKey) {
     event.preventDefault();
     undo();
@@ -1335,7 +2080,80 @@ function handleSettingsTabClick(event) {
   setActiveSettingsPanel(button.dataset.settingsTarget);
 }
 
+function setViewMode(mode) {
+  const nextMode = mode === "control" ? "control" : "edit";
+  if (state.layout.viewMode === nextMode) return;
+  pushHistory("view mode");
+  state.layout.viewMode = nextMode;
+  if (nextMode === "control") state.layout.layerLock = true;
+  else state.layout.layerLock = false;
+  syncGlobalControlsFromState();
+  update();
+}
+
+function renderControlMode() {
+  if (!els.controlRunnerList) return;
+  els.controlTimerReadout.textContent = formatTimerDisplay(currentTimerElapsedMs());
+  els.controlRunnerList.innerHTML = "";
+  const template = document.getElementById("controlRunnerTemplate");
+  for (const runner of state.runners) {
+    const node = template.content.firstElementChild.cloneNode(true);
+    node.dataset.slot = String(runner.slot);
+    node.classList.toggle("inactive", !runner.active);
+    node.classList.toggle("runner-done", Boolean(runner.done));
+    node.querySelector("[data-role='name']").textContent = `P${runner.placement} - ${runner.name}`;
+    node.querySelector("[data-role='status']").textContent = controlRunnerStatus(runner);
+    node.querySelector("[data-action='toggleActive']").textContent = runner.active ? "Hide" : "Show";
+    node.querySelector("[data-action='markDone']").textContent = runner.done ? "Update Finish" : "Finish";
+    node.querySelector("[data-action='toggleMute']").textContent = runner.audioMuted ? "Unmute" : "Mute";
+    els.controlRunnerList.appendChild(node);
+  }
+}
+
+function controlRunnerStatus(runner) {
+  const parts = [];
+  parts.push(runner.active ? "Visible" : "Hidden");
+  if (runner.done) parts.push(formatRunnerFinalTime(runner) || "Finished");
+  if (runner.audioMuted) parts.push("Muted");
+  if (runner.feedMode && runner.feedMode !== "live") parts.push(feedModeLabel(runner.feedMode));
+  return parts.join(" / ");
+}
+
+function handleControlRunnerAction(event) {
+  const button = event.target.closest("[data-action]");
+  if (!button) return;
+  const slot = Number(button.closest(".control-runner-card")?.dataset.slot);
+  const runner = state.runners.find((candidate) => candidate.slot === slot);
+  if (!runner) return;
+
+  if (button.dataset.action === "toggleActive") {
+    pushHistory("control runner active");
+    runner.active = !runner.active;
+    renderRunnerControls();
+    update();
+    scheduleObsApply("active", 80);
+  } else if (button.dataset.action === "markDone") {
+    markRunnerDone(runner);
+  } else if (button.dataset.action === "spotlight") {
+    pushHistory("control spotlight");
+    state.layout.spotlight.enabled = true;
+    state.layout.spotlight.slots = String(runner.slot);
+    syncGlobalControlsFromState();
+    update();
+    scheduleObsApply("spotlight", 80);
+  } else if (button.dataset.action === "toggleMute") {
+    pushHistory("control mute");
+    runner.audioMuted = !runner.audioMuted;
+    renderRunnerControls();
+    update();
+    scheduleObsApply("audio", 80);
+  }
+}
+
 function setActiveSettingsPanel(target) {
+  const previousPanel = selection.activePanel;
+  const changed = previousPanel !== target;
+  selection.activePanel = target;
   for (const button of els.settingsTabs.querySelectorAll("[data-settings-target]")) {
     button.classList.toggle("active", button.dataset.settingsTarget === target);
   }
@@ -1344,6 +2162,10 @@ function setActiveSettingsPanel(target) {
     const active = panel.dataset.settingsPanel === target;
     panel.classList.toggle("active", active);
     panel.open = active;
+  }
+
+  if (changed && (target === "finishedTime" || previousPanel === "finishedTime")) {
+    update();
   }
 }
 
@@ -1390,6 +2212,10 @@ function renderRunnerControls() {
     setInputValue(node, "active", runner.active);
     setInputValue(node, "name", runner.name);
     setInputValue(node, "source", runner.source);
+    setInputValue(node, "feedMode", runner.feedMode || "live");
+    setInputValue(node, "finalTimeText", runner.finalTimeText || formatRunnerFinalTime(runner));
+    setInputValue(node, "audioMuted", runner.audioMuted);
+    setInputValue(node, "audioVolume", runner.audioVolume);
     setInputValue(node, "cropLeft", runner.crop.left);
     setInputValue(node, "cropTop", runner.crop.top);
     setInputValue(node, "cropRight", runner.crop.right);
@@ -1397,6 +2223,7 @@ function renderRunnerControls() {
     syncCropOutputs(node, runner);
     syncFeedStatus(node, runner);
     syncRunnerFinishButtons(node, runner);
+    syncRunnerAudioControls(node, runner);
 
     node.addEventListener("input", (event) => handleRunnerInput(event, runner, node));
     node.addEventListener("change", (event) => handleRunnerInput(event, runner, node));
@@ -1419,8 +2246,15 @@ function populateSetupPreviewSlotOptions() {
 function syncRunnerFinishButtons(node, runner) {
   const doneButton = node.querySelector("[data-action='markDone']");
   const resetButton = node.querySelector("[data-action='resetDone']");
-  if (doneButton) doneButton.textContent = runner.done ? `Done: ${formatTimerDisplay(runner.finalTimeMs ?? 0)}` : "Done";
+  const finishEdit = node.querySelector("[data-role='finishEdit']");
+  if (doneButton) doneButton.textContent = runner.done ? "Update Finish To Current" : "Mark as Finished";
   if (resetButton) resetButton.hidden = !runner.done;
+  if (finishEdit) finishEdit.hidden = !runner.done;
+}
+
+function syncRunnerAudioControls(node, runner) {
+  const output = node.querySelector("[data-role='audioVolumeValue']");
+  if (output) output.textContent = `${Math.round(Number(runner.audioVolume) || 0)}%`;
 }
 
 function renderStagePanels() {
@@ -1439,6 +2273,10 @@ function renderStagePanels() {
         <div class="runner-nameplate drag-target" data-drag-target="name" title="Drag to move nameplate">
           <span class="resize-handle" data-resize-handle="name" aria-hidden="true"></span>
         </div>
+        <div class="runner-finished-time drag-target" data-drag-target="finish" title="Drag to move finished time">
+          <span class="finish-preview-frame"></span>
+          <span class="resize-handle" data-resize-handle="finish" aria-hidden="true"></span>
+        </div>
       </div>
     `;
     els.runnerLayer.appendChild(panel);
@@ -1452,10 +2290,24 @@ function handleRunnerInput(event, runner, node) {
   if (field === "active") {
     pushHistory("runner active");
     runner.active = event.target.checked;
-  } else if (field === "name" || field === "source") {
+  } else if (field === "name" || field === "source" || field === "finalTimeText") {
     beginContinuousHistory(`runner-${runner.slot}-${field}`);
     runner[field] = event.target.value;
     syncFeedStatus(node, runner);
+  } else if (field === "feedMode") {
+    pushHistory(`runner-${runner.slot}-feed-mode`);
+    runner.feedMode = event.target.value;
+    syncFeedStatus(node, runner);
+  } else if (field === "audioMuted") {
+    pushHistory("runner audio mute");
+    runner.audioMuted = event.target.checked;
+    syncRunnerAudioControls(node, runner);
+    scheduleObsApply("audio", 80);
+  } else if (field === "audioVolume") {
+    beginContinuousHistory(`runner-${runner.slot}-audioVolume`);
+    runner.audioVolume = clampNumber(event.target.value, 0, 200, 100);
+    syncRunnerAudioControls(node, runner);
+    scheduleObsApply("audio", 80);
   } else if (field.startsWith("crop")) {
     beginContinuousHistory(`runner-${runner.slot}-${field}`);
     const cropKey = field.replace("crop", "").toLowerCase();
@@ -1465,7 +2317,7 @@ function handleRunnerInput(event, runner, node) {
   }
 
   update();
-  scheduleObsApply(field, field.startsWith("crop") ? 80 : 250);
+  scheduleObsApply(field === "finalTimeText" ? "finish" : field, field.startsWith("crop") ? 80 : 250);
 }
 
 function handleRunnerAction(event, runner, node) {
@@ -1498,18 +2350,61 @@ function markRunnerDone(runner) {
   pushHistory("runner done");
   runner.done = true;
   runner.finalTimeMs = currentTimerElapsedMs();
+  runner.finalTimeText = formatTimerDisplay(runner.finalTimeMs);
   renderRunnerControls();
   update();
-  scheduleObsApply("nameplate", 120);
+  scheduleObsApply("finish", 80);
 }
 
 function resetRunnerDone(runner) {
   pushHistory("runner finish reset");
   runner.done = false;
   runner.finalTimeMs = null;
+  runner.finalTimeText = "";
   renderRunnerControls();
   update();
-  scheduleObsApply("nameplate", 120);
+  scheduleObsApply("finish", 80);
+}
+
+function resetAllFinishes() {
+  if (!state.runners.some((runner) => runner.done || runner.finalTimeText)) return;
+  pushHistory("reset all finishes");
+  for (const runner of state.runners) {
+    runner.done = false;
+    runner.finalTimeMs = null;
+    runner.finalTimeText = "";
+  }
+  renderRunnerControls();
+  update();
+  scheduleObsApply("finish", 80);
+}
+
+function formatRunnerFinalTime(runner) {
+  if (runner.finalTimeText) return runner.finalTimeText;
+  if (runner.finalTimeMs !== null && runner.finalTimeMs !== undefined) return formatTimerDisplay(runner.finalTimeMs);
+  return "";
+}
+
+function hasRealRunnerFinalTime(runner) {
+  return Boolean(runner.done || runner.finalTimeText || runner.finalTimeMs !== null && runner.finalTimeMs !== undefined);
+}
+
+function isFinishedTimePreviewMode() {
+  return selection.activePanel === "finishedTime";
+}
+
+function displayRunnerFinalTime(runner, allowExample = false) {
+  const real = formatRunnerFinalTime(runner);
+  if (real) return real;
+  if (hasRealRunnerFinalTime(runner)) return "";
+  if (!allowExample || !isFinishedTimePreviewMode()) return "";
+  return exampleFinishedTime(runner.slot);
+}
+
+function exampleFinishedTime(slot) {
+  const baseMs = 12 * 60 * 1000 + 34 * 1000 + 560;
+  const offsetMs = (Math.max(1, Number(slot) || 1) - 1) * 47 * 1000;
+  return formatTimerDisplay(baseMs + offsetMs);
 }
 
 function readImageFile(file, onLoad) {
@@ -1523,7 +2418,7 @@ async function connectObs() {
   try {
     const host = els.obsHost.value.trim() || "localhost";
     const port = Number(els.obsPort.value) || 4455;
-    obsBridge.sceneName = els.obsSceneName.value.trim() || "ORM__RaceMaster";
+    obsBridge.sceneName = els.obsSceneName.value.trim() || "ORM__Default";
     setObsUiBusy(true);
     logObs(`Connecting to OBS on ${host}:${port}...`);
     obsBridge.client = new ObsWebSocketClient();
@@ -1555,15 +2450,18 @@ async function createOrRepairObsScene() {
 
   try {
     setObsUiBusy(true);
-    obsBridge.sceneName = els.obsSceneName.value.trim() || "ORM__RaceMaster";
+    obsBridge.sceneName = els.obsSceneName.value.trim() || "ORM__Default";
     logObs(`Creating or repairing ${obsBridge.sceneName}...`);
     await ensureScene(obsBridge.sceneName);
     await cleanupManagedInputs({ keepScene: true });
     obsBridge.itemIds.clear();
     obsBridge.lastRects.clear();
     obsBridge.lastVisibility.clear();
+    obsBridge.lastSceneItemEnabled.clear();
 
     await createBrowserInput("Background", obsBridge.sceneName, htmlDataUrl(buildBackgroundHtml()), STAGE.width, STAGE.height, true);
+    const titleSize = titleBarSourceSize();
+    await createBrowserInput("TitleBar", obsBridge.sceneName, htmlDataUrl(buildTitleBarHtml()), titleSize.width, titleSize.height, state.layout.elements.titleBar);
     await createBrowserInput("TimerBorder", obsBridge.sceneName, htmlDataUrl(buildTimerBorderHtml()), STAGE.width, STAGE.height, state.layout.timerBorder.enabled);
     const timerTextSize = timerTextSourceSize();
     await createBrowserInput("TimerText", obsBridge.sceneName, htmlDataUrl(buildTimerTextHtml()), timerTextSize.width, timerTextSize.height, state.layout.elements.builtInTimer);
@@ -1594,9 +2492,7 @@ async function applyLayoutToObs(options = {}) {
     const animate = (options.forceAnimate || shouldAnimateObsLayout(options.reason)) && obsBridge.animateLayout;
     const rectBySlot = getCurrentRectBySlot();
     if (refreshInputs) {
-      await setInputUrl("Background", htmlDataUrl(buildBackgroundHtml()));
-      await setInputUrl("TimerBorder", htmlDataUrl(buildTimerBorderHtml()));
-      await updateTimerTextInput();
+      await updateInputsForReason(options.reason, rectBySlot);
     }
 
     await ensureManagedGlobalSources();
@@ -1606,17 +2502,15 @@ async function applyLayoutToObs(options = {}) {
       boundsWidth: STAGE.width,
       boundsHeight: STAGE.height
     });
+    await setSceneItemEnabled("TitleBar", state.layout.elements.titleBar);
+    await setSceneItemTransform("TitleBar", absoluteRect(state.layout.raceInfo.rect));
     await setSceneItemEnabled("TimerBorder", state.layout.timerBorder.enabled && state.layout.elements.timerBorder);
     await setSceneItemTransform("TimerBorder", absoluteRect(state.layout.timerBorder));
     await setSceneItemEnabled("TimerText", state.layout.elements.builtInTimer);
-    await setSceneItemTransform("TimerText", absoluteRect(state.layout.timerBorder), null, { boundsType: "OBS_BOUNDS_SCALE_INNER" });
+    await setSceneItemTransform("TimerText", timerTextTransformRect());
     await ensureManagedRunnerSources();
     await ensureRunnerItemIds();
     await enforceSceneLayerOrder();
-
-    for (const runner of state.runners) {
-      if (refreshInputs) await updateRunnerInputs(runner, rectBySlot.get(runner.slot));
-    }
 
     if (animate) {
       await animateRunnerLayout(rectBySlot);
@@ -1632,12 +2526,54 @@ async function applyLayoutToObs(options = {}) {
   }
 }
 
+async function updateInputsForReason(reason = "", rectBySlot = getCurrentRectBySlot()) {
+  const manual = !reason || ["manual-layout", "project-load", "undo", "redo", "pending"].includes(reason);
+  if (manual || ["background"].includes(reason)) {
+    await setInputUrl("Background", htmlDataUrl(buildBackgroundHtml()));
+  }
+  if (manual || ["raceInfo", "border", "border-image"].includes(reason)) {
+    await updateTitleBarInput();
+  }
+  if (manual || ["border", "border-image", "timerBorder"].includes(reason)) {
+    await setInputUrl("TimerBorder", htmlDataUrl(buildTimerBorderHtml()));
+  }
+  if (manual || ["timerText", "timerBorder", "geometry"].includes(reason)) {
+    await updateTimerTextInput();
+  }
+
+  for (const runner of state.runners) {
+    if (manual || ["source", "feedMode", "vdo-clean", "feedWidth", "feedHeight"].includes(reason)) {
+      await updateRunnerFeedInput(runner);
+    }
+    if (manual || ["border", "border-image"].includes(reason)) {
+      await setInputUrl(runnerPart(runner.slot, "Border"), htmlDataUrl(buildBorderHtml()));
+    }
+    if (manual || ["name", "nameplate", "nameplate-image", "geometry", "spotlight", "spotlight-nameplates"].includes(reason)) {
+      await updateRunnerNameInput(runner, rectBySlot.get(runner.slot));
+    }
+    if (manual || ["finish", "finishGeometry", "geometry", "spotlight"].includes(reason)) {
+      await updateRunnerFinishInput(runner, rectBySlot.get(runner.slot));
+    }
+    if (manual || reason === "audio") {
+      await updateRunnerAudio(runner);
+    }
+  }
+}
+
 async function applyRunnerLayoutImmediate(rectBySlot) {
   for (const runner of state.runners) {
     const rect = rectBySlot.get(runner.slot) ?? hiddenRect();
-    await setRunnerVisible(runner.slot, runner.active);
+    const visible = rectBySlot.has(runner.slot);
+    if (!visible && isSpotlightHiddenActiveRunner(runner)) {
+      const parked = offscreenRect();
+      await setRunnerSpotlightHidden(runner.slot);
+      await setRunnerTransforms(runner, parked, obsBridge.opacitySupported ? 0 : null);
+      rememberObsRunnerState(runner.slot, parked, false);
+      continue;
+    }
+    await setRunnerVisible(runner.slot, visible);
     await setRunnerTransforms(runner, rect, 1);
-    rememberObsRunnerState(runner.slot, rect, runner.active);
+    rememberObsRunnerState(runner.slot, rect, visible);
   }
 }
 
@@ -1653,13 +2589,21 @@ async function animateRunnerLayout(rectBySlot) {
     return {
       runner,
       wasVisible,
-      willBeVisible: runner.active,
+      willBeVisible: rectBySlot.has(runner.slot),
       from,
       to
     };
   });
 
   for (const plan of plans) {
+    if (!plan.willBeVisible && isSpotlightHiddenActiveRunner(plan.runner)) {
+      const parked = offscreenRect();
+      await setRunnerSpotlightHidden(plan.runner.slot);
+      await setRunnerTransforms(plan.runner, parked, obsBridge.opacitySupported ? 0 : null);
+      rememberObsRunnerState(plan.runner.slot, parked, false);
+      plan.skipAnimation = true;
+      continue;
+    }
     if (plan.wasVisible || plan.willBeVisible) {
       await setRunnerVisible(plan.runner.slot, true);
       if (!plan.wasVisible && plan.willBeVisible) {
@@ -1672,7 +2616,7 @@ async function animateRunnerLayout(rectBySlot) {
     const t = easeOutCubic(frame / frames);
     const requests = [];
     for (const plan of plans) {
-      if (!plan.wasVisible && !plan.willBeVisible) continue;
+      if (plan.skipAnimation || (!plan.wasVisible && !plan.willBeVisible)) continue;
       const rect = animationFrameRect(plan.from, plan.to, t, plan, style);
       const opacity = animationFrameOpacity(t, plan, style);
       requests.push(...runnerTransformRequests(plan.runner, rect, opacity));
@@ -1682,6 +2626,7 @@ async function animateRunnerLayout(rectBySlot) {
   }
 
   for (const plan of plans) {
+    if (plan.skipAnimation) continue;
     if (!plan.willBeVisible) {
       await setRunnerVisible(plan.runner.slot, false);
     }
@@ -1697,7 +2642,8 @@ function runnerTransformRequests(runner, rect, opacity = null) {
   const requests = [
     sceneItemTransformRequest(runnerPart(runner.slot, "Border"), rect),
     sceneItemTransformRequest(runnerPart(runner.slot, "Feed"), viewportRect(rect, state.layout.panelGeometry.feed), cropPixels(runner.crop)),
-    sceneItemTransformRequest(runnerPart(runner.slot, "Name"), viewportRect(rect, state.layout.panelGeometry.name))
+    sceneItemTransformRequest(runnerPart(runner.slot, "Name"), viewportRect(rect, nameTransformGeometry())),
+    sceneItemTransformRequest(runnerPart(runner.slot, "Finish"), viewportRect(rect, finishGeometry(runner, rect)))
   ];
 
   if (opacity !== null && obsBridge.opacitySupported) {
@@ -1734,12 +2680,15 @@ function sourceOpacityRequest(partName, opacity) {
 
 function animationStyleConfig() {
   const style = state.layout.animationStyle;
-  const hasFade = obsBridge.opacitySupported && (style === "moveFade" || style === "scaleFade" || style === "fade");
+  const hasFade = obsBridge.opacitySupported && ["moveFade", "scaleFade", "fade", "pop", "spotlightPulse"].includes(style);
   return {
     usesMovement: style !== "fade" || !hasFade,
-    usesScale: style === "scaleFade",
+    usesScale: ["scaleFade", "pop", "spotlightPulse"].includes(style),
     usesFade: hasFade,
-    fadesMoving: style === "moveFade"
+    fadesMoving: style === "moveFade",
+    settle: style === "settle",
+    pop: style === "pop",
+    pulse: style === "spotlightPulse"
   };
 }
 
@@ -1749,11 +2698,13 @@ function animationFrameRect(from, to, t, plan, style) {
   }
 
   if (!style.usesScale) {
-    return lerpRect(from, to, t);
+    const progress = style.settle ? easeOutBack(t) : t;
+    return lerpRect(from, to, progress);
   }
 
   if (!plan.wasVisible && plan.willBeVisible) {
-    return scaleRectFromCenter(to, Math.max(0.12, t));
+    const scale = style.pop ? Math.min(1.08, easeOutBack(t)) : Math.max(0.12, t);
+    return scaleRectFromCenter(to, scale);
   }
 
   if (plan.wasVisible && !plan.willBeVisible) {
@@ -1761,7 +2712,14 @@ function animationFrameRect(from, to, t, plan, style) {
   }
 
   const moved = lerpRect(from, to, t);
-  return scaleRectFromCenter(moved, 1 - 0.08 * Math.sin(t * Math.PI));
+  const pulse = style.pulse ? 1 + 0.06 * Math.sin(t * Math.PI) : 1 - 0.08 * Math.sin(t * Math.PI);
+  return scaleRectFromCenter(moved, pulse);
+}
+
+function easeOutBack(t) {
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
 }
 
 function animationFrameOpacity(t, plan, style) {
@@ -1815,17 +2773,23 @@ async function runScheduledObsApply(reason) {
 function shouldRefreshObsInputs(reason) {
   return [
     "source",
+    "feedMode",
     "name",
     "vdo-clean",
     "border",
     "timerText",
     "timerBorder",
     "geometry",
+    "finish",
+    "finishGeometry",
+    "audio",
     "background",
+    "raceInfo",
     "border-image",
     "feedWidth",
     "feedHeight",
     "nameplate",
+    "nameplate-image",
     "active-runners",
     "active",
     "runner-add",
@@ -1835,6 +2799,7 @@ function shouldRefreshObsInputs(reason) {
     "margin",
     "gap",
     "spotlight",
+    "spotlight-nameplates",
     "feed-visible",
     "feed-border-visible",
     "name-visible",
@@ -1897,6 +2862,7 @@ async function cleanupObsScene() {
     obsBridge.itemIds.clear();
     obsBridge.lastRects.clear();
     obsBridge.lastVisibility.clear();
+    obsBridge.lastSceneItemEnabled.clear();
     obsBridge.opacitySupported = false;
     logObs("Cleanup complete. Managed scene was left in place.");
   } catch (error) {
@@ -1925,6 +2891,12 @@ function syncCropOutputs(root, runner) {
 function syncFeedStatus(root, runner) {
   const status = root.querySelector("[data-role='feedStatus']");
   if (!status) return;
+
+  if (runner.feedMode && runner.feedMode !== "live") {
+    status.textContent = feedModeLabel(runner.feedMode);
+    status.classList.remove("url");
+    return;
+  }
 
   if (isUrl(runner.source)) {
     status.textContent = isVdoNinjaUrl(runner.source) ? "VDO.Ninja browser source" : "Browser source URL";
@@ -1961,14 +2933,19 @@ function update() {
   const rectBySlot = getCurrentRectBySlot();
   const previewRectBySlot = getPreviewRectBySlot(rectBySlot);
 
+  document.body.classList.toggle("control-mode", state.layout.viewMode === "control");
+  document.body.classList.toggle("edit-mode", state.layout.viewMode !== "control");
+  document.body.classList.toggle("layers-locked", Boolean(state.layout.layerLock));
   els.stage.style.setProperty("--timer-height", state.layout.timerHeight);
   els.stage.classList.toggle("custom-background", Boolean(state.layout.backgroundImage));
   els.stage.style.backgroundImage = state.layout.backgroundImage ? `url("${state.layout.backgroundImage}")` : "";
   els.activeCount.textContent = `${activeRunners.length} active`;
   els.layoutSummary.textContent = `${STAGE.width}x${STAGE.height} canvas, ${state.layout.aspectPreset} game frames`;
   syncGeometryControls();
+  applyTitleBarPreviewGeometry();
   applyTimerBorderPreviewGeometry();
   applyTimerTextPreviewGeometry();
+  renderControlMode();
 
   for (const runner of state.runners) {
     const rect = previewRectBySlot.get(runner.slot) ?? hiddenRect();
@@ -1987,17 +2964,44 @@ function applyTimerBorderPreviewGeometry() {
   applyNormalizedStyle(els.timerBorder, state.layout.timerBorder);
 }
 
+function applyTitleBarPreviewGeometry() {
+  const config = state.layout.raceInfo;
+  const visible = Boolean(state.layout.elements.titleBar);
+  const stageScale = els.stage.clientWidth / STAGE.width;
+  const sourceWidth = Math.max(1, STAGE.width * config.rect.width);
+  const sourceHeight = Math.max(1, STAGE.height * config.rect.height);
+  els.titleBarPreview.classList.toggle("hidden-element", !visible);
+  els.titleBarPreview.style.cssText = [
+    `transition-duration:${state.layout.animationMs}ms`,
+    `font-family:${cssFontStack(config.fontFamily)}`,
+    `color:${config.textColor}`,
+    `font-size:${Math.max(8, Number(config.fontSize) || 34) * stageScale}px`,
+    raceInfoPlateFrameCss(config, sourceWidth, sourceHeight)
+  ].join(";");
+  els.titleBarPreview.querySelector(".title-main").textContent = config.title;
+  const subtitle = els.titleBarPreview.querySelector(".title-sub");
+  subtitle.textContent = config.subtitle;
+  subtitle.style.color = hexToRgba(config.textColor, 0.68);
+  applyNormalizedStyle(els.titleBarPreview, config.rect);
+  if (!visible) els.titleBarPreview.style.display = "none";
+}
+
 function applyTimerTextPreviewGeometry() {
   const visible = state.layout.elements.builtInTimer;
   const sourceSize = timerTextSourceSize();
   const stageScale = els.stage.clientWidth / STAGE.width;
-  const fontSize = Math.min(Number(state.layout.timerText.fontSize), sourceSize.height * 0.76) * stageScale;
+  const fontSize = timerEffectiveFontSize(state.layout.timerText, sourceSize) * stageScale;
   els.timerTextPreview.classList.toggle("hidden", !visible);
   els.timerTextPreview.textContent = formatTimerDisplay(currentTimerElapsedMs());
   els.timerTextPreview.style.fontFamily = cssFontStack(state.layout.timerText.fontFamily);
   els.timerTextPreview.style.fontSize = `${fontSize}px`;
   els.timerTextPreview.style.color = timerTextColor();
-  els.timerTextPreview.style.textShadow = timerTextShadowCss(state.layout.timerText, stageScale);
+  els.timerTextPreview.style.textShadow = timerTextShadowValue(state.layout.timerText, stageScale);
+  els.timerTextPreview.style.webkitTextStroke = state.layout.timerText.strokeEnabled && Number(state.layout.timerText.strokeWidth) > 0
+    ? `${Number(state.layout.timerText.strokeWidth) * stageScale}px ${state.layout.timerText.strokeColor}`
+    : "0 transparent";
+  els.timerTextPreview.style.paintOrder = state.layout.timerText.strokeEnabled ? "stroke fill" : "normal";
+  els.timerTextPreview.style.overflow = timerTextIsUnframed() ? "visible" : "hidden";
   applyNormalizedStyle(els.timerTextPreview, state.layout.timerBorder);
 }
 
@@ -2018,6 +3022,14 @@ function syncGeometryControls() {
     [els.nameY, state.layout.panelGeometry.name.y],
     [els.nameW, state.layout.panelGeometry.name.width],
     [els.nameH, state.layout.panelGeometry.name.height],
+    [els.finishX, state.layout.panelGeometry.finish.x],
+    [els.finishY, state.layout.panelGeometry.finish.y],
+    [els.finishW, state.layout.panelGeometry.finish.width],
+    [els.finishH, state.layout.panelGeometry.finish.height],
+    [els.titleX, state.layout.raceInfo.rect.x],
+    [els.titleY, state.layout.raceInfo.rect.y],
+    [els.titleW, state.layout.raceInfo.rect.width],
+    [els.titleH, state.layout.raceInfo.rect.height],
     [els.timerX, state.layout.timerBorder.x],
     [els.timerY, state.layout.timerBorder.y],
     [els.timerW, state.layout.timerBorder.width],
@@ -2031,6 +3043,11 @@ function syncGeometryControls() {
   els.feedVisible.checked = state.layout.elements.feed;
   els.feedBorderVisible.checked = state.layout.elements.feedBorder;
   els.nameVisible.checked = state.layout.elements.name;
+  els.finishedTimeVisible.checked = state.layout.elements.finishedTime;
+  els.titleBarVisible.checked = state.layout.elements.titleBar;
+  els.raceInfoEnabled.checked = state.layout.elements.titleBar;
+  els.layerLockEnabled.checked = state.layout.layerLock;
+  els.snapEnabled.checked = state.layout.snapEnabled;
 }
 
 function getCurrentRectBySlot() {
@@ -2040,7 +3057,7 @@ function getCurrentRectBySlot() {
     : generateLayout(activeRunners.length, state.layout);
   const rectBySlot = new Map();
   activeRunners.forEach((runner, index) => {
-    rectBySlot.set(runner.slot, rects[index]);
+    if (rects[index]) rectBySlot.set(runner.slot, rects[index]);
   });
   return rectBySlot;
 }
@@ -2078,9 +3095,17 @@ function rowPattern(count) {
     9: [3, 3, 3],
     10: [4, 3, 3],
     11: [4, 4, 3],
-    12: [4, 4, 4]
+    12: [4, 4, 4],
+    13: [5, 4, 4],
+    14: [5, 5, 4],
+    15: [5, 5, 5],
+    16: [4, 4, 4, 4],
+    17: [5, 4, 4, 4],
+    18: [5, 5, 4, 4],
+    19: [5, 5, 5, 4],
+    20: [5, 5, 5, 5]
   };
-  return patterns[count] ?? patterns[12];
+  return patterns[count] ?? patterns[20];
 }
 
 function generateLayout(count, layout) {
@@ -2168,7 +3193,7 @@ function generateSpotlightLayout(activeRunners, layout) {
     });
   }
 
-  return activeRunners.map((runner) => rectsBySlot.get(runner.slot) ?? hiddenRect());
+  return activeRunners.map((runner) => rectsBySlot.get(runner.slot));
 }
 
 function scaleAreaFromCenter(area, scale) {
@@ -2229,10 +3254,39 @@ function parseSlotList(value) {
     .filter((slot) => Number.isInteger(slot) && slot >= 1 && slot <= MAX_RUNNERS));
 }
 
+function spotlightMainSlotSet() {
+  if (!state.layout.spotlight.enabled) return new Set();
+  const activeRunners = getActiveRunners().sort((a, b) => a.placement - b.placement);
+  const requested = parseSlotList(state.layout.spotlight.slots);
+  const spotlight = activeRunners.filter((runner) => requested.has(runner.slot));
+  const mainRunners = spotlight.length > 0 ? spotlight : activeRunners.slice(0, 1);
+  return new Set(mainRunners.map((runner) => runner.slot));
+}
+
+function isSmallSpotlightSlot(slot) {
+  if (!state.layout.spotlight.enabled || !state.layout.spotlight.showOthers) return false;
+  const runner = state.runners.find((candidate) => candidate.slot === slot);
+  if (!runner?.active) return false;
+  return !spotlightMainSlotSet().has(slot);
+}
+
+function shouldHideNameplateForSlot(slot) {
+  return Boolean(state.layout.spotlight.disableSmallNameplates && isSmallSpotlightSlot(slot));
+}
+
 function hiddenRect() {
   return {
     x: STAGE.width / 2 - 10,
     y: STAGE.height / 2 - 10,
+    width: 20,
+    height: 20
+  };
+}
+
+function offscreenRect() {
+  return {
+    x: -10000,
+    y: -10000,
     width: 20,
     height: 20
   };
@@ -2243,6 +3297,7 @@ function applyPanelGeometry(runner, rect, visible = runner.active) {
   const viewport = panel.querySelector(".game-viewport");
   const feed = panel.querySelector(".feed-art");
   const nameplate = panel.querySelector(".runner-nameplate");
+  const finish = panel.querySelector(".runner-finished-time");
 
   panel.className = `runner-panel ${state.layout.borderPreset}`;
   panel.classList.toggle("hidden", !visible);
@@ -2255,12 +3310,140 @@ function applyPanelGeometry(runner, rect, visible = runner.active) {
   panel.style.height = `${(rect.height / STAGE.height) * 100}%`;
 
   applyNormalizedStyle(viewport, state.layout.panelGeometry.feed);
-  applyNormalizedStyle(nameplate, state.layout.panelGeometry.name);
+  applyNormalizedStyle(nameplate, nameTransformGeometry());
+  applyNormalizedStyle(finish, finishGeometry(runner, rect));
   viewport.classList.toggle("hidden-element", !state.layout.elements.feed);
   panel.querySelector(".runner-shell").classList.toggle("hide-border", !state.layout.elements.feedBorder);
-  nameplate.classList.toggle("hidden-element", !state.layout.elements.name);
+  nameplate.classList.toggle("hidden-element", !state.layout.elements.name || shouldHideNameplateForSlot(runner.slot));
+  finish.classList.toggle("hidden-element", !state.layout.elements.finishedTime || !displayRunnerFinalTime(runner, true));
   applyCrop(feed, runner.crop);
   feed.dataset.source = runner.source;
+  applyFeedPreview(feed, runner);
+  applyFinishedTimePreview(finish, runner, rect);
+}
+
+function finishGeometry(runner = null, panelRect = null) {
+  const finish = state.layout.panelGeometry.finish;
+  const autoSize = finishAutoNormalizedSize(runner, panelRect);
+  if (!state.layout.finishedTime.lockToNameplate) {
+    const rect = { ...finish, width: autoSize.width, height: autoSize.height };
+    normalizeGeometryRect(rect);
+    return rect;
+  }
+
+  const name = state.layout.panelGeometry.name;
+  const baseName = DEFAULT_PANEL_GEOMETRY.name;
+  const rect = {
+    x: finish.x + (name.x - baseName.x),
+    y: finish.y + (name.y - baseName.y),
+    width: autoSize.width,
+    height: autoSize.height
+  };
+  normalizeFinishInsideNameplate(rect);
+  return rect;
+}
+
+function storedFinishGeometry(effectiveRect) {
+  if (!state.layout.finishedTime.lockToNameplate) return effectiveRect;
+
+  const name = state.layout.panelGeometry.name;
+  const baseName = DEFAULT_PANEL_GEOMETRY.name;
+  const rect = {
+    x: effectiveRect.x - (name.x - baseName.x),
+    y: effectiveRect.y - (name.y - baseName.y),
+    width: effectiveRect.width,
+    height: effectiveRect.height
+  };
+  normalizeGeometryRect(rect);
+  return rect;
+}
+
+function finishAutoNormalizedSize(runner, panelRect) {
+  if (!runner || !panelRect) {
+    return {
+      width: state.layout.panelGeometry.finish.width,
+      height: state.layout.panelGeometry.finish.height
+    };
+  }
+
+  const size = measureFinishedTimeSourceSize(runner);
+  const maxWidth = state.layout.finishedTime.lockToNameplate ? state.layout.panelGeometry.name.width : 1;
+  const maxHeight = state.layout.finishedTime.lockToNameplate ? state.layout.panelGeometry.name.height : 1;
+  return {
+    width: clampNumber(size.width / Math.max(1, panelRect.width), 0.01, maxWidth, state.layout.panelGeometry.finish.width),
+    height: clampNumber(size.height / Math.max(1, panelRect.height), 0.01, maxHeight, state.layout.panelGeometry.finish.height)
+  };
+}
+
+function normalizeFinishInsideNameplate(rect) {
+  const name = state.layout.panelGeometry.name;
+  rect.width = Math.max(0.01, Math.min(name.width, Number(rect.width)));
+  rect.height = Math.max(0.01, Math.min(name.height, Number(rect.height)));
+  rect.x = Math.max(name.x, Math.min(name.x + name.width - rect.width, Number(rect.x)));
+  rect.y = Math.max(name.y, Math.min(name.y + name.height - rect.height, Number(rect.y)));
+}
+
+function applyFeedPreview(feed, runner) {
+  if (runner.feedMode && runner.feedMode !== "live") {
+    feed.querySelector("iframe")?.remove();
+    feed.querySelector(".feed-preview-blocked")?.remove();
+    feed.classList.remove("url-preview", "blocked-preview");
+    feed.classList.add("replacement-preview");
+    feed.dataset.replacement = runner.feedMode;
+    feed.innerHTML = `<div class="replacement-card"><strong>${escapeHtml(feedModeLabel(runner.feedMode))}</strong><span>${escapeHtml(runner.name)}</span></div>`;
+    return;
+  }
+  feed.classList.remove("replacement-preview");
+  feed.removeAttribute("data-replacement");
+  feed.querySelector(".replacement-card")?.remove();
+  const url = isUrl(runner.source) ? buildFeedUrl(runner) : "";
+  let iframe = feed.querySelector("iframe");
+  let blocked = feed.querySelector(".feed-preview-blocked");
+  const canInlinePreview = url && isInlinePreviewUrl(url);
+  feed.classList.toggle("url-preview", Boolean(canInlinePreview));
+  feed.classList.toggle("blocked-preview", Boolean(url && !canInlinePreview));
+  if (!url) {
+    iframe?.remove();
+    blocked?.remove();
+    return;
+  }
+
+  if (!canInlinePreview) {
+    iframe?.remove();
+    if (!blocked) {
+      blocked = document.createElement("div");
+      blocked.className = "feed-preview-blocked";
+      feed.appendChild(blocked);
+    }
+    blocked.innerHTML = `<strong>Preview blocked</strong><span>This site refuses browser embedding. OBS will still use the feed URL.</span>`;
+    return;
+  }
+
+  blocked?.remove();
+  if (!iframe) {
+    iframe = document.createElement("iframe");
+    iframe.setAttribute("title", `Runner ${runner.slot} feed preview`);
+    iframe.setAttribute("allow", "autoplay; fullscreen; microphone; camera");
+    iframe.setAttribute("referrerpolicy", "no-referrer");
+    feed.appendChild(iframe);
+  }
+  syncFeedPreviewIframeSize(feed, iframe);
+  if (iframe.src !== url) iframe.src = url;
+}
+
+function isInlinePreviewUrl(value) {
+  if (!isUrl(value)) return false;
+  return isVdoNinjaUrl(value);
+}
+
+function syncFeedPreviewIframeSize(feed, iframe) {
+  const width = Math.max(1, Number(state.layout.feedWidth) || 1920);
+  const height = Math.max(1, Number(state.layout.feedHeight) || 1080);
+  const scaleX = feed.clientWidth / width;
+  const scaleY = feed.clientHeight / height;
+  iframe.style.width = `${width}px`;
+  iframe.style.height = `${height}px`;
+  iframe.style.transform = `scale(${scaleX}, ${scaleY})`;
 }
 
 function schedulePreviewRefresh(rectBySlot = getCurrentRectBySlot(), delay = 0) {
@@ -2279,15 +3462,34 @@ function schedulePreviewRefresh(rectBySlot = getCurrentRectBySlot(), delay = 0) 
 }
 
 function refreshMeasuredPreviews(rectBySlot) {
-  applyBorderPreview(els.timerBorder, true);
+  syncDynamicPreviewStyles();
+  applyBorderPreview(els.timerBorder, "timer");
+  applyBorderPreview(els.titleBarPreview, "title");
 
   for (const runner of state.runners) {
     const panel = els.runnerLayer.querySelector(`[data-slot='${runner.slot}']`);
     if (!panel) continue;
     const rect = rectBySlot.get(runner.slot) ?? hiddenRect();
-    applyBorderPreview(panel.querySelector(".runner-shell"), false);
+    applyBorderPreview(panel.querySelector(".runner-shell"), "feed");
     applyNameplatePreview(panel.querySelector(".runner-nameplate"), runner, rect);
+    applyFinishedTimePreview(panel.querySelector(".runner-finished-time"), runner, rect);
   }
+}
+
+function syncDynamicPreviewStyles() {
+  let style = document.getElementById("dynamicPreviewStyles");
+  if (!style) {
+    style = document.createElement("style");
+    style.id = "dynamicPreviewStyles";
+    document.head.appendChild(style);
+  }
+  style.textContent = [
+    borderAnimationCss(getBorderStyle("feed"), state.layout.feedWidth, state.layout.feedHeight),
+    borderAnimationCss(getBorderStyle("timer"), STAGE.width, STAGE.height),
+    borderAnimationCss(getBorderStyle("title"), STAGE.width * state.layout.raceInfo.rect.width, STAGE.height * state.layout.raceInfo.rect.height),
+    nameplateAnimationCss(state.layout.nameplate),
+    nameplateAnimationCss(state.layout.raceInfo, STAGE.width * state.layout.raceInfo.rect.width, STAGE.height * state.layout.raceInfo.rect.height, "ormRaceInfoTexture")
+  ].join("\n");
 }
 
 function startPreviewLiveRefresh(rectBySlot, duration) {
@@ -2305,7 +3507,7 @@ function startPreviewLiveRefresh(rectBySlot, duration) {
   previewLiveRefreshFrame = window.requestAnimationFrame(tick);
 }
 
-function applyBorderPreview(element, isTimer) {
+function applyBorderPreview(element, targetOrTimer) {
   let preview = element.querySelector(".border-preview-frame");
   if (!preview) {
     preview = document.createElement("div");
@@ -2314,19 +3516,21 @@ function applyBorderPreview(element, isTimer) {
     element.prepend(preview);
   }
 
-  const sourceSize = isTimer
+  const target = typeof targetOrTimer === "string" ? targetOrTimer : targetOrTimer ? "timer" : "feed";
+  const sourceSize = target === "timer"
     ? { width: STAGE.width, height: STAGE.height }
-    : { width: state.layout.feedWidth, height: state.layout.feedHeight };
+    : target === "title"
+      ? titleBarSourceSize()
+      : { width: state.layout.feedWidth, height: state.layout.feedHeight };
   const previewWidth = Math.max(1, element.clientWidth);
   const previewHeight = Math.max(1, element.clientHeight);
   const basePreviewStyle = `width:${sourceSize.width}px;height:${sourceSize.height}px;transform:scale(${previewWidth / sourceSize.width}, ${previewHeight / sourceSize.height});`;
 
-  const target = isTimer ? "timer" : "feed";
   const image = getBorderImage(target);
   if (image) {
-    preview.style.cssText = `${basePreviewStyle}position:absolute;left:0;top:0;background-color:transparent;background-image:url("${image}");background-size:100% 100%;background-repeat:no-repeat;`;
+    preview.style.cssText = `${basePreviewStyle}position:absolute;left:0;top:0;background-color:transparent;background-image:url("${escapeCssString(image)}");background-size:100% 100%;background-repeat:no-repeat;`;
   } else {
-    preview.style.cssText = `${basePreviewStyle}${borderFrameCss(isTimer, getBorderStyle(target))}`;
+    preview.style.cssText = `${basePreviewStyle}${borderFrameCss(target === "timer", getBorderStyle(target), sourceSize.width, sourceSize.height)}`;
   }
 }
 
@@ -2340,14 +3544,13 @@ function applyNameplatePreview(nameplate, runner, rect) {
   }
 
   const config = state.layout.nameplate;
-  const finish = runner.done ? `<em>${escapeHtml(formatTimerDisplay(runner.finalTimeMs ?? 0))}</em>` : "";
   const sourceSize = nameSourceSize(rect);
   const previewWidth = Math.max(1, nameplate.clientWidth);
   const previewHeight = Math.max(1, nameplate.clientHeight);
   const plateImage = config.showBox && config.plateMode === "image" && config.plateImage
     ? `<img class="plate-art" src="${escapeAttribute(config.plateImage)}" alt="">`
     : "";
-  const markup = `${plateImage}<div class="name-content" title="Drag the text to move it inside the nameplate"><strong class="name-text-drag" data-drag-target="nameText">${escapeHtml(runner.name)}</strong>${finish}</div>`;
+  const markup = `${plateImage}${nameTextSvgMarkup(runner, sourceSize)}<div class="name-content" title="Drag the text to move it inside the nameplate"><strong class="name-text-drag" data-drag-target="nameText">${escapeHtml(runner.name)}</strong></div>`;
   if (frame.dataset.markup !== markup) {
     frame.dataset.markup = markup;
     frame.innerHTML = markup;
@@ -2355,11 +3558,25 @@ function applyNameplatePreview(nameplate, runner, rect) {
 
   frame.style.cssText = `${nameplateFrameCss(config, sourceSize.width, sourceSize.height)}font-family:${cssFontStack(config.fontFamily)};color:${config.textColor};text-rendering:geometricPrecision;-webkit-font-smoothing:antialiased;font-stretch:normal;letter-spacing:0;transform:scale(${previewWidth / sourceSize.width}, ${previewHeight / sourceSize.height});`;
   const content = frame.querySelector(".name-content");
-  if (content) content.style.cssText = nameplateContentCss(config);
+  if (content) content.style.cssText = nameplateContentCss(config, sourceSize);
   const strong = frame.querySelector("strong");
-  if (strong) strong.style.cssText = nameplateStrongCss(config, `${sourceSize.height * NAME_FONT_HEIGHT_RATIO}px`);
-  const finishElement = frame.querySelector("em");
-  if (finishElement) finishElement.style.cssText = nameplateFinishCss(config, `${sourceSize.height * NAME_FONT_HEIGHT_RATIO}px`);
+  const fontLimit = nameTextIsUnframed() ? `${config.fontSize}px` : `${sourceSize.height * NAME_FONT_HEIGHT_RATIO}px`;
+  if (strong) strong.style.cssText = `${nameplateStrongCss(config, fontLimit)}color:transparent;text-shadow:none;-webkit-text-stroke:0 transparent;`;
+}
+
+function applyFinishedTimePreview(element, runner, rect) {
+  const frame = element.querySelector(".finish-preview-frame");
+  if (!frame) return;
+  const text = displayRunnerFinalTime(runner, true);
+  const sourceSize = finishSourceSize(runner, rect);
+  const previewWidth = Math.max(1, element.clientWidth);
+  const previewHeight = Math.max(1, element.clientHeight);
+  const markup = finishTextSvgMarkup(runner, sourceSize, text);
+  if (frame.dataset.markup !== markup) {
+    frame.dataset.markup = markup;
+    frame.innerHTML = markup;
+  }
+  frame.style.cssText = `position:absolute;left:0;top:0;width:${sourceSize.width}px;height:${sourceSize.height}px;display:block;overflow:hidden;box-sizing:border-box;transform-origin:0 0;transform:scale(${previewWidth / sourceSize.width}, ${previewHeight / sourceSize.height});font-family:${cssFontStack(state.layout.finishedTime.fontFamily)};`;
 }
 
 function applyCrop(feed, crop) {
@@ -2396,7 +3613,8 @@ function buildObsPayload(rectBySlot) {
       borderStyles: structuredClone(state.layout.borderStyles),
       hasCustomBorderImage: {
         feed: Boolean(state.layout.borderImages.feed),
-        timer: Boolean(state.layout.borderImages.timer)
+        timer: Boolean(state.layout.borderImages.timer),
+        title: Boolean(state.layout.borderImages.title)
       },
       hasBackgroundImage: Boolean(state.layout.backgroundImage),
       nameplate: structuredClone(state.layout.nameplate)
@@ -2530,12 +3748,15 @@ function managedInputNames() {
 
 async function createRunnerObsInputs(runner, rect = null) {
   const nameSize = nameSourceSize(rect);
-  await createBrowserInput(runnerPart(runner.slot, "Feed"), obsBridge.sceneName, buildFeedUrl(runner), state.layout.feedWidth, state.layout.feedHeight, runner.active);
+  const finishSize = finishSourceSize(runner, rect);
+  await createBrowserInput(runnerPart(runner.slot, "Feed"), obsBridge.sceneName, buildFeedUrl(runner), state.layout.feedWidth, state.layout.feedHeight, runner.active, { rerouteAudio: true });
   await createBrowserInput(runnerPart(runner.slot, "Border"), obsBridge.sceneName, htmlDataUrl(buildBorderHtml()), state.layout.feedWidth, state.layout.feedHeight, runner.active);
-  await createBrowserInput(runnerPart(runner.slot, "Name"), obsBridge.sceneName, htmlDataUrl(buildNameHtml(runner)), nameSize.width, nameSize.height, runner.active);
+  await createBrowserInput(runnerPart(runner.slot, "Name"), obsBridge.sceneName, htmlDataUrl(buildNameHtml(runner, rect)), nameSize.width, nameSize.height, runner.active);
+  await createBrowserInput(runnerPart(runner.slot, "Finish"), obsBridge.sceneName, htmlDataUrl(buildFinishHtml(runner)), finishSize.width, finishSize.height, runner.active && runner.done);
+  await updateRunnerAudio(runner);
 }
 
-async function createBrowserInput(partName, sceneName, url, width, height, enabled) {
+async function createBrowserInput(partName, sceneName, url, width, height, enabled, options = {}) {
   const inputName = `${MANAGED_PREFIX}${partName}`;
   const response = await obsCall("CreateInput", {
     sceneName,
@@ -2546,7 +3767,7 @@ async function createBrowserInput(partName, sceneName, url, width, height, enabl
       width,
       height,
       css: "html, body { background: rgba(0, 0, 0, 0) !important; overflow: hidden; }",
-      reroute_audio: false,
+      reroute_audio: Boolean(options.rerouteAudio),
       shutdown: false,
       restart_when_active: false
     },
@@ -2556,6 +3777,7 @@ async function createBrowserInput(partName, sceneName, url, width, height, enabl
   if (response?.sceneItemId !== undefined) {
     obsBridge.itemIds.set(inputName, response.sceneItemId);
   }
+  obsBridge.lastSceneItemEnabled.set(inputName, Boolean(enabled));
   return inputName;
 }
 
@@ -2614,17 +3836,37 @@ async function setSourceOpacity(sourceName, opacity) {
 }
 
 async function updateRunnerInputs(runner, rect = null) {
-  const nameSize = nameSourceSize(rect);
+  await updateRunnerFeedInput(runner);
+  await setInputUrl(runnerPart(runner.slot, "Border"), htmlDataUrl(buildBorderHtml()));
+  await updateRunnerNameInput(runner, rect);
+  await updateRunnerFinishInput(runner, rect);
+  await updateRunnerAudio(runner);
+}
+
+async function updateRunnerFeedInput(runner) {
   await setBrowserInputSettings(runnerPart(runner.slot, "Feed"), {
     url: buildFeedUrl(runner),
     width: state.layout.feedWidth,
-    height: state.layout.feedHeight
+    height: state.layout.feedHeight,
+    reroute_audio: true
   });
-  await setInputUrl(runnerPart(runner.slot, "Border"), htmlDataUrl(buildBorderHtml()));
+}
+
+async function updateRunnerNameInput(runner, rect = null) {
+  const nameSize = nameSourceSize(rect);
   await setBrowserInputSettings(runnerPart(runner.slot, "Name"), {
-    url: htmlDataUrl(buildNameHtml(runner)),
+    url: htmlDataUrl(buildNameHtml(runner, rect)),
     width: nameSize.width,
     height: nameSize.height
+  });
+}
+
+async function updateRunnerFinishInput(runner, rect = null) {
+  const finishSize = finishSourceSize(runner, rect);
+  await setBrowserInputSettings(runnerPart(runner.slot, "Finish"), {
+    url: htmlDataUrl(buildFinishHtml(runner)),
+    width: finishSize.width,
+    height: finishSize.height
   });
 }
 
@@ -2638,6 +3880,31 @@ async function setBrowserInputSettings(partName, settings) {
     });
   } catch (error) {
     if (!/not found|ResourceNotFound|does not exist/i.test(error.message)) throw error;
+  }
+}
+
+async function updateRunnerAudio(runner) {
+  const inputName = `${MANAGED_PREFIX}${runnerPart(runner.slot, "Feed")}`;
+  try {
+    await obsCall("SetInputMute", {
+      inputName,
+      inputMuted: Boolean(runner.audioMuted)
+    });
+  } catch (error) {
+    if (!/not found|ResourceNotFound|does not exist/i.test(error.message)) {
+      logObs(`Could not set audio mute for runner ${runner.slot}: ${error.message}`);
+    }
+  }
+
+  try {
+    await obsCall("SetInputVolume", {
+      inputName,
+      inputVolumeMul: clampNumber(runner.audioVolume, 0, 200, 100) / 100
+    });
+  } catch (error) {
+    if (!/not found|ResourceNotFound|does not exist/i.test(error.message)) {
+      logObs(`Could not set audio volume for runner ${runner.slot}: ${error.message}`);
+    }
   }
 }
 
@@ -2657,7 +3924,20 @@ async function setInputUrl(partName, url) {
 async function setRunnerVisible(slot, visible) {
   await setSceneItemEnabled(runnerPart(slot, "Feed"), visible && state.layout.elements.feed);
   await setSceneItemEnabled(runnerPart(slot, "Border"), visible && state.layout.elements.feedBorder);
-  await setSceneItemEnabled(runnerPart(slot, "Name"), visible && state.layout.elements.name);
+  await setSceneItemEnabled(runnerPart(slot, "Name"), visible && state.layout.elements.name && !shouldHideNameplateForSlot(slot));
+  const runner = state.runners.find((candidate) => candidate.slot === slot);
+  await setSceneItemEnabled(runnerPart(slot, "Finish"), visible && Boolean(runner?.done) && state.layout.elements.finishedTime);
+}
+
+function isSpotlightHiddenActiveRunner(runner) {
+  return Boolean(runner?.active && state.layout.spotlight.enabled && !state.layout.spotlight.showOthers);
+}
+
+async function setRunnerSpotlightHidden(slot) {
+  await setSceneItemEnabled(runnerPart(slot, "Feed"), state.layout.elements.feed);
+  await setSceneItemEnabled(runnerPart(slot, "Border"), false);
+  await setSceneItemEnabled(runnerPart(slot, "Name"), false);
+  await setSceneItemEnabled(runnerPart(slot, "Finish"), false);
 }
 
 async function ensureRunnerItemIds() {
@@ -2673,8 +3953,10 @@ async function ensureRunnerItemIds() {
 
 async function ensureManagedGlobalSources() {
   const timerTextSize = timerTextSourceSize();
+  const titleSize = titleBarSourceSize();
   const globals = [
     ["Background", htmlDataUrl(buildBackgroundHtml()), STAGE.width, STAGE.height, true],
+    ["TitleBar", htmlDataUrl(buildTitleBarHtml()), titleSize.width, titleSize.height, state.layout.elements.titleBar],
     ["TimerBorder", htmlDataUrl(buildTimerBorderHtml()), STAGE.width, STAGE.height, state.layout.timerBorder.enabled && state.layout.elements.timerBorder],
     ["TimerText", htmlDataUrl(buildTimerTextHtml()), timerTextSize.width, timerTextSize.height, state.layout.elements.builtInTimer]
   ];
@@ -2698,6 +3980,15 @@ async function updateTimerTextInput() {
   });
 }
 
+async function updateTitleBarInput() {
+  const size = titleBarSourceSize();
+  await setBrowserInputSettings("TitleBar", {
+    url: htmlDataUrl(buildTitleBarHtml()),
+    width: size.width,
+    height: size.height
+  });
+}
+
 async function ensureManagedRunnerSources() {
   let createdAny = false;
   for (const runner of state.runners) {
@@ -2708,12 +3999,15 @@ async function ensureManagedRunnerSources() {
         await getSceneItemId(inputName);
       } catch {
         if (part === "Feed") {
-          await createBrowserInput(runnerPart(runner.slot, "Feed"), obsBridge.sceneName, buildFeedUrl(runner), state.layout.feedWidth, state.layout.feedHeight, runner.active);
+          await createBrowserInput(runnerPart(runner.slot, "Feed"), obsBridge.sceneName, buildFeedUrl(runner), state.layout.feedWidth, state.layout.feedHeight, runner.active, { rerouteAudio: true });
         } else if (part === "Border") {
           await createBrowserInput(runnerPart(runner.slot, "Border"), obsBridge.sceneName, htmlDataUrl(buildBorderHtml()), state.layout.feedWidth, state.layout.feedHeight, runner.active);
-        } else {
+        } else if (part === "Name") {
           const nameSize = nameSourceSize(rectBySlot.get(runner.slot));
-          await createBrowserInput(runnerPart(runner.slot, "Name"), obsBridge.sceneName, htmlDataUrl(buildNameHtml(runner)), nameSize.width, nameSize.height, runner.active);
+          await createBrowserInput(runnerPart(runner.slot, "Name"), obsBridge.sceneName, htmlDataUrl(buildNameHtml(runner, rectBySlot.get(runner.slot))), nameSize.width, nameSize.height, runner.active);
+        } else {
+          const finishSize = finishSourceSize(runner, rectBySlot.get(runner.slot));
+          await createBrowserInput(runnerPart(runner.slot, "Finish"), obsBridge.sceneName, htmlDataUrl(buildFinishHtml(runner)), finishSize.width, finishSize.height, runner.active && runner.done);
         }
         createdAny = true;
       }
@@ -2726,12 +4020,29 @@ async function ensureManagedRunnerSources() {
 }
 
 async function setSceneItemEnabled(partName, enabled) {
-  const sceneItemId = await getSceneItemId(`${MANAGED_PREFIX}${partName}`);
+  const inputName = `${MANAGED_PREFIX}${partName}`;
+  const normalized = Boolean(enabled);
+  if (obsBridge.lastSceneItemEnabled.get(inputName) === normalized) return;
+  const sceneItemId = await getSceneItemId(inputName);
+  if (!obsBridge.lastSceneItemEnabled.has(inputName)) {
+    try {
+      const response = await obsCall("GetSceneItemEnabled", {
+        sceneName: obsBridge.sceneName,
+        sceneItemId
+      });
+      const current = Boolean(response.sceneItemEnabled);
+      obsBridge.lastSceneItemEnabled.set(inputName, current);
+      if (current === normalized) return;
+    } catch {
+      // Older websocket builds may not expose this request; fall back to setting it.
+    }
+  }
   await obsCall("SetSceneItemEnabled", {
     sceneName: obsBridge.sceneName,
     sceneItemId,
-    sceneItemEnabled: enabled
+    sceneItemEnabled: normalized
   });
+  obsBridge.lastSceneItemEnabled.set(inputName, normalized);
 }
 
 async function enforceSceneLayerOrder() {
@@ -2748,6 +4059,8 @@ async function enforceSceneLayerOrder() {
     }
   }
 
+  requests.push(sceneItemIndexRequest("TitleBar", index));
+  index += 1;
   requests.push(sceneItemIndexRequest("TimerBorder", index));
   index += 1;
   requests.push(sceneItemIndexRequest("TimerText", index));
@@ -2844,19 +4157,108 @@ function absoluteRect(rect) {
   };
 }
 
+function fullStageRect() {
+  return { x: 0, y: 0, width: STAGE.width, height: STAGE.height };
+}
+
+function fullPanelGeometry() {
+  return { x: 0, y: 0, width: 1, height: 1 };
+}
+
+function timerTextIsUnframed() {
+  return !state.layout.timerBorder.enabled || !state.layout.elements.timerBorder;
+}
+
+function timerTextTransformRect() {
+  return timerTextIsUnframed() ? fullStageRect() : absoluteRect(state.layout.timerBorder);
+}
+
+function timerTextAnchor(size) {
+  if (!timerTextIsUnframed()) {
+    return { x: size.width / 2, y: size.height / 2 };
+  }
+
+  return {
+    x: STAGE.width * (state.layout.timerBorder.x + state.layout.timerBorder.width / 2),
+    y: STAGE.height * (state.layout.timerBorder.y + state.layout.timerBorder.height / 2)
+  };
+}
+
+function nameTextIsUnframed() {
+  return !state.layout.nameplate.showBox && !state.layout.nameplate.showBorder;
+}
+
+function nameTransformGeometry() {
+  return nameTextIsUnframed() ? fullPanelGeometry() : state.layout.panelGeometry.name;
+}
+
+function nameTextAnchor(sourceSize) {
+  const config = state.layout.nameplate;
+  const padding = Math.max(0, Number(config.platePaddingX) || 0);
+  if (!nameTextIsUnframed()) {
+    return {
+      x: padding + (Number(config.textX) || 0),
+      y: sourceSize.height / 2 + (Number(config.textY) || 0)
+    };
+  }
+
+  const name = state.layout.panelGeometry.name;
+  return {
+    x: name.x * sourceSize.width + padding + (Number(config.textX) || 0),
+    y: (name.y + name.height / 2) * sourceSize.height + (Number(config.textY) || 0)
+  };
+}
+
 function nameSourceSize(rect) {
-  const sourceRect = rect ? viewportRect(rect, state.layout.panelGeometry.name) : null;
+  const sourceRect = rect ? viewportRect(rect, nameTransformGeometry()) : null;
   return {
     width: Math.max(96, Math.round(sourceRect?.width ?? 960)),
     height: Math.max(24, Math.round(sourceRect?.height ?? 120))
   };
 }
 
+function finishSourceSize(runner = null, rect = null) {
+  if (runner) return measureFinishedTimeSourceSize(runner);
+  const sourceRect = rect ? viewportRect(rect, finishGeometry(runner, rect)) : null;
+  return {
+    width: Math.max(24, Math.round(sourceRect?.width ?? 160)),
+    height: Math.max(18, Math.round(sourceRect?.height ?? 54))
+  };
+}
+
+function measureFinishedTimeSourceSize(runner) {
+  const config = state.layout.finishedTime;
+  const text = displayRunnerFinalTime(runner, true) || "00:00:00";
+  const fontSize = Math.max(1, Number(config.fontSize) || DEFAULT_FINISHED_TIME.fontSize);
+  const pad = textEffectPadding(config, 0);
+  const canvas = measureFinishedTimeSourceSize.canvas ?? document.createElement("canvas");
+  measureFinishedTimeSourceSize.canvas = canvas;
+  const context = canvas.getContext("2d");
+  context.font = `900 ${fontSize}px ${cssFontStack(config.fontFamily)}`;
+  const metrics = context.measureText(text);
+  const width = Math.ceil(metrics.width + pad * 2);
+  const ascent = metrics.actualBoundingBoxAscent || fontSize * 0.82;
+  const descent = metrics.actualBoundingBoxDescent || fontSize * 0.22;
+  const height = Math.ceil(ascent + descent + pad * 2);
+  return {
+    width: Math.max(24, width),
+    height: Math.max(18, height)
+  };
+}
+
 function timerTextSourceSize() {
-  const rect = absoluteRect(state.layout.timerBorder);
+  const rect = timerTextTransformRect();
   return {
     width: Math.max(96, Math.round(rect.width)),
     height: Math.max(24, Math.round(rect.height))
+  };
+}
+
+function titleBarSourceSize() {
+  const rect = absoluteRect(state.layout.raceInfo.rect);
+  return {
+    width: Math.max(1, Math.round(rect.width)),
+    height: Math.max(1, Math.round(rect.height))
   };
 }
 
@@ -2868,12 +4270,72 @@ function buildBackgroundHtml() {
   return `<!doctype html><html><body><div class="bg"></div></body><style>${baseHtmlCss()} .bg{width:100vw;height:100vh;background:linear-gradient(135deg,rgba(45,198,163,.25),transparent 38%),linear-gradient(315deg,rgba(240,184,74,.2),transparent 38%),#11161a;}</style></html>`;
 }
 
+function buildTitleBarHtml() {
+  const config = state.layout.raceInfo;
+  const size = titleBarSourceSize();
+  const titleBorder = titleBorderHtmlCss(size.width, size.height);
+  return `<!doctype html><html><body><div class="title"><strong>${escapeHtml(config.title)}</strong><span>${escapeHtml(config.subtitle)}</span><div class="title-border" aria-hidden="true"></div></div></body><style>${baseHtmlCss()} ${nameplateAnimationCss(config, size.width, size.height, "ormRaceInfoTexture")}${borderAnimationCss(getBorderStyle("title"), size.width, size.height)}body{font-family:${cssFontStack(config.fontFamily)};}.title{position:absolute;inset:0;${raceInfoPlateFrameCss(config, size.width, size.height)}color:${config.textColor};}.title-border{${titleBorder}}strong,span{position:relative;z-index:1;}strong{font-size:${Math.max(8, Number(config.fontSize) || 34)}px;font-weight:900;line-height:1;}span{font-size:${Math.max(8, Number(config.fontSize) || 34) * 0.58}px;font-weight:800;line-height:1;color:${hexToRgba(config.textColor, 0.68)};}</style></html>`;
+}
+
+function titleBorderHtmlCss(width, height) {
+  const image = getBorderImage("title");
+  const base = "position:absolute;inset:0;z-index:2;pointer-events:none;";
+  if (image) {
+    return `${base}background-color:transparent;background-image:url("${escapeCssString(image)}");background-size:100% 100%;background-repeat:no-repeat;`;
+  }
+  return `${base}${borderFrameCss(false, getBorderStyle("title"), width, height)}`;
+}
+
+function raceInfoPlateFrameCss(config, sourceWidth = 960, sourceHeight = 120) {
+  const borderWidth = Math.max(0, Number(config.plateBorderWidth) || 0);
+  const borderColor = hexToRgba(config.plateBorderColor, Number(config.plateBorderOpacity) / 100);
+  const border = config.showBorder ? `${borderWidth}px solid ${borderColor}` : `${borderWidth}px solid transparent`;
+  const padding = Math.max(0, Number(config.platePaddingX) || 0);
+  let background = "background:transparent;";
+
+  if (config.showBox && config.plateMode === "image" && config.plateImage) {
+    background = `background-color:transparent;background-image:url("${escapeCssString(config.plateImage)}");background-size:100% 100%;background-repeat:no-repeat;background-position:center;`;
+  } else if (config.showBox && config.plateMode !== "image") {
+    background = nameplateBackgroundCss(config, sourceWidth, sourceHeight, "ormRaceInfoTexture");
+  }
+
+  return `display:flex;align-items:center;justify-content:center;gap:18px;padding:0 ${padding}px;overflow:hidden;white-space:nowrap;${background}border:${border};border-radius:${Math.max(0, Number(config.plateRadius) || 0)}px;box-sizing:border-box;`;
+}
+
 function buildFeedUrl(runner) {
+  if (runner.feedMode && runner.feedMode !== "live") {
+    return htmlDataUrl(buildReplacementFeedHtml(runner));
+  }
   if (isUrl(runner.source)) {
     return runner.source.trim();
   }
 
   return htmlDataUrl(buildFeedHtml(runner));
+}
+
+function buildReplacementFeedHtml(runner) {
+  const mode = runner.feedMode || "live";
+  const labels = {
+    brb: ["BRB", `${runner.name} will be right back`],
+    tech: ["Technical Difficulty", `${runner.name}'s feed is being checked`],
+    black: ["", ""],
+    standby: ["Standby", `${runner.name} is not live yet`]
+  };
+  const [title, subtitle] = labels[mode] || labels.standby;
+  const background = mode === "black"
+    ? "#000"
+    : "radial-gradient(circle at 28% 24%,rgba(45,198,163,.28),transparent 34%),radial-gradient(circle at 76% 74%,rgba(240,184,74,.22),transparent 38%),#101417";
+  return `<!doctype html><html><body><main><strong>${escapeHtml(title)}</strong><span>${escapeHtml(subtitle)}</span></main></body><style>${baseHtmlCss()} body{background:${background};font-family:Segoe UI,Arial,sans-serif;}main{position:absolute;inset:0;display:grid;place-content:center;gap:14px;text-align:center;color:#eef2f4;}strong{font-size:clamp(42px,8vw,112px);font-weight:950;line-height:1;}span{font-size:clamp(20px,3vw,42px);font-weight:800;color:rgba(238,242,244,.68);}</style></html>`;
+}
+
+function feedModeLabel(mode) {
+  return {
+    live: "Live feed",
+    brb: "BRB card",
+    tech: "Tech difficulty",
+    black: "Black screen",
+    standby: "Standby card"
+  }[mode] || "Live feed";
 }
 
 function isUrl(value) {
@@ -2921,20 +4383,24 @@ function getEditingBorderStyle() {
 }
 
 function getBorderStyle(target) {
-  const key = target === "timer" ? "timer" : "feed";
+  const key = borderTargetKey(target);
   state.layout.borderStyles[key] ??= structuredClone(BORDER_PRESETS.graphite);
   return state.layout.borderStyles[key];
 }
 
 function getBorderImage(target) {
-  const key = target === "timer" ? "timer" : "feed";
+  const key = borderTargetKey(target);
   return state.layout.borderImages?.[key] || "";
 }
 
 function setEditingBorderImage(value) {
-  const key = state.layout.borderTarget === "timer" ? "timer" : "feed";
-  state.layout.borderImages ??= { feed: "", timer: "" };
+  const key = borderTargetKey(state.layout.borderTarget);
+  state.layout.borderImages ??= { feed: "", timer: "", title: "" };
   state.layout.borderImages[key] = value;
+}
+
+function borderTargetKey(target) {
+  return target === "timer" || target === "title" ? target : "feed";
 }
 
 function buildBorderHtml() {
@@ -2960,16 +4426,36 @@ function buildTimerTextHtml() {
   const size = timerTextSourceSize();
   const start = config.state === "running" ? Number(config.startedAt || Date.now()) : 0;
   const elapsed = currentTimerElapsedMs();
-  const fontSize = Math.min(Number(config.fontSize), size.height * 0.76);
-  return `<!doctype html><html><body><div id="timer">${formatTimerDisplay(elapsed)}</div><script>const state=${JSON.stringify(config.state)};const startedAt=${start};const format=${JSON.stringify(config.format)};let elapsed=${elapsed};function fmt(ms){const totalSeconds=Math.floor(ms/1000);const hours=Math.floor(totalSeconds/3600);const totalMinutes=Math.floor(totalSeconds/60);const minutes=Math.floor((totalSeconds%3600)/60);const seconds=totalSeconds%60;if(format==="mmss")return String(totalMinutes).padStart(2,"0")+":"+String(seconds).padStart(2,"0");if(format==="mmssms")return String(totalMinutes).padStart(2,"0")+":"+String(seconds).padStart(2,"0")+"."+String(Math.floor(ms%1000)).padStart(3,"0");return [hours,minutes,seconds].map(v=>String(v).padStart(2,"0")).join(":");}function tick(){if(state==="running") elapsed=Math.max(0,Date.now()-startedAt);document.getElementById("timer").textContent=fmt(elapsed);}tick();if(state==="running") setInterval(tick,format==="mmssms"?33:200);</script></body><style>${baseHtmlCss()} body{display:grid;place-items:center;font-family:${cssFontStack(config.fontFamily)};}#timer{max-width:100vw;max-height:100vh;overflow:hidden;white-space:nowrap;text-overflow:clip;font-size:${fontSize}px;line-height:1;font-weight:900;color:${timerTextColor()};${timerTextShadowCss(config)}}</style></html>`;
+  const fontSize = timerEffectiveFontSize(config, size);
+  const anchor = timerTextAnchor(size);
+  const svg = svgTextMarkup({
+    id: "timerText",
+    text: formatTimerDisplay(elapsed),
+    width: size.width,
+    height: size.height,
+    fontFamily: config.fontFamily,
+    fontSize,
+    fill: timerTextColor(),
+    config,
+    align: "center",
+    x: anchor.x,
+    y: anchor.y
+  });
+  return `<!doctype html><html><body>${svg}<script>const state=${JSON.stringify(config.state)};const startedAt=${start};const format=${JSON.stringify(config.format)};let elapsed=${elapsed};function fmt(ms){const totalSeconds=Math.floor(ms/1000);const hours=Math.floor(totalSeconds/3600);const totalMinutes=Math.floor(totalSeconds/60);const minutes=Math.floor((totalSeconds%3600)/60);const seconds=totalSeconds%60;if(format==="mmss")return String(totalMinutes).padStart(2,"0")+":"+String(seconds).padStart(2,"0");if(format==="mmssms")return String(totalMinutes).padStart(2,"0")+":"+String(seconds).padStart(2,"0")+"."+String(Math.floor(ms%1000)).padStart(3,"0");return [hours,minutes,seconds].map(v=>String(v).padStart(2,"0")).join(":");}function tick(){if(state==="running") elapsed=Math.max(0,Date.now()-startedAt);document.getElementById("timerText").textContent=fmt(elapsed);}tick();if(state==="running") setInterval(tick,format==="mmssms"?33:200);</script></body><style>${baseHtmlCss()} body{display:grid;place-items:center;}</style></html>`;
+}
+
+function timerEffectiveFontSize(config, size) {
+  return Math.max(1, Number(config.fontSize) || DEFAULT_TIMER_TEXT.fontSize);
 }
 
 function buildGeneratedBorderHtml(isTimer, style) {
-  const animationCss = borderAnimationCss(style);
-  return `<!doctype html><html><body><div class="frame"></div></body><style>${baseHtmlCss()} ${animationCss}.frame{${borderFrameCss(isTimer, style)}}</style></html>`;
+  const sourceWidth = isTimer ? STAGE.width : state.layout.feedWidth;
+  const sourceHeight = isTimer ? STAGE.height : state.layout.feedHeight;
+  const animationCss = borderAnimationCss(style, sourceWidth, sourceHeight);
+  return `<!doctype html><html><body><div class="frame"></div></body><style>${baseHtmlCss()} ${animationCss}.frame{${borderFrameCss(isTimer, style, sourceWidth, sourceHeight)}}</style></html>`;
 }
 
-function borderFrameCss(isTimer, style = getBorderStyle(isTimer ? "timer" : "feed")) {
+function borderFrameCss(isTimer, style = getBorderStyle(isTimer ? "timer" : "feed"), sourceWidth = isTimer ? STAGE.width : state.layout.feedWidth, sourceHeight = isTimer ? STAGE.height : state.layout.feedHeight) {
   const lineWidth = Math.max(0, Number(style.lineWidth));
   const glowSize = isTimer ? 26 : 42;
   const innerGlowSize = isTimer ? 18 : 28;
@@ -2983,15 +4469,71 @@ function borderFrameCss(isTimer, style = getBorderStyle(isTimer ? "timer" : "fee
   const borderPaint = style.mode === "gradient"
     ? `--orm-gradient-angle-start:${style.gradientAngle}deg;--orm-gradient-angle:${style.gradientAngle}deg;border:${lineWidth}px solid transparent;background:linear-gradient(${angle}, ${style.gradientFrom}, ${style.gradientTo}) border-box;-webkit-mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;${animation}`
     : style.mode === "texture" && style.textureImage
-      ? `border:${lineWidth}px solid transparent;background-image:url("${escapeCssString(style.textureImage)}");background-size:${style.textureScale}% ${style.textureScale}%;background-position:${style.textureX}% ${style.textureY}%;background-repeat:repeat;-webkit-mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;`
+      ? `border:${lineWidth}px solid transparent;background-image:url("${escapeCssString(style.textureImage)}");background-size:${style.textureScale}% ${style.textureScale}%;background-position:${style.textureX}% ${style.textureY}%;background-repeat:repeat;-webkit-mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;${textureScrollAnimationCss(style.textureScrollX, style.textureScrollY, "ormBorderTexture", sourceWidth, sourceHeight, style.textureScale)}`
     : `border:${lineWidth}px solid ${style.lineColor};`;
   const background = style.mode === "gradient" || style.mode === "texture" ? "" : "background:transparent;";
   return `position:absolute;inset:0;${borderPaint}box-shadow:inset 0 0 0 ${insetWidth}px rgba(255,255,255,.16),inset 0 0 ${innerGlowSize}px ${innerGlow},0 0 ${glowSize}px ${glow};border-radius:${style.radius}px;${background}box-sizing:border-box;`;
 }
 
-function borderAnimationCss(style) {
-  if (style.mode !== "gradient" || !style.animateGradientAngle || Number(style.gradientAngleSpeed) === 0) return "";
-  return `@property --orm-gradient-angle{syntax:"<angle>";inherits:false;initial-value:${style.gradientAngle}deg;}@keyframes ormGradientAnglePositive{to{--orm-gradient-angle:calc(var(--orm-gradient-angle-start) + 360deg);}}@keyframes ormGradientAngleNegative{to{--orm-gradient-angle:calc(var(--orm-gradient-angle-start) - 360deg);}}`;
+function borderAnimationCss(style, sourceWidth = state.layout.feedWidth, sourceHeight = state.layout.feedHeight) {
+  let css = "";
+  if (style.mode === "gradient" && style.animateGradientAngle && Number(style.gradientAngleSpeed) !== 0) {
+    css += `@property --orm-gradient-angle{syntax:"<angle>";inherits:false;initial-value:${style.gradientAngle}deg;}@keyframes ormGradientAnglePositive{to{--orm-gradient-angle:calc(var(--orm-gradient-angle-start) + 360deg);}}@keyframes ormGradientAngleNegative{to{--orm-gradient-angle:calc(var(--orm-gradient-angle-start) - 360deg);}}`;
+  }
+  if (style.mode === "texture" && style.textureImage && (Number(style.textureScrollX) !== 0 || Number(style.textureScrollY) !== 0)) {
+    css += textureScrollKeyframesCss(style.textureScrollX, style.textureScrollY, "ormBorderTexture", sourceWidth, sourceHeight, style.textureScale, style.textureX, style.textureY);
+  }
+  return css;
+}
+
+function textureScrollAnimationCss(scrollX, scrollY, name, sourceWidth, sourceHeight, textureScale) {
+  const loop = textureLoop(scrollX, scrollY, sourceWidth, sourceHeight, textureScale);
+  if (!loop) return "";
+  return `animation:${name} ${loop.duration}s linear infinite;`;
+}
+
+function textureScrollKeyframesCss(scrollX, scrollY, name, sourceWidth, sourceHeight, textureScale, baseX = 50, baseY = 50) {
+  const loop = textureLoop(scrollX, scrollY, sourceWidth, sourceHeight, textureScale);
+  if (!loop) return "";
+  return `@keyframes ${name}{from{background-position:${baseX}% ${baseY}%;}to{background-position:calc(${baseX}% + ${loop.dx}px) calc(${baseY}% + ${loop.dy}px);}}`;
+}
+
+function textureLoop(scrollX, scrollY, sourceWidth, sourceHeight, textureScale) {
+  const sx = Number(scrollX) || 0;
+  const sy = Number(scrollY) || 0;
+  if (sx === 0 && sy === 0) return null;
+
+  const tileW = Math.max(1, Number(sourceWidth || STAGE.width) * Math.max(1, Number(textureScale) || 100) / 100);
+  const tileH = Math.max(1, Number(sourceHeight || STAGE.height) * Math.max(1, Number(textureScale) || 100) / 100);
+  const ax = Math.abs(sx);
+  const ay = Math.abs(sy);
+  let nx = ax > 0 ? 1 : 0;
+  let ny = ay > 0 ? 1 : 0;
+  let duration = ax > 0 ? tileW / ax : tileH / ay;
+
+  if (ax > 0 && ay > 0) {
+    let best = { nx: 1, ny: 1, duration: (tileW / ax + tileH / ay) / 2, error: Number.POSITIVE_INFINITY };
+    for (let xMultiple = 1; xMultiple <= 12; xMultiple += 1) {
+      const xDuration = xMultiple * tileW / ax;
+      for (let yMultiple = 1; yMultiple <= 12; yMultiple += 1) {
+        const yDuration = yMultiple * tileH / ay;
+        const error = Math.abs(xDuration - yDuration);
+        if (error < best.error) {
+          best = { nx: xMultiple, ny: yMultiple, duration: (xDuration + yDuration) / 2, error };
+        }
+      }
+    }
+    nx = best.nx;
+    ny = best.ny;
+    duration = best.duration;
+  }
+
+  duration = clampNumber(duration, 0.25, 120, 4);
+  return {
+    dx: sx === 0 ? 0 : Math.sign(sx) * nx * tileW,
+    dy: sy === 0 ? 0 : Math.sign(sy) * ny * tileH,
+    duration: round(duration)
+  };
 }
 
 function gradientAnimationName(style) {
@@ -3003,34 +4545,140 @@ function gradientAnimationDuration(style) {
   return round(360 / speed);
 }
 
-function buildNameHtml(runner) {
+function buildNameHtml(runner, rect = null) {
   const config = state.layout.nameplate;
-  const finish = runner.done ? `<em>${escapeHtml(formatTimerDisplay(runner.finalTimeMs ?? 0))}</em>` : "";
+  const sourceSize = nameSourceSize(rect);
   const plateImage = config.showBox && config.plateMode === "image" && config.plateImage;
   const plateImageMarkup = plateImage ? `<img class="plate-art" src="${escapeAttribute(config.plateImage)}" alt="">` : "";
-  return `<!doctype html><html><body><div class="bar">${plateImageMarkup}<div class="name-content"><strong>${escapeHtml(runner.name)}</strong>${finish}</div></div></body><style>${baseHtmlCss()} body{font-family:${cssFontStack(config.fontFamily)};color:${config.textColor};text-rendering:geometricPrecision;-webkit-font-smoothing:antialiased;font-stretch:normal;letter-spacing:0;}.bar{${nameplateFrameCss(config)}}.plate-art{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:block;z-index:0;pointer-events:none;}.name-content{${nameplateContentCss(config)}}strong{${nameplateStrongCss(config)}}em{${nameplateFinishCss(config)}}</style></html>`;
+  const textSvg = nameTextSvgMarkup(runner, sourceSize);
+  return `<!doctype html><html><body><div class="bar">${plateImageMarkup}${textSvg}</div></body><style>${baseHtmlCss()} ${nameplateAnimationCss(config, sourceSize.width, sourceSize.height)}body{font-family:${cssFontStack(config.fontFamily)};color:${config.textColor};text-rendering:geometricPrecision;-webkit-font-smoothing:antialiased;font-stretch:normal;letter-spacing:0;}.bar{${nameplateFrameCss(config, "100%", "100%", sourceSize.width, sourceSize.height)}}.plate-art{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:block;z-index:0;pointer-events:none;}.svg-text{position:absolute;inset:0;z-index:1;display:block;pointer-events:none;}</style></html>`;
 }
 
-function nameplateFrameCss(config, width = "100%", height = "100%") {
-  const background = config.showBox
-    ? hexToRgba(config.plateBackgroundColor, Number(config.plateBackgroundOpacity) / 100)
-    : "transparent";
+function nameTextSvgMarkup(runner, sourceSize) {
+  const config = state.layout.nameplate;
+  const fontSize = nameTextIsUnframed()
+    ? Math.max(1, Number(config.fontSize) || state.layout.nameplate.fontSize)
+    : Math.min(Number(config.fontSize), sourceSize.height * NAME_FONT_HEIGHT_RATIO);
+  const anchor = nameTextAnchor(sourceSize);
+  return svgTextMarkup({
+    text: runner.name,
+    width: sourceSize.width,
+    height: sourceSize.height,
+    fontFamily: config.fontFamily,
+    fontSize,
+    fill: config.textColor,
+    config,
+    align: "left",
+    x: anchor.x,
+    y: anchor.y,
+    textClass: "name-visual-text",
+    filterKey: `name-${runner.slot}`
+  });
+}
+
+function buildFinishHtml(runner) {
+  const text = formatRunnerFinalTime(runner);
+  const size = finishSourceSize(runner, getCurrentRectBySlot().get(runner.slot));
+  const svg = finishTextSvgMarkup(runner, size, text);
+  return `<!doctype html><html><body>${svg}</body><style>${baseHtmlCss()} body{display:block;}</style></html>`;
+}
+
+function finishTextSvgMarkup(runner, size, text = formatRunnerFinalTime(runner)) {
+  const config = state.layout.finishedTime;
+  const pad = textEffectPadding(config, 0);
+  const fontSize = Math.max(1, Number(config.fontSize) || DEFAULT_FINISHED_TIME.fontSize);
+  const align = config.align || "right";
+  const x = align === "left" ? pad : align === "center" ? size.width / 2 : size.width - pad;
+  return svgTextMarkup({
+    text,
+    width: size.width,
+    height: size.height,
+    fontFamily: config.fontFamily,
+    fontSize,
+    fill: config.color,
+    config,
+    align,
+    x,
+    y: size.height / 2,
+    textClass: "finish-visual-text",
+    filterKey: `finish-${runner.slot}`
+  });
+}
+
+function svgTextMarkup({ id = "", text, width, height, fontFamily, fontSize, fill, config, align = "left", x, y, textClass = "", filterKey = "" }) {
+  const strokeWidth = config.strokeEnabled ? Math.max(0, Number(config.strokeWidth) || 0) : 0;
+  const strokeAttrs = strokeWidth > 0
+    ? `stroke="${escapeAttribute(config.strokeColor)}" stroke-width="${strokeWidth}" paint-order="stroke fill" stroke-linejoin="round" stroke-linecap="round"`
+    : `stroke="none" stroke-width="0"`;
+  const filterId = `shadow-${filterKey ? safeSvgId(filterKey) : Math.random().toString(36).slice(2)}`;
+  const filterAttr = config.shadowEnabled ? ` filter="url(#${filterId})"` : "";
+  const filter = config.shadowEnabled
+    ? `<defs><filter id="${filterId}" x="-50%" y="-80%" width="200%" height="260%"><feDropShadow dx="${Number(config.shadowX) || 0}" dy="${Number(config.shadowY) || 0}" stdDeviation="${Math.max(0, Number(config.shadowBlur) || 0) / 2}" flood-color="${escapeAttribute(config.shadowColor)}" flood-opacity="1"/></filter></defs>`
+    : "";
+  const anchor = align === "center" ? "middle" : align === "right" ? "end" : "start";
+  const idAttr = id ? ` id="${escapeAttribute(id)}"` : "";
+  const classAttr = textClass ? ` class="${escapeAttribute(textClass)}"` : "";
+  return `<svg class="svg-text" xmlns="http://www.w3.org/2000/svg" width="${Math.max(1, Math.round(width))}" height="${Math.max(1, Math.round(height))}" viewBox="0 0 ${Math.max(1, Math.round(width))} ${Math.max(1, Math.round(height))}" preserveAspectRatio="none">${filter}<text${idAttr}${classAttr} x="${round(x)}" y="${round(y)}" dominant-baseline="central" text-anchor="${anchor}" font-family="${escapeAttribute(svgFontFamily(fontFamily))}" font-size="${round(fontSize)}" font-weight="900" fill="${escapeAttribute(fill)}" ${strokeAttrs}${filterAttr}>${escapeHtml(text)}</text></svg>`;
+}
+
+function svgFontFamily(value) {
+  return `${String(value || "Segoe UI").split(",")[0].replaceAll("\"", "").replaceAll("'", "").trim() || "Segoe UI"}, Arial, sans-serif`;
+}
+
+function safeSvgId(value) {
+  return String(value).replace(/[^a-zA-Z0-9_-]/g, "-");
+}
+
+function nameplateFrameCss(config, width = "100%", height = "100%", sourceWidth = typeof width === "number" ? width : 960, sourceHeight = typeof height === "number" ? height : 120) {
+  const background = nameplateBackgroundCss(config, sourceWidth, sourceHeight);
   const borderWidth = Math.max(0, Number(config.plateBorderWidth) || 0);
   const borderColor = hexToRgba(config.plateBorderColor, Number(config.plateBorderOpacity) / 100);
   const border = config.showBorder ? `${borderWidth}px solid ${borderColor}` : `${borderWidth}px solid transparent`;
   const generatedPlate = config.plateMode !== "image";
-  const plateBackground = generatedPlate ? background : "transparent";
+  const plateBackground = generatedPlate && config.showBox ? background : "transparent";
   const plateBorder = generatedPlate ? border : `${borderWidth}px solid transparent`;
-  return `position:absolute;left:0;top:0;width:${typeof width === "number" ? `${width}px` : width};height:${typeof height === "number" ? `${height}px` : height};display:flex;align-items:center;justify-content:space-between;gap:2%;padding:0 ${Math.max(0, Number(config.platePaddingX) || 0)}px;background:${plateBackground};border:${plateBorder};border-radius:${Math.max(0, Number(config.plateRadius) || 0)}px;overflow:hidden;box-sizing:border-box;transform-origin:0 0;`;
+  return `position:absolute;left:0;top:0;width:${typeof width === "number" ? `${width}px` : width};height:${typeof height === "number" ? `${height}px` : height};display:flex;align-items:center;justify-content:space-between;gap:2%;padding:0 ${Math.max(0, Number(config.platePaddingX) || 0)}px;${plateBackground}border:${plateBorder};border-radius:${Math.max(0, Number(config.plateRadius) || 0)}px;overflow:hidden;box-sizing:border-box;transform-origin:0 0;`;
 }
 
-function nameplateContentCss(config) {
-  return `position:relative;z-index:1;display:inline-flex;align-items:center;gap:14px;max-width:100%;min-width:0;transform:translate(${Number(config.textX) || 0}px, ${Number(config.textY) || 0}px);`;
+function nameplateBackgroundCss(config, sourceWidth = 960, sourceHeight = 120, textureAnimationName = "ormNameplateTexture") {
+  const alpha = Number(config.plateBackgroundOpacity) / 100;
+  if (config.plateFillMode === "gradient") {
+    const angle = config.plateAnimateGradientAngle ? "var(--orm-gradient-angle)" : `${config.plateGradientAngle}deg`;
+    const animation = config.plateAnimateGradientAngle && Number(config.plateGradientAngleSpeed) !== 0
+      ? `animation:${gradientAnimationName({ gradientAngleSpeed: config.plateGradientAngleSpeed })} ${gradientAnimationDuration({ gradientAngleSpeed: config.plateGradientAngleSpeed })}s linear infinite;`
+      : "";
+    return `--orm-gradient-angle-start:${config.plateGradientAngle}deg;--orm-gradient-angle:${config.plateGradientAngle}deg;background:linear-gradient(${angle}, ${hexToRgba(config.plateGradientFrom, alpha)}, ${hexToRgba(config.plateGradientTo, alpha)});${animation}`;
+  }
+  if (config.plateFillMode === "texture" && config.plateTextureImage) {
+    return `background-color:${hexToRgba(config.plateBackgroundColor, alpha)};background-image:url("${escapeCssString(config.plateTextureImage)}");background-size:${config.plateTextureScale}% ${config.plateTextureScale}%;background-position:${config.plateTextureX}% ${config.plateTextureY}%;background-repeat:repeat;${textureScrollAnimationCss(config.plateTextureScrollX, config.plateTextureScrollY, textureAnimationName, sourceWidth, sourceHeight, config.plateTextureScale)}`;
+  }
+  return `background:${hexToRgba(config.plateBackgroundColor, alpha)};`;
+}
+
+function nameplateAnimationCss(config, sourceWidth = 960, sourceHeight = 120, textureAnimationName = "ormNameplateTexture") {
+  const needsGradient = config.plateFillMode === "gradient" && config.plateAnimateGradientAngle && Number(config.plateGradientAngleSpeed) !== 0;
+  const needsTexture = config.plateFillMode === "texture" && config.plateTextureImage && (Number(config.plateTextureScrollX) !== 0 || Number(config.plateTextureScrollY) !== 0);
+  let css = "";
+  if (needsGradient) css += borderAnimationCss({ mode: "gradient", animateGradientAngle: true, gradientAngleSpeed: config.plateGradientAngleSpeed, gradientAngle: config.plateGradientAngle });
+  if (needsTexture) css += textureScrollKeyframesCss(config.plateTextureScrollX, config.plateTextureScrollY, textureAnimationName, sourceWidth, sourceHeight, config.plateTextureScale, config.plateTextureX, config.plateTextureY);
+  return css;
+}
+
+function nameplateContentCss(config, sourceSize = null) {
+  if (sourceSize && nameTextIsUnframed()) {
+    const name = state.layout.panelGeometry.name;
+    const padding = Math.max(0, Number(config.platePaddingX) || 0);
+    const left = name.x * sourceSize.width + padding;
+    const top = (name.y + name.height / 2) * sourceSize.height;
+    return `position:absolute;left:${round(left)}px;top:${round(top)}px;z-index:1;display:inline-flex;align-items:center;gap:14px;width:max-content;max-width:none;min-width:max-content;overflow:visible;transform:translate(${Number(config.textX) || 0}px, calc(-50% + ${Number(config.textY) || 0}px));`;
+  }
+  return `position:relative;z-index:1;display:inline-flex;align-items:center;gap:14px;width:max-content;max-width:none;min-width:max-content;overflow:visible;transform:translate(${Number(config.textX) || 0}px, ${Number(config.textY) || 0}px);`;
 }
 
 function nameplateStrongCss(config, heightLimit = `${NAME_FONT_HEIGHT_RATIO * 100}vh`) {
   const shadow = nameTextShadowCss(config);
-  return `display:block;min-width:0;max-width:100%;font-size:min(${config.fontSize}px,${heightLimit});font-weight:800;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${config.textColor};${shadow}`;
+  const pad = textEffectPadding(config);
+  return `display:block;flex:0 0 auto;min-width:max-content;max-width:none;padding:${pad}px;margin:-${pad}px;font-size:min(${config.fontSize}px,${heightLimit});font-weight:800;line-height:1;white-space:nowrap;overflow:visible;text-overflow:clip;color:${config.textColor};${shadow}`;
 }
 
 function nameplateFinishCss(config, heightLimit = `${NAME_FONT_HEIGHT_RATIO * 100}vh`) {
@@ -3040,29 +4688,48 @@ function nameplateFinishCss(config, heightLimit = `${NAME_FONT_HEIGHT_RATIO * 10
 
 function nameTextShadowCss(config) {
   const shadows = [];
-  if (config.strokeEnabled && Number(config.strokeWidth) > 0) {
-    const width = Math.min(8, Math.max(1, Math.round(Number(config.strokeWidth))));
-    for (let radius = 1; radius <= width; radius += 1) {
-      shadows.push(`${radius}px 0 0 ${config.strokeColor}`);
-      shadows.push(`${-radius}px 0 0 ${config.strokeColor}`);
-      shadows.push(`0 ${radius}px 0 ${config.strokeColor}`);
-      shadows.push(`0 ${-radius}px 0 ${config.strokeColor}`);
-      shadows.push(`${radius}px ${radius}px 0 ${config.strokeColor}`);
-      shadows.push(`${-radius}px ${radius}px 0 ${config.strokeColor}`);
-      shadows.push(`${radius}px ${-radius}px 0 ${config.strokeColor}`);
-      shadows.push(`${-radius}px ${-radius}px 0 ${config.strokeColor}`);
-    }
-  }
-
   if (config.shadowEnabled) {
     shadows.push(`${config.shadowX}px ${config.shadowY}px ${config.shadowBlur}px ${config.shadowColor}`);
   }
 
-  return shadows.length > 0 ? `text-shadow:${shadows.join(",")};` : "text-shadow:none;";
+  const shadow = shadows.length > 0 ? `text-shadow:${shadows.join(",")};` : "text-shadow:none;";
+  return `${shadow}${nativeTextStrokeCss(config)}`;
+}
+
+function finishTextCss(config, heightLimit = "72vh") {
+  return `display:block;max-width:100%;overflow:visible;text-overflow:clip;white-space:nowrap;font-size:min(${config.fontSize}px,${heightLimit});font-weight:900;line-height:1;color:${config.color};${textEffectCss(config)}`;
+}
+
+function textEffectCss(config) {
+  const value = textEffectShadowValue(config);
+  const shadow = value === "none" ? "text-shadow:none;" : `text-shadow:${value};`;
+  return `${shadow}${nativeTextStrokeCss(config)}`;
+}
+
+function textEffectShadowValue(config) {
+  const shadows = [];
+  if (config.shadowEnabled) {
+    shadows.push(`${config.shadowX}px ${config.shadowY}px ${config.shadowBlur}px ${config.shadowColor}`);
+  }
+  return shadows.length > 0 ? shadows.join(",") : "none";
+}
+
+function textEffectPadding(config, minimum = 4) {
+  const stroke = config.strokeEnabled ? Math.ceil((Number(config.strokeWidth) || 0) / 2) + 2 : 0;
+  const shadow = config.shadowEnabled
+    ? Math.abs(Number(config.shadowX) || 0) + Math.abs(Number(config.shadowY) || 0) + Number(config.shadowBlur || 0) + 2
+    : 0;
+  return Math.ceil(Math.max(stroke, shadow, minimum));
+}
+
+function finishJustify(align) {
+  if (align === "left") return "start";
+  if (align === "center") return "center";
+  return "end";
 }
 
 async function browseInstalledFonts() {
-  els.browseFonts.disabled = true;
+  for (const button of [els.browseFonts, els.timerBrowseFonts, els.finishBrowseFonts, els.raceInfoBrowseFonts]) button.disabled = true;
   setFontStatus("Looking for installed fonts...");
   try {
     if ("queryLocalFonts" in window) {
@@ -3083,7 +4750,7 @@ async function browseInstalledFonts() {
     const detected = detectAvailableFonts(COMMON_FONT_FACES);
     populateFontChoices(detected, `Font permission was not granted. Showing ${detected.length} detected common fonts.`);
   } finally {
-    els.browseFonts.disabled = false;
+    for (const button of [els.browseFonts, els.timerBrowseFonts, els.finishBrowseFonts, els.raceInfoBrowseFonts]) button.disabled = false;
   }
 }
 
@@ -3099,6 +4766,16 @@ function populateFontChoices(fonts, status = "") {
     option.value = font;
     return option;
   }));
+  els.raceInfoFontChoices.replaceChildren(...names.map((font) => {
+    const option = document.createElement("option");
+    option.value = font;
+    return option;
+  }));
+  els.finishFontChoices.replaceChildren(...names.map((font) => {
+    const option = document.createElement("option");
+    option.value = font;
+    return option;
+  }));
   els.nameFontBrowser.replaceChildren(
     selectOption("", "Choose a font..."),
     ...names.map((font) => selectOption(font, font))
@@ -3107,8 +4784,18 @@ function populateFontChoices(fonts, status = "") {
     selectOption("", "Choose a font..."),
     ...names.map((font) => selectOption(font, font))
   );
+  els.raceInfoFontBrowser.replaceChildren(
+    selectOption("", "Choose a font..."),
+    ...names.map((font) => selectOption(font, font))
+  );
+  els.finishFontBrowser.replaceChildren(
+    selectOption("", "Choose a font..."),
+    ...names.map((font) => selectOption(font, font))
+  );
   els.nameFontBrowser.value = names.includes(state.layout.nameplate.fontFamily) ? state.layout.nameplate.fontFamily : "";
   els.timerFontBrowser.value = names.includes(state.layout.timerText.fontFamily) ? state.layout.timerText.fontFamily : "";
+  els.raceInfoFontBrowser.value = names.includes(state.layout.raceInfo.fontFamily) ? state.layout.raceInfo.fontFamily : "";
+  els.finishFontBrowser.value = names.includes(state.layout.finishedTime.fontFamily) ? state.layout.finishedTime.fontFamily : "";
   if (status) setFontStatus(status);
 }
 
@@ -3377,12 +5064,38 @@ async function sha256Base64(value) {
   return btoa(String.fromCharCode(...bytes));
 }
 
-function saveProject() {
-  const blob = new Blob([JSON.stringify(serializeProject(), null, 2)], { type: "application/json" });
+async function saveProject() {
+  const contents = JSON.stringify(serializeProject(), null, 2);
+  const suggestedName = "obs-race-manager-project.json";
+
+  if ("showSaveFilePicker" in window) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName,
+        types: [
+          {
+            description: "OBS Race Manager Project",
+            accept: { "application/json": [".json"] }
+          }
+        ]
+      });
+      const writable = await handle.createWritable();
+      await writable.write(contents);
+      await writable.close();
+      logObs(`Saved project as ${handle.name}.`);
+      return;
+    } catch (error) {
+      if (error.name === "AbortError") return;
+      logObs(`Native save failed: ${error.message}. Falling back to download.`);
+    }
+  }
+
+  const fallbackName = (window.prompt("Save project as", suggestedName) || suggestedName).trim() || suggestedName;
+  const blob = new Blob([contents], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "obs-race-manager-project.json";
+  link.download = fallbackName.endsWith(".json") ? fallbackName : `${fallbackName}.json`;
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -3464,6 +5177,19 @@ function normalizeLoadedLayout(layout) {
       ...state.layout.timerText,
       ...layout.timerText
     },
+    finishedTime: {
+      ...DEFAULT_FINISHED_TIME,
+      ...state.layout.finishedTime,
+      ...layout.finishedTime
+    },
+    raceInfo: {
+      ...state.layout.raceInfo,
+      ...layout.raceInfo,
+      rect: {
+        ...state.layout.raceInfo.rect,
+        ...layout.raceInfo?.rect
+      }
+    },
     nameplate: {
       ...state.layout.nameplate,
       ...layout.nameplate
@@ -3478,15 +5204,22 @@ function normalizeLoadedLayout(layout) {
         ...legacyBorderStyle,
         ...state.layout.borderStyles?.timer,
         ...layout.borderStyles?.timer
+      },
+      title: {
+        ...legacyBorderStyle,
+        ...state.layout.borderStyles?.title,
+        ...layout.borderStyles?.title
       }
     },
     borderImages: {
       feed: layout.borderImages?.feed ?? layout.borderImage ?? state.layout.borderImages?.feed ?? "",
-      timer: layout.borderImages?.timer ?? layout.borderImage ?? state.layout.borderImages?.timer ?? ""
+      timer: layout.borderImages?.timer ?? layout.borderImage ?? state.layout.borderImages?.timer ?? "",
+      title: layout.borderImages?.title ?? state.layout.borderImages?.title ?? ""
     },
     panelGeometry: {
       feed: { ...DEFAULT_PANEL_GEOMETRY.feed, ...layout.panelGeometry?.feed },
-      name: { ...DEFAULT_PANEL_GEOMETRY.name, ...layout.panelGeometry?.name }
+      name: { ...DEFAULT_PANEL_GEOMETRY.name, ...layout.panelGeometry?.name },
+      finish: { ...DEFAULT_PANEL_GEOMETRY.finish, ...layout.panelGeometry?.finish }
     },
     timerBorder: {
       ...DEFAULT_TIMER_BORDER,
@@ -3496,23 +5229,33 @@ function normalizeLoadedLayout(layout) {
 
   normalizeGeometryRect(next.panelGeometry.feed);
   normalizeGeometryRect(next.panelGeometry.name);
+  normalizeGeometryRect(next.panelGeometry.finish);
   normalizeGeometryRect(next.timerBorder);
+  normalizeGeometryRect(next.raceInfo.rect);
   normalizeNameplateStyle(next.nameplate);
+  normalizeRaceInfo(next.raceInfo);
   normalizeTimerText(next.timerText);
+  normalizeFinishedTime(next.finishedTime);
   normalizeSpotlight(next.spotlight);
   normalizeBorderStyle(next.borderStyles.feed);
   normalizeBorderStyle(next.borderStyles.timer);
-  next.borderTarget = next.borderTarget === "timer" ? "timer" : "feed";
+  normalizeBorderStyle(next.borderStyles.title);
+  next.borderTarget = ["feed", "timer", "title"].includes(next.borderTarget) ? next.borderTarget : "feed";
   next.borderModeSource = ["generated", "image", "template"].includes(next.borderModeSource) ? next.borderModeSource : "generated";
   next.borderStyle = structuredClone(next.borderStyles.feed);
   next.borderImage = next.borderImages.feed;
   next.setupPreviewSlot = clampNumber(next.setupPreviewSlot, 0, MAX_RUNNERS, 0);
+  next.viewMode = next.viewMode === "control" ? "control" : "edit";
+  next.layerLock = Boolean(next.layerLock);
+  next.snapEnabled = next.snapEnabled !== false;
   next.timerBorder.enabled = Boolean(next.timerBorder.enabled);
   next.elements.timerBorder = Boolean(next.elements.timerBorder);
   next.elements.feed = Boolean(next.elements.feed);
   next.elements.feedBorder = Boolean(next.elements.feedBorder);
   next.elements.name = Boolean(next.elements.name);
+  next.elements.titleBar = Boolean(next.elements.titleBar);
   next.elements.builtInTimer = Boolean(next.elements.builtInTimer);
+  next.elements.finishedTime = Boolean(next.elements.finishedTime);
   return next;
 }
 
@@ -3520,11 +5263,43 @@ function normalizeSpotlight(config) {
   config.enabled = Boolean(config.enabled);
   config.slots = String(config.slots || "");
   config.showOthers = Boolean(config.showOthers);
+  config.disableSmallNameplates = Boolean(config.disableSmallNameplates);
   config.side = ["right", "left", "bottom"].includes(config.side) ? config.side : "bottom";
   config.stackOrder = ["horizontal", "vertical"].includes(config.stackOrder) ? config.stackOrder : "horizontal";
   config.mainScale = clampNumber(config.mainScale, 55, 92, 78);
   config.otherScale = clampNumber(config.otherScale, 8, 40, 22);
   config.gap = clampNumber(config.gap, 0, 64, 20);
+}
+
+function normalizeRaceInfo(config) {
+  config.title = String(config.title || "Race Title");
+  config.subtitle = String(config.subtitle || "");
+  config.fontFamily = String(config.fontFamily || "Segoe UI");
+  config.fontSize = clampNumber(config.fontSize, 1, 1000, 34);
+  config.textColor = normalizeHexColor(config.textColor, "#ffffff");
+  config.plateImage = String(config.plateImage || "");
+  config.plateBackgroundColor = normalizeHexColor(config.plateBackgroundColor || config.backgroundColor, "#10161a");
+  config.plateBackgroundOpacity = clampNumber(config.plateBackgroundOpacity, 0, 100, 84);
+  config.plateBorderColor = normalizeHexColor(config.plateBorderColor, "#ffffff");
+  config.plateBorderOpacity = clampNumber(config.plateBorderOpacity, 0, 100, 14);
+  config.plateBorderWidth = clampNumber(config.plateBorderWidth, 0, 20, 1);
+  config.plateRadius = clampNumber(config.plateRadius, 0, 60, 8);
+  config.platePaddingX = clampNumber(config.platePaddingX, 0, 160, 18);
+  config.plateFillMode = ["solid", "gradient", "texture"].includes(config.plateFillMode) ? config.plateFillMode : "solid";
+  config.plateGradientFrom = normalizeHexColor(config.plateGradientFrom, config.plateBackgroundColor);
+  config.plateGradientTo = normalizeHexColor(config.plateGradientTo, "#26343b");
+  config.plateGradientAngle = clampNumber(config.plateGradientAngle, 0, 360, 135);
+  config.plateAnimateGradientAngle = Boolean(config.plateAnimateGradientAngle);
+  config.plateGradientAngleSpeed = clampNumber(config.plateGradientAngleSpeed, -360, 360, 45);
+  config.plateTextureImage = String(config.plateTextureImage || "");
+  config.plateTextureScale = clampNumber(config.plateTextureScale, 25, 400, 100);
+  config.plateTextureX = clampNumber(config.plateTextureX, 0, 100, 50);
+  config.plateTextureY = clampNumber(config.plateTextureY, 0, 100, 50);
+  config.plateTextureScrollX = clampNumber(config.plateTextureScrollX, -200, 200, 0);
+  config.plateTextureScrollY = clampNumber(config.plateTextureScrollY, -200, 200, 0);
+  config.plateMode = ["generated", "image"].includes(config.plateMode) ? config.plateMode : "generated";
+  config.showBox = config.showBox !== false;
+  config.showBorder = config.showBorder !== false;
 }
 
 function normalizeLoadedRunners(runners) {
@@ -3537,9 +5312,13 @@ function normalizeLoadedRunners(runners) {
       active: Boolean(runner.active ?? slot <= 2),
       name: String(runner.name ?? `Runner ${slot}`),
       source: String(runner.source ?? `runner_${slot}_feed`),
+      feedMode: ["live", "brb", "tech", "black", "standby"].includes(runner.feedMode) ? runner.feedMode : "live",
       placement: Number(runner.placement ?? slot),
       done: Boolean(runner.done),
       finalTimeMs: runner.finalTimeMs === null || runner.finalTimeMs === undefined ? null : Number(runner.finalTimeMs),
+      finalTimeText: String(runner.finalTimeText || ""),
+      audioMuted: Boolean(runner.audioMuted),
+      audioVolume: clampNumber(runner.audioVolume, 0, 200, 100),
       collapsed: Boolean(runner.collapsed),
       crop: {
         left: Number(runner.crop?.left ?? 0),
@@ -3553,7 +5332,7 @@ function normalizeLoadedRunners(runners) {
 
 function normalizeTimerText(config) {
   config.fontFamily = String(config.fontFamily || DEFAULT_TIMER_TEXT.fontFamily);
-  config.fontSize = clampNumber(config.fontSize, 16, 120, DEFAULT_TIMER_TEXT.fontSize);
+  config.fontSize = clampNumber(config.fontSize, 1, 1000, DEFAULT_TIMER_TEXT.fontSize);
   config.format = ["hhmmss", "mmss", "mmssms"].includes(config.format) ? config.format : DEFAULT_TIMER_TEXT.format;
   config.idleColor = normalizeHexColor(config.idleColor, DEFAULT_TIMER_TEXT.idleColor);
   config.stoppedColor = normalizeHexColor(config.stoppedColor, DEFAULT_TIMER_TEXT.stoppedColor);
@@ -3571,9 +5350,25 @@ function normalizeTimerText(config) {
   config.startedAt = clampNumber(config.startedAt, 0, Number.MAX_SAFE_INTEGER, 0);
 }
 
+function normalizeFinishedTime(config) {
+  config.fontFamily = String(config.fontFamily || DEFAULT_FINISHED_TIME.fontFamily);
+  config.fontSize = clampNumber(config.fontSize, 1, 1000, DEFAULT_FINISHED_TIME.fontSize);
+  config.color = normalizeHexColor(config.color, DEFAULT_FINISHED_TIME.color);
+  config.align = ["left", "center", "right"].includes(config.align) ? config.align : DEFAULT_FINISHED_TIME.align;
+  config.lockToNameplate = Boolean(config.lockToNameplate);
+  config.strokeEnabled = Boolean(config.strokeEnabled);
+  config.strokeColor = normalizeHexColor(config.strokeColor, DEFAULT_FINISHED_TIME.strokeColor);
+  config.strokeWidth = clampNumber(config.strokeWidth, 0, 10, DEFAULT_FINISHED_TIME.strokeWidth);
+  config.shadowEnabled = Boolean(config.shadowEnabled);
+  config.shadowColor = normalizeHexColor(config.shadowColor, DEFAULT_FINISHED_TIME.shadowColor);
+  config.shadowBlur = clampNumber(config.shadowBlur, 0, 30, DEFAULT_FINISHED_TIME.shadowBlur);
+  config.shadowX = clampNumber(config.shadowX, -20, 20, DEFAULT_FINISHED_TIME.shadowX);
+  config.shadowY = clampNumber(config.shadowY, -20, 20, DEFAULT_FINISHED_TIME.shadowY);
+}
+
 function normalizeNameplateStyle(config) {
   config.fontFamily = String(config.fontFamily || "Segoe UI");
-  config.fontSize = clampNumber(config.fontSize, 12, 120, state.layout.nameplate.fontSize);
+  config.fontSize = clampNumber(config.fontSize, 1, 1000, state.layout.nameplate.fontSize);
   config.textColor = normalizeHexColor(config.textColor, state.layout.nameplate.textColor);
   config.plateImage = String(config.plateImage || "");
   config.plateBackgroundColor = normalizeHexColor(config.plateBackgroundColor, state.layout.nameplate.plateBackgroundColor);
@@ -3584,6 +5379,18 @@ function normalizeNameplateStyle(config) {
   config.plateRadius = clampNumber(config.plateRadius, 0, 80, state.layout.nameplate.plateRadius);
   config.platePaddingX = clampNumber(config.platePaddingX, 0, 160, state.layout.nameplate.platePaddingX);
   config.badgeColor = normalizeHexColor(config.badgeColor, state.layout.nameplate.badgeColor);
+  config.plateFillMode = ["solid", "gradient", "texture"].includes(config.plateFillMode) ? config.plateFillMode : "solid";
+  config.plateGradientFrom = normalizeHexColor(config.plateGradientFrom, state.layout.nameplate.plateGradientFrom);
+  config.plateGradientTo = normalizeHexColor(config.plateGradientTo, state.layout.nameplate.plateGradientTo);
+  config.plateGradientAngle = clampNumber(config.plateGradientAngle, 0, 360, state.layout.nameplate.plateGradientAngle);
+  config.plateAnimateGradientAngle = Boolean(config.plateAnimateGradientAngle);
+  config.plateGradientAngleSpeed = clampNumber(config.plateGradientAngleSpeed, -360, 360, state.layout.nameplate.plateGradientAngleSpeed);
+  config.plateTextureImage = String(config.plateTextureImage || "");
+  config.plateTextureScale = clampNumber(config.plateTextureScale, 25, 400, state.layout.nameplate.plateTextureScale);
+  config.plateTextureX = clampNumber(config.plateTextureX, 0, 100, state.layout.nameplate.plateTextureX);
+  config.plateTextureY = clampNumber(config.plateTextureY, 0, 100, state.layout.nameplate.plateTextureY);
+  config.plateTextureScrollX = clampNumber(config.plateTextureScrollX, -200, 200, state.layout.nameplate.plateTextureScrollX);
+  config.plateTextureScrollY = clampNumber(config.plateTextureScrollY, -200, 200, state.layout.nameplate.plateTextureScrollY);
   config.textX = clampNumber(config.textX, -500, 500, state.layout.nameplate.textX);
   config.textY = clampNumber(config.textY, -200, 200, state.layout.nameplate.textY);
   config.plateMode = config.plateMode === "image" ? "image" : "generated";
@@ -3615,6 +5422,8 @@ function normalizeBorderStyle(style) {
   style.textureScale = clampNumber(style.textureScale, 25, 400, BORDER_PRESETS.graphite.textureScale);
   style.textureX = clampNumber(style.textureX, 0, 100, BORDER_PRESETS.graphite.textureX);
   style.textureY = clampNumber(style.textureY, 0, 100, BORDER_PRESETS.graphite.textureY);
+  style.textureScrollX = clampNumber(style.textureScrollX, -200, 200, BORDER_PRESETS.graphite.textureScrollX);
+  style.textureScrollY = clampNumber(style.textureScrollY, -200, 200, BORDER_PRESETS.graphite.textureScrollY);
 }
 
 function normalizeHexColor(value, fallback) {
@@ -3641,6 +5450,10 @@ function syncGlobalControlsFromState() {
   els.animationFpsValue.textContent = `${state.layout.animationFps} fps`;
   els.animationStyle.value = state.layout.animationStyle;
   els.animateObsLayout.checked = obsBridge.animateLayout;
+  els.layerLockEnabled.checked = state.layout.layerLock;
+  els.snapEnabled.checked = state.layout.snapEnabled;
+  els.viewEditMode.classList.toggle("active", state.layout.viewMode !== "control");
+  els.viewControlMode.classList.toggle("active", state.layout.viewMode === "control");
   els.feedWidth.value = state.layout.feedWidth;
   els.feedHeight.value = state.layout.feedHeight;
   els.builtInTimerEnabled.checked = state.layout.elements.builtInTimer;
@@ -3665,6 +5478,7 @@ function syncGlobalControlsFromState() {
   els.spotlightEnabled.checked = state.layout.spotlight.enabled;
   els.spotlightSlots.value = state.layout.spotlight.slots;
   els.spotlightShowOthers.checked = state.layout.spotlight.showOthers;
+  els.spotlightDisableSmallNameplates.checked = state.layout.spotlight.disableSmallNameplates;
   els.spotlightSide.value = state.layout.spotlight.side;
   els.spotlightStackOrder.value = state.layout.spotlight.stackOrder;
   els.spotlightMainScale.value = state.layout.spotlight.mainScale;
@@ -3673,10 +5487,22 @@ function syncGlobalControlsFromState() {
   els.spotlightOtherScaleValue.textContent = `${state.layout.spotlight.otherScale}%`;
   els.spotlightGap.value = state.layout.spotlight.gap;
   els.spotlightGapValue.textContent = `${state.layout.spotlight.gap} px`;
+  els.titleBarVisible.checked = state.layout.elements.titleBar;
+  els.raceInfoEnabled.checked = state.layout.elements.titleBar;
+  els.raceTitle.value = state.layout.raceInfo.title;
+  els.raceSubtitle.value = state.layout.raceInfo.subtitle;
+  els.raceInfoFont.value = state.layout.raceInfo.fontFamily;
+  els.raceInfoFontBrowser.value = Array.from(els.raceInfoFontBrowser.options).some((option) => option.value === state.layout.raceInfo.fontFamily)
+    ? state.layout.raceInfo.fontFamily
+    : "";
+  els.raceInfoFontSize.value = state.layout.raceInfo.fontSize;
+  els.raceInfoTextColor.value = state.layout.raceInfo.textColor;
+  syncRaceInfoControlsFromState();
   populateSetupPreviewSlotOptions();
   if (state.layout.timerText.state === "running") startTimerPreviewTicker();
   else stopTimerPreviewTicker();
   syncNameplateControlsFromState();
+  syncFinishedTimeControlsFromState();
   syncBorderStyleControlsFromState();
   syncGeometryControls();
 }
@@ -3701,6 +5527,10 @@ function syncBorderStyleControlsFromState() {
   els.borderTextureScaleValue.textContent = `${style.textureScale}%`;
   els.borderTextureX.value = style.textureX;
   els.borderTextureY.value = style.textureY;
+  els.borderTextureScrollX.value = style.textureScrollX;
+  els.borderTextureScrollXValue.textContent = `${style.textureScrollX} px/s`;
+  els.borderTextureScrollY.value = style.textureScrollY;
+  els.borderTextureScrollYValue.textContent = `${style.textureScrollY} px/s`;
   syncBorderSourceSections();
   syncBorderModeSections();
   syncBorderSwatches();
@@ -3728,6 +5558,53 @@ function syncBorderSwatches() {
   }
 }
 
+function syncRaceInfoControlsFromState() {
+  const config = state.layout.raceInfo;
+  els.raceInfoPlateMode.value = config.plateMode;
+  els.clearRaceInfoPlateImage.disabled = !config.plateImage;
+  els.raceInfoShowBox.checked = config.showBox;
+  els.raceInfoShowBorder.checked = config.showBorder;
+  els.raceInfoPlateFillMode.value = config.plateFillMode;
+  els.raceInfoPlateBackgroundColor.value = config.plateBackgroundColor;
+  els.raceInfoPlateGradientFrom.value = config.plateGradientFrom;
+  els.raceInfoPlateGradientTo.value = config.plateGradientTo;
+  els.raceInfoPlateGradientAngle.value = config.plateGradientAngle;
+  els.raceInfoPlateGradientAngleSlider.value = config.plateGradientAngle;
+  els.raceInfoPlateAnimateGradientAngle.checked = Boolean(config.plateAnimateGradientAngle);
+  els.raceInfoPlateGradientAngleSpeed.value = config.plateGradientAngleSpeed;
+  els.raceInfoPlateGradientAngleSpeedValue.textContent = `${config.plateGradientAngleSpeed} deg/s`;
+  els.clearRaceInfoPlateTextureImage.disabled = !config.plateTextureImage;
+  els.raceInfoPlateTextureScale.value = config.plateTextureScale;
+  els.raceInfoPlateTextureScaleValue.textContent = `${config.plateTextureScale}%`;
+  els.raceInfoPlateTextureX.value = config.plateTextureX;
+  els.raceInfoPlateTextureY.value = config.plateTextureY;
+  els.raceInfoPlateTextureScrollX.value = config.plateTextureScrollX;
+  els.raceInfoPlateTextureScrollXValue.textContent = `${config.plateTextureScrollX} px/s`;
+  els.raceInfoPlateTextureScrollY.value = config.plateTextureScrollY;
+  els.raceInfoPlateTextureScrollYValue.textContent = `${config.plateTextureScrollY} px/s`;
+  els.raceInfoPlateBackgroundOpacity.value = config.plateBackgroundOpacity;
+  els.raceInfoPlateBorderColor.value = config.plateBorderColor;
+  els.raceInfoPlateBorderOpacity.value = config.plateBorderOpacity;
+  els.raceInfoPlateBorderWidth.value = config.plateBorderWidth;
+  els.raceInfoPlateRadius.value = config.plateRadius;
+  els.raceInfoPlatePaddingX.value = config.platePaddingX;
+  syncRaceInfoModeSections();
+  syncRaceInfoFillSections();
+}
+
+function syncRaceInfoModeSections() {
+  for (const section of document.querySelectorAll("[data-race-info-section]")) {
+    section.hidden = section.dataset.raceInfoSection !== state.layout.raceInfo.plateMode;
+  }
+}
+
+function syncRaceInfoFillSections() {
+  for (const section of document.querySelectorAll("[data-race-info-fill-section]")) {
+    section.hidden = section.dataset.raceInfoFillSection !== state.layout.raceInfo.plateFillMode;
+  }
+  els.raceInfoPlateGradientSpeedRow.hidden = !(state.layout.raceInfo.plateFillMode === "gradient" && state.layout.raceInfo.plateAnimateGradientAngle);
+}
+
 function syncNameplateControlsFromState() {
   const config = state.layout.nameplate;
   els.nameFont.value = config.fontFamily;
@@ -3743,7 +5620,24 @@ function syncNameplateControlsFromState() {
   els.clearNameplateImage.disabled = !config.plateImage;
   els.nameShowBox.checked = config.showBox;
   els.nameShowBorder.checked = config.showBorder;
+  els.namePlateFillMode.value = config.plateFillMode;
   els.namePlateBackgroundColor.value = config.plateBackgroundColor;
+  els.namePlateGradientFrom.value = config.plateGradientFrom;
+  els.namePlateGradientTo.value = config.plateGradientTo;
+  els.namePlateGradientAngle.value = config.plateGradientAngle;
+  els.namePlateGradientAngleSlider.value = config.plateGradientAngle;
+  els.namePlateAnimateGradientAngle.checked = config.plateAnimateGradientAngle;
+  els.namePlateGradientAngleSpeed.value = config.plateGradientAngleSpeed;
+  els.namePlateGradientAngleSpeedValue.textContent = `${config.plateGradientAngleSpeed} deg/s`;
+  els.clearNamePlateTextureImage.disabled = !config.plateTextureImage;
+  els.namePlateTextureScale.value = config.plateTextureScale;
+  els.namePlateTextureScaleValue.textContent = `${config.plateTextureScale}%`;
+  els.namePlateTextureX.value = config.plateTextureX;
+  els.namePlateTextureY.value = config.plateTextureY;
+  els.namePlateTextureScrollX.value = config.plateTextureScrollX;
+  els.namePlateTextureScrollXValue.textContent = `${config.plateTextureScrollX} px/s`;
+  els.namePlateTextureScrollY.value = config.plateTextureScrollY;
+  els.namePlateTextureScrollYValue.textContent = `${config.plateTextureScrollY} px/s`;
   els.namePlateBackgroundOpacity.value = config.plateBackgroundOpacity;
   els.namePlateBorderColor.value = config.plateBorderColor;
   els.namePlateBorderOpacity.value = config.plateBorderOpacity;
@@ -3759,12 +5653,41 @@ function syncNameplateControlsFromState() {
   els.nameShadowX.value = config.shadowX;
   els.nameShadowY.value = config.shadowY;
   syncNameplateModeSections();
+  syncNameplateFillSections();
 }
 
 function syncNameplateModeSections() {
   for (const section of document.querySelectorAll("[data-nameplate-section]")) {
     section.hidden = section.dataset.nameplateSection !== state.layout.nameplate.plateMode;
   }
+}
+
+function syncNameplateFillSections() {
+  for (const section of document.querySelectorAll("[data-nameplate-fill-section]")) {
+    section.hidden = section.dataset.nameplateFillSection !== state.layout.nameplate.plateFillMode;
+  }
+  els.namePlateGradientSpeedRow.hidden = !(state.layout.nameplate.plateFillMode === "gradient" && state.layout.nameplate.plateAnimateGradientAngle);
+}
+
+function syncFinishedTimeControlsFromState() {
+  const config = state.layout.finishedTime;
+  els.finishLockToNameplate.checked = config.lockToNameplate;
+  els.finishFont.value = config.fontFamily;
+  els.finishFontBrowser.value = Array.from(els.finishFontBrowser.options).some((option) => option.value === config.fontFamily)
+    ? config.fontFamily
+    : "";
+  els.finishFontSize.value = config.fontSize;
+  els.finishFontSizeValue.textContent = `${config.fontSize} px`;
+  els.finishColor.value = config.color;
+  els.finishAlign.value = config.align;
+  els.finishStrokeEnabled.checked = config.strokeEnabled;
+  els.finishStrokeColor.value = config.strokeColor;
+  els.finishStrokeWidth.value = config.strokeWidth;
+  els.finishShadowEnabled.checked = config.shadowEnabled;
+  els.finishShadowColor.value = config.shadowColor;
+  els.finishShadowBlur.value = config.shadowBlur;
+  els.finishShadowX.value = config.shadowX;
+  els.finishShadowY.value = config.shadowY;
 }
 
 function round(value) {

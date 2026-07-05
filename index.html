@@ -9,28 +9,64 @@
 <body>
   <div class="app-shell">
     <header class="topbar">
+      <nav class="menu-bar" aria-label="Application menu">
+        <details class="menu">
+          <summary>File</summary>
+          <div class="menu-items">
+            <button id="saveProject" type="button">Save Project</button>
+            <label class="menu-file-item">
+              Load Project
+              <input id="loadProject" type="file" accept="application/json,.json">
+            </label>
+          </div>
+        </details>
+        <details class="menu">
+          <summary>Edit</summary>
+          <div class="menu-items">
+            <button id="undoAction" type="button" disabled>Undo</button>
+            <button id="redoAction" type="button" disabled>Redo</button>
+          </div>
+        </details>
+        <details class="menu">
+          <summary>View</summary>
+          <div class="menu-items">
+            <button id="viewEditMode" type="button">Edit Mode</button>
+            <button id="viewControlMode" type="button">Control Mode</button>
+            <button type="button" disabled>Crop Preview Mode</button>
+          </div>
+        </details>
+      </nav>
       <div class="brand-logo" aria-label="OBS Race Manager">
         <span>OBS</span>
         <strong>Race Manager</strong>
-      </div>
-      <div class="topbar-actions">
-        <button id="undoAction" type="button" disabled>Undo</button>
-        <button id="redoAction" type="button" disabled>Redo</button>
-        <button id="saveProject" type="button">Save Project</button>
-        <label class="import-button">
-          Load Project
-          <input id="loadProject" type="file" accept="application/json,.json">
-        </label>
       </div>
     </header>
 
     <main class="workspace">
       <section class="controls-panel" aria-label="Race controls">
-        <div class="section-heading">
+        <div class="section-heading edit-only">
           <h2>Runner Slots</h2>
           <span id="activeCount">2 active</span>
         </div>
-        <div id="runnerControls" class="runner-controls"></div>
+        <button id="resetAllFinishes" class="secondary-button wide-button edit-only" type="button">Reset All Finishes</button>
+        <div id="runnerControls" class="runner-controls edit-only"></div>
+
+        <section id="raceControlPanel" class="race-control-panel control-only" aria-label="Race control mode">
+          <div class="section-heading">
+            <h2>Race Control</h2>
+            <span>Operator</span>
+          </div>
+          <div class="control-timer-readout" id="controlTimerReadout">00:00:00</div>
+          <div class="control-action-grid">
+            <button id="controlTimerStart" type="button">Start</button>
+            <button id="controlTimerStop" type="button">Stop</button>
+            <button id="controlTimerReset" type="button">Reset</button>
+            <button id="controlApplyObs" type="button">Apply OBS</button>
+            <button id="controlRepairObs" type="button">Repair OBS</button>
+            <button id="controlExitSpotlight" type="button">Exit Spotlight</button>
+          </div>
+          <div id="controlRunnerList" class="control-runner-list"></div>
+        </section>
       </section>
 
       <section class="preview-panel" aria-label="Layout preview">
@@ -45,6 +81,13 @@
         <div class="stage-wrap">
           <div id="stage" class="stage" aria-label="OBS canvas preview">
             <div class="background-grid"></div>
+            <div id="snapGuideV" class="snap-guide snap-guide-v" aria-hidden="true"></div>
+            <div id="snapGuideH" class="snap-guide snap-guide-h" aria-hidden="true"></div>
+            <div id="titleBarPreview" class="title-bar-preview drag-target hidden-element" data-drag-target="title">
+              <span class="title-main">Race Title</span>
+              <span class="title-sub">Game - Category</span>
+              <span class="resize-handle" data-resize-handle="title" aria-hidden="true"></span>
+            </div>
             <div id="runnerLayer"></div>
             <div id="timerBorder" class="timer-border drag-target" data-drag-target="timer">
               <span></span>
@@ -79,8 +122,8 @@
         </label>
 
         <label>
-          Managed scene
-          <input id="obsSceneName" type="text" value="ORM__RaceMaster" autocomplete="off">
+          Scene Name
+          <input id="obsSceneName" type="text" value="ORM__Default" autocomplete="off">
         </label>
 
         <div class="obs-actions">
@@ -104,15 +147,16 @@
           </div>
           <nav class="settings-tabs" aria-label="Settings sections">
             <button type="button" class="active" data-settings-target="layout">Layout</button>
+            <button type="button" data-settings-target="raceInfo">Race Info</button>
             <button type="button" data-settings-target="positions">Item Positions</button>
             <button type="button" data-settings-target="nameText">Name Text</button>
             <button type="button" data-settings-target="nameplates">Nameplates</button>
             <button type="button" data-settings-target="borders">Borders</button>
-            <button type="button" data-settings-target="timer">Timer</button>
-            <button type="button" data-settings-target="spotlight">Spotlight</button>
             <button type="button" data-settings-target="theme">Theme</button>
             <button type="button" data-settings-target="animations">Animations</button>
-            <button type="button" data-settings-target="hotkeys">Hotkeys</button>
+            <button type="button" data-settings-target="timer">Timer</button>
+            <button type="button" data-settings-target="finishedTime">Finished Time</button>
+            <button type="button" data-settings-target="spotlight">Spotlight</button>
           </nav>
         </section>
 
@@ -129,6 +173,14 @@
 
         <details class="settings-group active" data-settings-panel="layout" open>
           <summary>Layout</summary>
+          <label class="toggle-row obs-toggle">
+            <input id="layerLockEnabled" type="checkbox">
+            <span>Lock design dragging</span>
+          </label>
+          <label class="toggle-row obs-toggle">
+            <input id="snapEnabled" type="checkbox" checked>
+            <span>Snap while dragging/resizing</span>
+          </label>
           <label>
             Aspect preset
             <select id="aspectPreset">
@@ -151,12 +203,199 @@
             <input id="gapSize" type="range" min="8" max="48" value="20">
             <output id="gapValue">20 px</output>
           </label>
+          <div class="section-subhead">Item Visibility</div>
+          <label class="toggle-row obs-toggle">
+            <input id="feedVisible" type="checkbox" checked>
+            <span>Show game feeds</span>
+          </label>
+          <label class="toggle-row obs-toggle">
+            <input id="feedBorderVisible" type="checkbox" checked>
+            <span>Show game feed borders</span>
+          </label>
+          <label class="toggle-row obs-toggle">
+            <input id="nameVisible" type="checkbox" checked>
+            <span>Show runner names</span>
+          </label>
+          <label class="toggle-row obs-toggle">
+            <input id="finishedTimeVisible" type="checkbox" checked>
+            <span>Show finished times</span>
+          </label>
+          <label class="toggle-row obs-toggle">
+            <input id="titleBarVisible" type="checkbox">
+            <span>Show title bar / race info</span>
+          </label>
+          <label class="toggle-row obs-toggle">
+            <input id="timerBorderEnabled" type="checkbox" checked>
+            <span>Show timer border</span>
+          </label>
+        </details>
+
+        <details class="settings-group" data-settings-panel="raceInfo">
+          <summary>Race Info</summary>
+          <label class="toggle-row obs-toggle">
+            <input id="raceInfoEnabled" type="checkbox">
+            <span>Show title bar / race info</span>
+          </label>
+          <label>
+            Title
+            <input id="raceTitle" type="text" value="Race Title">
+          </label>
+          <label>
+            Subtitle
+            <input id="raceSubtitle" type="text" value="Game - Category">
+          </label>
+          <label>
+            Font
+            <input id="raceInfoFont" list="raceInfoFontChoices" type="text" value="Segoe UI">
+            <datalist id="raceInfoFontChoices"></datalist>
+          </label>
+          <div class="font-picker">
+            <button id="raceInfoBrowseFonts" type="button">Browse Installed Fonts</button>
+            <select id="raceInfoFontBrowser" aria-label="Installed race info font browser">
+              <option value="">Choose a font...</option>
+            </select>
+          </div>
+          <label>
+            Font size
+            <input id="raceInfoFontSize" type="number" min="1" step="1" value="34">
+          </label>
+          <div class="obs-grid">
+            <label>
+              Text color
+              <input id="raceInfoTextColor" type="color" value="#ffffff">
+            </label>
+          </div>
+          <div class="section-subhead">Title Plate</div>
+          <label>
+            Customize
+            <select id="raceInfoPlateMode">
+              <option value="generated">Create Title Plate</option>
+              <option value="image">Upload title plate image</option>
+            </select>
+          </label>
+          <label class="toggle-row obs-toggle">
+            <input id="raceInfoShowBox" type="checkbox" checked>
+            <span>Show title plate</span>
+          </label>
+          <section data-race-info-section="generated">
+            <label>
+              Plate type
+              <select id="raceInfoPlateFillMode">
+                <option value="solid">Solid color</option>
+                <option value="gradient">Gradient</option>
+                <option value="texture">Texture image</option>
+              </select>
+            </label>
+            <section class="nameplate-editor-section" data-race-info-fill-section="solid">
+              <label>
+                Plate color
+                <input id="raceInfoPlateBackgroundColor" type="color" value="#10161a">
+              </label>
+            </section>
+            <section class="nameplate-editor-section" data-race-info-fill-section="gradient">
+              <div class="obs-grid">
+                <label>
+                  From color
+                  <input id="raceInfoPlateGradientFrom" type="color" value="#10161a">
+                </label>
+                <label>
+                  To color
+                  <input id="raceInfoPlateGradientTo" type="color" value="#26343b">
+                </label>
+                <label>
+                  Gradient angle
+                  <input id="raceInfoPlateGradientAngleSlider" type="range" min="0" max="360" step="1" value="135">
+                  <input id="raceInfoPlateGradientAngle" type="number" min="0" max="360" step="1" value="135">
+                </label>
+                <label class="toggle-row obs-toggle wide-control">
+                  <input id="raceInfoPlateAnimateGradientAngle" type="checkbox">
+                  <span>Animate Gradient Angle</span>
+                </label>
+                <label id="raceInfoPlateGradientSpeedRow" class="wide-control">
+                  Speed
+                  <input id="raceInfoPlateGradientAngleSpeed" type="range" min="-360" max="360" step="1" value="45">
+                  <output id="raceInfoPlateGradientAngleSpeedValue">45 deg/s</output>
+                </label>
+              </div>
+            </section>
+            <section class="nameplate-editor-section" data-race-info-fill-section="texture">
+              <label>
+                Texture image
+                <input id="raceInfoPlateTextureImage" type="file" accept="image/*">
+              </label>
+              <button id="clearRaceInfoPlateTextureImage" class="secondary-button" type="button">Clear Texture Image</button>
+              <div class="obs-grid">
+                <label>
+                  Scale
+                  <input id="raceInfoPlateTextureScale" type="range" min="25" max="400" step="1" value="100">
+                  <output id="raceInfoPlateTextureScaleValue">100%</output>
+                </label>
+                <label>
+                  X position
+                  <input id="raceInfoPlateTextureX" type="range" min="0" max="100" step="1" value="50">
+                </label>
+                <label>
+                  Y position
+                  <input id="raceInfoPlateTextureY" type="range" min="0" max="100" step="1" value="50">
+                </label>
+                <label>
+                  Scroll X
+                  <input id="raceInfoPlateTextureScrollX" type="range" min="-200" max="200" step="1" value="0">
+                  <output id="raceInfoPlateTextureScrollXValue">0 px/s</output>
+                </label>
+                <label>
+                  Scroll Y
+                  <input id="raceInfoPlateTextureScrollY" type="range" min="-200" max="200" step="1" value="0">
+                  <output id="raceInfoPlateTextureScrollYValue">0 px/s</output>
+                </label>
+              </div>
+            </section>
+            <label class="toggle-row obs-toggle">
+              <input id="raceInfoShowBorder" type="checkbox" checked>
+              <span>Show title plate border</span>
+            </label>
+            <div class="obs-grid">
+              <label>
+                Plate opacity
+                <input id="raceInfoPlateBackgroundOpacity" type="number" min="0" max="100" step="1" value="84">
+              </label>
+              <label>
+                Border color
+                <input id="raceInfoPlateBorderColor" type="color" value="#ffffff">
+              </label>
+              <label>
+                Border opacity
+                <input id="raceInfoPlateBorderOpacity" type="number" min="0" max="100" step="1" value="14">
+              </label>
+              <label>
+                Border width
+                <input id="raceInfoPlateBorderWidth" type="number" min="0" max="20" step="1" value="1">
+              </label>
+              <label>
+                Radius
+                <input id="raceInfoPlateRadius" type="number" min="0" max="60" step="1" value="8">
+              </label>
+              <label>
+                Side padding
+                <input id="raceInfoPlatePaddingX" type="number" min="0" max="160" step="1" value="18">
+              </label>
+            </div>
+          </section>
+          <section data-race-info-section="image">
+            <div class="section-subhead">Image Plate</div>
+            <label>
+              Title plate image
+              <input id="raceInfoPlateImage" type="file" accept="image/*">
+            </label>
+            <button id="clearRaceInfoPlateImage" class="secondary-button" type="button">Clear Title Plate Image</button>
+            <div class="note compact-note">Transparent PNGs render with transparency in both preview and OBS.</div>
+          </section>
         </details>
 
         <details class="settings-group" data-settings-panel="timer">
           <summary>Timer</summary>
           <label class="toggle-row obs-toggle">
-            <input id="builtInTimerEnabled" type="checkbox">
+            <input id="builtInTimerEnabled" type="checkbox" checked>
             <span>Show built-in timer</span>
           </label>
           <div class="timer-controls">
@@ -186,7 +425,7 @@
           <div id="timerFontStatus" class="note compact-note">Use Browse to request local font access, or type an installed font face.</div>
           <label>
             Timer font size
-            <input id="timerFontSize" type="range" min="24" max="96" value="54">
+            <input id="timerFontSize" type="number" min="1" step="1" value="54">
             <output id="timerFontSizeValue">54 px</output>
           </label>
           <div class="obs-grid">
@@ -255,6 +494,10 @@
             <input id="spotlightShowOthers" type="checkbox" checked>
             <span>Show other active runners small</span>
           </label>
+          <label class="toggle-row obs-toggle nested-toggle">
+            <input id="spotlightDisableSmallNameplates" type="checkbox">
+            <span>Disable nameplates for small runners</span>
+          </label>
           <label>
             Small runner side
             <select id="spotlightSide">
@@ -292,30 +535,9 @@
           <div class="note">
             Drag an element to move it. Drag its bottom-right corner to resize it. Values are saved in the project file and pushed to OBS.
           </div>
-          <label>
-            Setup preview slot
-            <select id="setupPreviewSlot">
-              <option value="0">Off</option>
-            </select>
-          </label>
-          <div class="note compact-note">Use this to preview and crop an inactive runner before turning them on.</div>
-          <div class="section-subhead">Visibility</div>
-          <label class="toggle-row obs-toggle">
-            <input id="feedVisible" type="checkbox" checked>
-            <span>Show game feeds</span>
-          </label>
-          <label class="toggle-row obs-toggle">
-            <input id="feedBorderVisible" type="checkbox" checked>
-            <span>Show game feed borders</span>
-          </label>
-          <label class="toggle-row obs-toggle">
-            <input id="nameVisible" type="checkbox" checked>
-            <span>Show runner names</span>
-          </label>
-          <label class="toggle-row obs-toggle">
-            <input id="timerBorderEnabled" type="checkbox" checked>
-            <span>Show timer border</span>
-          </label>
+          <select id="setupPreviewSlot" hidden>
+            <option value="0">Off</option>
+          </select>
           <div class="section-subhead">Game Feed</div>
           <div class="obs-grid">
             <label>
@@ -352,6 +574,44 @@
             <label>
               Name H
               <input id="nameH" type="number" min="0.05" max="1" step="0.001">
+            </label>
+          </div>
+          <div class="section-subhead">Finished Time</div>
+          <div class="obs-grid">
+            <label>
+              Finish X
+              <input id="finishX" type="number" min="0" max="1" step="0.001">
+            </label>
+            <label>
+              Finish Y
+              <input id="finishY" type="number" min="0" max="1" step="0.001">
+            </label>
+            <label>
+              Finish W
+              <input id="finishW" type="number" min="0.05" max="1" step="0.001">
+            </label>
+            <label>
+              Finish H
+              <input id="finishH" type="number" min="0.02" max="0.5" step="0.001">
+            </label>
+          </div>
+          <div class="section-subhead">Title Bar</div>
+          <div class="obs-grid">
+            <label>
+              Title X
+              <input id="titleX" type="number" min="0" max="1" step="0.001">
+            </label>
+            <label>
+              Title Y
+              <input id="titleY" type="number" min="0" max="1" step="0.001">
+            </label>
+            <label>
+              Title W
+              <input id="titleW" type="number" min="0.05" max="1" step="0.001">
+            </label>
+            <label>
+              Title H
+              <input id="titleH" type="number" min="0.02" max="0.5" step="0.001">
             </label>
           </div>
           <div class="section-subhead">Timer</div>
@@ -404,6 +664,9 @@
               <option value="move">Move only</option>
               <option value="scaleFade">Scale + fade</option>
               <option value="fade">Fade only</option>
+              <option value="pop">Pop in/out</option>
+              <option value="settle">Settle bounce</option>
+              <option value="spotlightPulse">Spotlight pulse</option>
             </select>
           </label>
           <label>
@@ -440,7 +703,7 @@
           <div id="fontStatus" class="note compact-note">Use Browse to request local font access, or type an installed font face.</div>
           <label>
             Max font size
-            <input id="nameFontSize" type="range" min="22" max="72" value="44">
+            <input id="nameFontSize" type="number" min="1" step="1" value="44">
             <output id="nameFontSizeValue">44 px</output>
           </label>
           <label>
@@ -500,7 +763,7 @@
           <label>
             Customize
             <select id="nameplateMode">
-              <option value="generated">Edit generated nameplate</option>
+              <option value="generated">Create Nameplate</option>
               <option value="image">Upload nameplate image</option>
             </select>
           </label>
@@ -510,15 +773,85 @@
           </label>
           <section data-nameplate-section="generated">
             <div class="section-subhead">Generated Plate</div>
+            <label>
+              Plate type
+              <select id="namePlateFillMode">
+                <option value="solid">Solid color</option>
+                <option value="gradient">Gradient</option>
+                <option value="texture">Texture image</option>
+              </select>
+            </label>
+            <section class="nameplate-editor-section" data-nameplate-fill-section="solid">
+              <div class="obs-grid">
+                <label>
+                  Plate color
+                  <input id="namePlateBackgroundColor" type="color" value="#070a0c">
+                </label>
+              </div>
+            </section>
+            <section class="nameplate-editor-section" data-nameplate-fill-section="gradient">
+              <div class="obs-grid">
+                <label>
+                  From color
+                  <input id="namePlateGradientFrom" type="color" value="#070a0c">
+                </label>
+                <label>
+                  To color
+                  <input id="namePlateGradientTo" type="color" value="#1f2d34">
+                </label>
+                <label>
+                  Gradient angle
+                  <input id="namePlateGradientAngleSlider" type="range" min="0" max="360" step="1" value="135">
+                  <input id="namePlateGradientAngle" type="number" min="0" max="360" step="1" value="135">
+                </label>
+                <label class="toggle-row obs-toggle wide-control">
+                  <input id="namePlateAnimateGradientAngle" type="checkbox">
+                  <span>Animate Gradient Angle</span>
+                </label>
+                <label id="namePlateGradientSpeedRow" class="wide-control">
+                  Speed
+                  <input id="namePlateGradientAngleSpeed" type="range" min="-360" max="360" step="1" value="45">
+                  <output id="namePlateGradientAngleSpeedValue">45 deg/s</output>
+                </label>
+              </div>
+            </section>
+            <section class="nameplate-editor-section" data-nameplate-fill-section="texture">
+              <label>
+                Texture image
+                <input id="namePlateTextureImage" type="file" accept="image/*">
+              </label>
+              <button id="clearNamePlateTextureImage" class="secondary-button" type="button">Clear Texture Image</button>
+              <div class="obs-grid">
+                <label>
+                  Scale
+                  <input id="namePlateTextureScale" type="range" min="25" max="400" step="1" value="100">
+                  <output id="namePlateTextureScaleValue">100%</output>
+                </label>
+                <label>
+                  X position
+                  <input id="namePlateTextureX" type="range" min="0" max="100" step="1" value="50">
+                </label>
+                <label>
+                  Y position
+                  <input id="namePlateTextureY" type="range" min="0" max="100" step="1" value="50">
+                </label>
+                <label>
+                  Scroll X
+                  <input id="namePlateTextureScrollX" type="range" min="-200" max="200" step="1" value="0">
+                  <output id="namePlateTextureScrollXValue">0 px/s</output>
+                </label>
+                <label>
+                  Scroll Y
+                  <input id="namePlateTextureScrollY" type="range" min="-200" max="200" step="1" value="0">
+                  <output id="namePlateTextureScrollYValue">0 px/s</output>
+                </label>
+              </div>
+            </section>
             <label class="toggle-row obs-toggle">
               <input id="nameShowBorder" type="checkbox" checked>
               <span>Show plate border</span>
             </label>
             <div class="obs-grid">
-              <label>
-                Plate color
-                <input id="namePlateBackgroundColor" type="color" value="#070a0c">
-              </label>
               <label>
                 Plate opacity
                 <input id="namePlateBackgroundOpacity" type="number" min="0" max="100" step="1" value="82">
@@ -556,6 +889,80 @@
           </section>
         </details>
 
+        <details class="settings-group" data-settings-panel="finishedTime">
+          <summary>Finished Time</summary>
+          <label class="toggle-row obs-toggle">
+            <input id="finishLockToNameplate" type="checkbox" checked>
+            <span>Lock to nameplate</span>
+          </label>
+          <label>
+            Font
+            <input id="finishFont" list="finishFontChoices" type="text" value="Segoe UI" placeholder="Installed font face">
+            <datalist id="finishFontChoices"></datalist>
+          </label>
+          <div class="font-picker">
+            <button id="finishBrowseFonts" type="button">Browse Installed Fonts</button>
+            <select id="finishFontBrowser" aria-label="Installed finished time font browser">
+              <option value="">Choose a font...</option>
+            </select>
+          </div>
+          <label>
+            Max font size
+            <input id="finishFontSize" type="number" min="1" step="1" value="34">
+            <output id="finishFontSizeValue">34 px</output>
+          </label>
+          <div class="obs-grid">
+            <label>
+              Color
+              <input id="finishColor" type="color" value="#f0b84a">
+            </label>
+            <label>
+              Alignment
+              <select id="finishAlign">
+                <option value="right">Right</option>
+                <option value="center">Center</option>
+                <option value="left">Left</option>
+              </select>
+            </label>
+          </div>
+          <label class="toggle-row obs-toggle">
+            <input id="finishStrokeEnabled" type="checkbox">
+            <span>Text stroke</span>
+          </label>
+          <div class="obs-grid">
+            <label>
+              Stroke color
+              <input id="finishStrokeColor" type="color" value="#000000">
+            </label>
+            <label>
+              Stroke width
+              <input id="finishStrokeWidth" type="number" min="0" max="10" step="1" value="2">
+            </label>
+          </div>
+          <label class="toggle-row obs-toggle">
+            <input id="finishShadowEnabled" type="checkbox" checked>
+            <span>Drop shadow</span>
+          </label>
+          <div class="obs-grid">
+            <label>
+              Shadow color
+              <input id="finishShadowColor" type="color" value="#000000">
+            </label>
+            <label>
+              Blur
+              <input id="finishShadowBlur" type="number" min="0" max="30" step="1" value="8">
+            </label>
+            <label>
+              X
+              <input id="finishShadowX" type="number" min="-20" max="20" step="1" value="0">
+            </label>
+            <label>
+              Y
+              <input id="finishShadowY" type="number" min="-20" max="20" step="1" value="2">
+            </label>
+          </div>
+        </details>
+
         <details class="settings-group" data-settings-panel="borders">
           <summary>Borders</summary>
           <label>
@@ -563,6 +970,7 @@
             <select id="borderTarget">
               <option value="feed">Game feed borders</option>
               <option value="timer">Timer border</option>
+              <option value="title">Title bar border</option>
             </select>
           </label>
           <label>
@@ -657,6 +1065,16 @@
                   Y position
                   <input id="borderTextureY" type="range" min="0" max="100" step="1" value="50">
                 </label>
+                <label>
+                  Scroll X
+                  <input id="borderTextureScrollX" type="range" min="-200" max="200" step="1" value="0">
+                  <output id="borderTextureScrollXValue">0 px/s</output>
+                </label>
+                <label>
+                  Scroll Y
+                  <input id="borderTextureScrollY" type="range" min="-200" max="200" step="1" value="0">
+                  <output id="borderTextureScrollYValue">0 px/s</output>
+                </label>
               </div>
             </section>
             <div class="obs-grid border-common-controls" data-border-section="shared">
@@ -720,11 +1138,25 @@
           <span data-role="feedStatus" class="feed-status">Test pattern</span>
           <button data-action="vdoClean" type="button">VDO Clean</button>
         </div>
+        <label>
+          Temporary feed replace
+          <select data-field="feedMode">
+            <option value="live">Live feed</option>
+            <option value="brb">BRB card</option>
+            <option value="tech">Tech difficulty</option>
+            <option value="black">Black screen</option>
+            <option value="standby">Standby card</option>
+          </select>
+        </label>
         <div class="feed-tools">
           <button data-action="previewSlot" type="button">Preview Crop</button>
-          <button data-action="markDone" type="button">Done</button>
+          <button data-action="markDone" type="button">Mark as Finished</button>
           <button data-action="resetDone" type="button">Reset Finish</button>
         </div>
+        <label data-role="finishEdit" class="finish-edit">
+          Finished time
+          <input data-field="finalTimeText" type="text" placeholder="00:00:00">
+        </label>
 
         <div class="crop-grid">
         <label>
@@ -748,6 +1180,32 @@
           <input data-field="cropBottom" class="crop-number" type="number" min="0" max="78" step="0.1" value="0" aria-label="Bottom crop percent">
         </label>
         </div>
+
+        <div class="section-subhead">Audio</div>
+        <label class="toggle-row obs-toggle">
+          <input data-field="audioMuted" type="checkbox">
+          <span>Mute this runner</span>
+        </label>
+        <label>
+          Volume
+          <input data-field="audioVolume" type="range" min="0" max="200" step="1" value="100">
+          <output data-role="audioVolumeValue">100%</output>
+        </label>
+      </div>
+    </article>
+  </template>
+
+  <template id="controlRunnerTemplate">
+    <article class="control-runner-card">
+      <div class="control-runner-main">
+        <strong data-role="name">Runner</strong>
+        <span data-role="status">Idle</span>
+      </div>
+      <div class="control-runner-actions">
+        <button data-action="toggleActive" type="button">Visible</button>
+        <button data-action="markDone" type="button">Finish</button>
+        <button data-action="spotlight" type="button">Spotlight</button>
+        <button data-action="toggleMute" type="button">Mute</button>
       </div>
     </article>
   </template>
