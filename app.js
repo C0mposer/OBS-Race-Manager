@@ -70,7 +70,26 @@ const DEFAULT_TIMER_TEXT = {
   shadowY: 2,
   state: "idle",
   elapsedMs: 0,
-  startedAt: 0
+  startedAt: 0,
+  plateImage: "",
+  plateBackgroundColor: "#10161a",
+  plateBackgroundOpacity: 84,
+  plateRadius: 8,
+  platePaddingX: 18,
+  plateFillMode: "solid",
+  plateGradientFrom: "#10161a",
+  plateGradientTo: "#26343b",
+  plateGradientAngle: 135,
+  plateAnimateGradientAngle: false,
+  plateGradientAngleSpeed: 45,
+  plateTextureImage: "",
+  plateTextureScale: 100,
+  plateTextureX: 50,
+  plateTextureY: 50,
+  plateTextureScrollX: 0,
+  plateTextureScrollY: 0,
+  plateMode: "generated",
+  showBox: false
 };
 const DEFAULT_FINISHED_TIME = {
   fontFamily: "Segoe UI",
@@ -170,6 +189,7 @@ const state = {
   layout: {
     aspectPreset: "4:3",
     timerHeight: 130,
+    titleHeight: 100,
     margin: 36,
     gap: 20,
     viewMode: "edit",
@@ -291,7 +311,10 @@ const state = {
     },
     borderStyle: structuredClone(BORDER_PRESETS.graphite),
     borderImage: "",
-    backgroundImage: ""
+    backgroundImage: "",
+    backgroundScale: 100,
+    backgroundScrollX: 0,
+    backgroundScrollY: 0
   },
   runners: createDefaultRunners()
 };
@@ -331,12 +354,14 @@ let timerPreviewInterval = 0;
 
 document.addEventListener("DOMContentLoaded", () => {
   bindElements();
+  hideObsoletePlateRadiusControls();
   renderRunnerControls();
   renderStagePanels();
   bindGlobalControls();
   syncGlobalControlsFromState();
   bindStageSizing();
   update();
+  makeOutputsEditable();
 });
 
 function createDefaultRunners() {
@@ -469,6 +494,13 @@ function nativeTextStrokeCss(config, scale = 1) {
   return `-webkit-text-stroke:${width}px ${config.strokeColor};paint-order:stroke fill;-webkit-font-smoothing:antialiased;text-rendering:geometricPrecision;`;
 }
 
+function hideObsoletePlateRadiusControls() {
+  for (const input of [els.timerPlateRadius, els.raceInfoPlateRadius]) {
+    const row = input?.closest?.("label");
+    if (row) row.remove();
+  }
+}
+
 function bindElements() {
   els.runnerControls = document.getElementById("runnerControls");
   els.runnerLayer = document.getElementById("runnerLayer");
@@ -483,6 +515,7 @@ function bindElements() {
   els.layoutSummary = document.getElementById("layoutSummary");
   els.aspectPreset = document.getElementById("aspectPreset");
   els.timerHeight = document.getElementById("timerHeight");
+  els.titleHeight = document.getElementById("titleHeight");
   els.marginSize = document.getElementById("marginSize");
   els.gapSize = document.getElementById("gapSize");
   els.builtInTimerEnabled = document.getElementById("builtInTimerEnabled");
@@ -508,6 +541,33 @@ function bindElements() {
   els.timerShadowBlur = document.getElementById("timerShadowBlur");
   els.timerShadowX = document.getElementById("timerShadowX");
   els.timerShadowY = document.getElementById("timerShadowY");
+  els.timerPlateMode = document.getElementById("timerPlateMode");
+  els.timerShowBox = document.getElementById("timerShowBox");
+  els.timerPlateFillMode = document.getElementById("timerPlateFillMode");
+  els.timerPlateBackgroundColor = document.getElementById("timerPlateBackgroundColor");
+  els.timerPlateGradientFrom = document.getElementById("timerPlateGradientFrom");
+  els.timerPlateGradientTo = document.getElementById("timerPlateGradientTo");
+  els.timerPlateGradientAngle = document.getElementById("timerPlateGradientAngle");
+  els.timerPlateGradientAngleSlider = document.getElementById("timerPlateGradientAngleSlider");
+  els.timerPlateAnimateGradientAngle = document.getElementById("timerPlateAnimateGradientAngle");
+  els.timerPlateGradientAngleSpeed = document.getElementById("timerPlateGradientAngleSpeed");
+  els.timerPlateGradientAngleSpeedValue = document.getElementById("timerPlateGradientAngleSpeedValue");
+  els.timerPlateGradientSpeedRow = document.getElementById("timerPlateGradientSpeedRow");
+  els.timerPlateTextureImage = document.getElementById("timerPlateTextureImage");
+  els.clearTimerPlateTextureImage = document.getElementById("clearTimerPlateTextureImage");
+  els.timerPlateTextureScale = document.getElementById("timerPlateTextureScale");
+  els.timerPlateTextureScaleValue = document.getElementById("timerPlateTextureScaleValue");
+  els.timerPlateTextureX = document.getElementById("timerPlateTextureX");
+  els.timerPlateTextureY = document.getElementById("timerPlateTextureY");
+  els.timerPlateTextureScrollX = document.getElementById("timerPlateTextureScrollX");
+  els.timerPlateTextureScrollXValue = document.getElementById("timerPlateTextureScrollXValue");
+  els.timerPlateTextureScrollY = document.getElementById("timerPlateTextureScrollY");
+  els.timerPlateTextureScrollYValue = document.getElementById("timerPlateTextureScrollYValue");
+  els.timerPlateBackgroundOpacity = document.getElementById("timerPlateBackgroundOpacity");
+  els.timerPlateRadius = document.getElementById("timerPlateRadius");
+  els.timerPlatePaddingX = document.getElementById("timerPlatePaddingX");
+  els.timerPlateImage = document.getElementById("timerPlateImage");
+  els.clearTimerPlateImage = document.getElementById("clearTimerPlateImage");
   els.setupPreviewSlot = document.getElementById("setupPreviewSlot");
   els.spotlightEnabled = document.getElementById("spotlightEnabled");
   els.spotlightSlots = document.getElementById("spotlightSlots");
@@ -525,6 +585,7 @@ function bindElements() {
   els.animationStyle = document.getElementById("animationStyle");
   els.animationFps = document.getElementById("animationFps");
   els.timerHeightValue = document.getElementById("timerHeightValue");
+  els.titleHeightValue = document.getElementById("titleHeightValue");
   els.marginValue = document.getElementById("marginValue");
   els.gapValue = document.getElementById("gapValue");
   els.animationValue = document.getElementById("animationValue");
@@ -670,6 +731,13 @@ function bindElements() {
   els.finishShadowX = document.getElementById("finishShadowX");
   els.finishShadowY = document.getElementById("finishShadowY");
   els.backgroundImage = document.getElementById("backgroundImage");
+  els.clearBackgroundImage = document.getElementById("clearBackgroundImage");
+  els.backgroundScale = document.getElementById("backgroundScale");
+  els.backgroundScaleValue = document.getElementById("backgroundScaleValue");
+  els.backgroundScrollX = document.getElementById("backgroundScrollX");
+  els.backgroundScrollXValue = document.getElementById("backgroundScrollXValue");
+  els.backgroundScrollY = document.getElementById("backgroundScrollY");
+  els.backgroundScrollYValue = document.getElementById("backgroundScrollYValue");
   els.borderImage = document.getElementById("borderImage");
   els.borderTarget = document.getElementById("borderTarget");
   els.borderSourceMode = document.getElementById("borderSourceMode");
@@ -869,6 +937,7 @@ function bindGlobalControls() {
   }
 
   bindRaceInfoPlateControls();
+  bindTimerPlateControls();
   els.timerStart.addEventListener("click", startBuiltInTimer);
   els.timerStop.addEventListener("click", stopBuiltInTimer);
   els.timerReset.addEventListener("click", resetBuiltInTimer);
@@ -1012,6 +1081,7 @@ function bindGlobalControls() {
 
   for (const [element, key, output, suffix] of [
     [els.timerHeight, "timerHeight", els.timerHeightValue, " px"],
+    [els.titleHeight, "titleHeight", els.titleHeightValue, " px"],
     [els.marginSize, "margin", els.marginValue, " px"],
     [els.gapSize, "gap", els.gapValue, " px"],
     [els.animationMs, "animationMs", els.animationValue, " ms"],
@@ -1077,10 +1147,36 @@ function bindGlobalControls() {
     readImageFile(event.target.files?.[0], (dataUrl) => {
       pushHistory("background image");
       state.layout.backgroundImage = dataUrl;
+      syncGlobalControlsFromState();
       update();
       scheduleObsApply("background", 250);
     });
   });
+
+  els.clearBackgroundImage.addEventListener("click", () => {
+    if (!state.layout.backgroundImage) return;
+    pushHistory("clear background image");
+    state.layout.backgroundImage = "";
+    els.backgroundImage.value = "";
+    syncGlobalControlsFromState();
+    update();
+    scheduleObsApply("background", 120);
+  });
+
+  for (const [element, key, output, suffix] of [
+    [els.backgroundScale, "backgroundScale", els.backgroundScaleValue, "%"],
+    [els.backgroundScrollX, "backgroundScrollX", els.backgroundScrollXValue, " px/s"],
+    [els.backgroundScrollY, "backgroundScrollY", els.backgroundScrollYValue, " px/s"]
+  ]) {
+    element.addEventListener("focus", () => beginContinuousHistory(`theme-bg-${key}`));
+    element.addEventListener("change", endContinuousHistory);
+    element.addEventListener("input", () => {
+      state.layout[key] = Number(element.value);
+      if (output) output.textContent = `${state.layout[key]}${suffix}`;
+      update();
+      scheduleObsApply("background", 160);
+    });
+  }
 
   els.borderImage.addEventListener("change", (event) => {
     readImageFile(event.target.files?.[0], (dataUrl) => {
@@ -1193,7 +1289,6 @@ function bindGeometryInputs() {
 function bindRaceInfoPlateControls() {
   const numberBindings = [
     [els.raceInfoPlateBackgroundOpacity, "plateBackgroundOpacity", null, ""],
-    [els.raceInfoPlateRadius, "plateRadius", null, ""],
     [els.raceInfoPlatePaddingX, "platePaddingX", null, ""],
     [els.raceInfoPlateGradientAngle, "plateGradientAngle", null, ""],
     [els.raceInfoPlateGradientAngleSlider, "plateGradientAngle", null, ""],
@@ -1304,6 +1399,123 @@ function bindRaceInfoPlateControls() {
       state.layout.raceInfo[key] = input.checked;
       update();
       scheduleObsApply("raceInfo", 120);
+    });
+  }
+}
+
+function bindTimerPlateControls() {
+  const numberBindings = [
+    [els.timerPlateBackgroundOpacity, "plateBackgroundOpacity", null, ""],
+    [els.timerPlatePaddingX, "platePaddingX", null, ""],
+    [els.timerPlateGradientAngle, "plateGradientAngle", null, ""],
+    [els.timerPlateGradientAngleSlider, "plateGradientAngle", null, ""],
+    [els.timerPlateGradientAngleSpeed, "plateGradientAngleSpeed", els.timerPlateGradientAngleSpeedValue, " deg/s"],
+    [els.timerPlateTextureScale, "plateTextureScale", els.timerPlateTextureScaleValue, "%"],
+    [els.timerPlateTextureX, "plateTextureX", null, ""],
+    [els.timerPlateTextureY, "plateTextureY", null, ""],
+    [els.timerPlateTextureScrollX, "plateTextureScrollX", els.timerPlateTextureScrollXValue, " px/s"],
+    [els.timerPlateTextureScrollY, "plateTextureScrollY", els.timerPlateTextureScrollYValue, " px/s"]
+  ];
+
+  els.timerPlateMode.addEventListener("change", (event) => {
+    pushHistory("timer plate mode");
+    state.layout.timerText.plateMode = event.target.value;
+    syncTimerTextControlsFromState();
+    update();
+    scheduleObsApply("timerText", 120);
+  });
+
+  els.timerPlateFillMode.addEventListener("change", (event) => {
+    pushHistory("timer plate fill mode");
+    state.layout.timerText.plateFillMode = event.target.value;
+    syncTimerTextControlsFromState();
+    update();
+    scheduleObsApply("timerText", 120);
+  });
+
+  els.timerPlateAnimateGradientAngle.addEventListener("change", () => {
+    pushHistory("timer gradient animation");
+    state.layout.timerText.plateAnimateGradientAngle = els.timerPlateAnimateGradientAngle.checked;
+    syncTimerTextControlsFromState();
+    update();
+    scheduleObsApply("timerText", 120);
+  });
+
+  els.timerPlateTextureImage.addEventListener("change", (event) => {
+    readImageFile(event.target.files?.[0], (dataUrl) => {
+      pushHistory("timer texture image");
+      state.layout.timerText.plateTextureImage = dataUrl;
+      state.layout.timerText.plateFillMode = "texture";
+      syncTimerTextControlsFromState();
+      update();
+      scheduleObsApply("timerText", 250);
+    });
+    event.target.value = "";
+  });
+
+  els.clearTimerPlateTextureImage.addEventListener("click", () => {
+    if (!state.layout.timerText.plateTextureImage) return;
+    pushHistory("clear timer texture image");
+    state.layout.timerText.plateTextureImage = "";
+    syncTimerTextControlsFromState();
+    update();
+    scheduleObsApply("timerText", 120);
+  });
+
+  els.timerPlateImage.addEventListener("change", (event) => {
+    readImageFile(event.target.files?.[0], (dataUrl) => {
+      pushHistory("timer plate image");
+      state.layout.timerText.plateImage = dataUrl;
+      state.layout.timerText.plateMode = "image";
+      syncTimerTextControlsFromState();
+      update();
+      scheduleObsApply("timerText", 250);
+    });
+    event.target.value = "";
+  });
+
+  els.clearTimerPlateImage.addEventListener("click", () => {
+    if (!state.layout.timerText.plateImage) return;
+    pushHistory("clear timer plate image");
+    state.layout.timerText.plateImage = "";
+    syncTimerTextControlsFromState();
+    update();
+    scheduleObsApply("timerText", 120);
+  });
+
+  for (const [input, key, output, suffix] of numberBindings) {
+    input.addEventListener("focus", () => beginContinuousHistory(`timer-plate-${key}`));
+    input.addEventListener("change", endContinuousHistory);
+    input.addEventListener("input", () => {
+      state.layout.timerText[key] = Number(input.value);
+      if (output) output.textContent = `${state.layout.timerText[key]}${suffix}`;
+      update();
+      scheduleObsApply("timerText", 160);
+    });
+  }
+
+  for (const [input, key] of [
+    [els.timerPlateBackgroundColor, "plateBackgroundColor"],
+    [els.timerPlateGradientFrom, "plateGradientFrom"],
+    [els.timerPlateGradientTo, "plateGradientTo"],
+  ]) {
+    input.addEventListener("pointerdown", () => beginContinuousHistory(`timer-plate-${key}`));
+    input.addEventListener("input", () => {
+      state.layout.timerText[key] = input.value;
+      update();
+      scheduleObsApply("timerText", 80);
+    });
+    input.addEventListener("change", endContinuousHistory);
+  }
+
+  for (const [input, key] of [
+    [els.timerShowBox, "showBox"]
+  ]) {
+    input.addEventListener("change", () => {
+      pushHistory(`timer-plate-${key}`);
+      state.layout.timerText[key] = input.checked;
+      update();
+      scheduleObsApply("timerText", 120);
     });
   }
 }
@@ -2390,6 +2602,12 @@ function handleRunnerAction(event, runner, node) {
     markRunnerDone(runner);
   } else if (button.dataset.action === "resetDone") {
     resetRunnerDone(runner);
+  } else if (button.dataset.action === "quickFinish") {
+    if (runner.done) {
+      resetRunnerDone(runner);
+    } else {
+      markRunnerDone(runner);
+    }
   }
 }
 
@@ -2509,7 +2727,8 @@ async function createOrRepairObsScene() {
     await createBrowserInput("Background", obsBridge.sceneName, htmlDataUrl(buildBackgroundHtml()), STAGE.width, STAGE.height, true);
     const titleSize = titleBarSourceSize();
     await createBrowserInput("TitleBar", obsBridge.sceneName, htmlDataUrl(buildTitleBarHtml()), titleSize.width, titleSize.height, state.layout.elements.titleBar);
-    await createBrowserInput("TimerBorder", obsBridge.sceneName, htmlDataUrl(buildTimerBorderHtml()), STAGE.width, STAGE.height, state.layout.timerBorder.enabled);
+    const timerBorderSize = timerBorderSourceSize();
+    await createBrowserInput("TimerBorder", obsBridge.sceneName, htmlDataUrl(buildTimerBorderHtml()), timerBorderSize.width, timerBorderSize.height, state.layout.timerBorder.enabled);
     const timerTextSize = timerTextSourceSize();
     await createBrowserInput("TimerText", obsBridge.sceneName, htmlDataUrl(buildTimerTextHtml()), timerTextSize.width, timerTextSize.height, state.layout.elements.builtInTimer);
 
@@ -2560,9 +2779,9 @@ async function applyLayoutToObs(options = {}) {
     await enforceSceneLayerOrder();
 
     if (animate) {
-      await animateRunnerLayout(rectBySlot);
+      await animateRunnerLayout(rectBySlot, { refreshVisibleNameSources: refreshInputs && runnerNameSourceSizeReason(options.reason) });
     } else {
-      await applyRunnerLayoutImmediate(rectBySlot);
+      await applyRunnerLayoutImmediate(rectBySlot, { refreshVisibleNameSources: refreshInputs && runnerNameSourceSizeReason(options.reason) });
     }
 
     logObs(options.scheduled ? `Live OBS update: ${options.reason || "change"}.` : "Applied current layout to OBS.");
@@ -2581,21 +2800,23 @@ async function updateInputsForReason(reason = "", rectBySlot = getCurrentRectByS
   if (manual || ["raceInfo", "border", "border-image"].includes(reason)) {
     await updateTitleBarInput();
   }
-  if (manual || ["border", "border-image", "timerBorder"].includes(reason)) {
-    await setInputUrl("TimerBorder", htmlDataUrl(buildTimerBorderHtml()));
+  if (manual || ["border", "border-image", "timerBorder", "timerText", "geometry"].includes(reason)) {
+    await updateTimerBorderInput();
   }
-  if (manual || ["timerText", "timerBorder", "geometry"].includes(reason)) {
+  if (manual || ["timerText", "timerBorder", "geometry", "border", "border-image"].includes(reason)) {
     await updateTimerTextInput();
   }
 
   for (const runner of state.runners) {
     if (manual || ["source", "feedMode", "vdo-clean", "feedWidth", "feedHeight"].includes(reason)) {
       await updateRunnerFeedInput(runner);
+    } else if (["border", "border-image", "feed-border-visible"].includes(reason)) {
+      await updateRunnerFeedClipCss(runner);
     }
     if (manual || ["border", "border-image"].includes(reason)) {
       await setInputUrl(runnerPart(runner.slot, "Border"), htmlDataUrl(buildBorderHtml()));
     }
-    if (manual || ["name", "nameplate", "nameplate-image", "geometry", "spotlight", "spotlight-nameplates"].includes(reason)) {
+    if (manual || ["name", "nameplate", "nameplate-image"].includes(reason) || runnerNameSourceSizeReason(reason)) {
       await updateRunnerNameInput(runner, rectBySlot.get(runner.slot));
     }
     if (manual || ["finish", "finishGeometry", "geometry", "spotlight"].includes(reason)) {
@@ -2607,7 +2828,7 @@ async function updateInputsForReason(reason = "", rectBySlot = getCurrentRectByS
   }
 }
 
-async function applyRunnerLayoutImmediate(rectBySlot) {
+async function applyRunnerLayoutImmediate(rectBySlot, options = {}) {
   for (const runner of state.runners) {
     const rect = rectBySlot.get(runner.slot) ?? hiddenRect();
     const visible = rectBySlot.has(runner.slot);
@@ -2619,12 +2840,15 @@ async function applyRunnerLayoutImmediate(rectBySlot) {
       continue;
     }
     await setRunnerVisible(runner.slot, visible);
+    if (visible && options.refreshVisibleNameSources) {
+      await updateRunnerNameInput(runner, rect);
+    }
     await setRunnerTransforms(runner, rect, 1);
     rememberObsRunnerState(runner.slot, rect, visible);
   }
 }
 
-async function animateRunnerLayout(rectBySlot) {
+async function animateRunnerLayout(rectBySlot, options = {}) {
   const duration = Math.max(80, state.layout.animationMs);
   const frameMs = Math.max(16, Math.round(1000 / Math.max(15, state.layout.animationFps)));
   const frames = Math.max(2, Math.ceil(duration / frameMs));
@@ -2653,6 +2877,9 @@ async function animateRunnerLayout(rectBySlot) {
     }
     if (plan.wasVisible || plan.willBeVisible) {
       await setRunnerVisible(plan.runner.slot, true);
+      if (plan.willBeVisible && options.refreshVisibleNameSources) {
+        await updateRunnerNameInput(plan.runner, plan.to);
+      }
       if (!plan.wasVisible && plan.willBeVisible) {
         await setRunnerTransforms(plan.runner, plan.from, style.usesFade ? 0 : 1);
       }
@@ -2688,7 +2915,7 @@ async function setRunnerTransforms(runner, rect, opacity = null) {
 function runnerTransformRequests(runner, rect, opacity = null) {
   const requests = [
     sceneItemTransformRequest(runnerPart(runner.slot, "Border"), rect),
-    sceneItemTransformRequest(runnerPart(runner.slot, "Feed"), viewportRect(rect, state.layout.panelGeometry.feed), cropPixels(runner.crop)),
+    sceneItemTransformRequest(runnerPart(runner.slot, "Feed"), viewportRect(rect, gameFeedViewportGeometry()), cropPixels(runner.crop)),
     sceneItemTransformRequest(runnerPart(runner.slot, "Name"), viewportRect(rect, nameTransformGeometry())),
     sceneItemTransformRequest(runnerPart(runner.slot, "Finish"), viewportRect(rect, finishGeometry(runner, rect)))
   ];
@@ -2843,6 +3070,7 @@ function shouldRefreshObsInputs(reason) {
     "runner-remove",
     "aspectPreset",
     "timerHeight",
+    "titleHeight",
     "margin",
     "gap",
     "spotlight",
@@ -2866,9 +3094,29 @@ function shouldAnimateObsLayout(reason) {
     "runner-order",
     "aspectPreset",
     "timerHeight",
+    "titleHeight",
     "margin",
     "gap",
     "spotlight",
+    "drag-end"
+  ].includes(reason);
+}
+
+function runnerNameSourceSizeReason(reason) {
+  return [
+    "active-runners",
+    "active",
+    "runner-add",
+    "runner-remove",
+    "runner-order",
+    "aspectPreset",
+    "timerHeight",
+    "titleHeight",
+    "margin",
+    "gap",
+    "spotlight",
+    "spotlight-nameplates",
+    "geometry",
     "drag-end"
   ].includes(reason);
 }
@@ -2923,7 +3171,7 @@ function setInputValue(root, field, value) {
   const inputs = root.querySelectorAll(`[data-field='${field}']`);
   for (const input of inputs) {
     if (input.type === "checkbox") input.checked = Boolean(value);
-    else input.value = value;
+    else syncRangeInput(input, value);
   }
 }
 
@@ -2984,8 +3232,28 @@ function update() {
   document.body.classList.toggle("edit-mode", state.layout.viewMode !== "control");
   document.body.classList.toggle("layers-locked", Boolean(state.layout.layerLock));
   els.stage.style.setProperty("--timer-height", state.layout.timerHeight);
-  els.stage.classList.toggle("custom-background", Boolean(state.layout.backgroundImage));
-  els.stage.style.backgroundImage = state.layout.backgroundImage ? `url("${state.layout.backgroundImage}")` : "";
+  const hasBg = Boolean(state.layout.backgroundImage);
+  els.stage.classList.toggle("custom-background", hasBg);
+  els.stage.style.backgroundImage = hasBg ? `url("${state.layout.backgroundImage}")` : "";
+  if (hasBg) {
+    const loop = textureLoop(state.layout.backgroundScrollX, state.layout.backgroundScrollY, STAGE.width, STAGE.height, state.layout.backgroundScale);
+    if (loop) {
+      els.stage.style.setProperty("--orm-bg-scroll-x", `${loop.dx}px`);
+      els.stage.style.setProperty("--orm-bg-scroll-y", `${loop.dy}px`);
+      els.stage.style.setProperty("--orm-bg-duration", `${loop.duration}s`);
+      els.stage.style.setProperty("--orm-bg-scale", `${state.layout.backgroundScale}%`);
+    } else {
+      els.stage.style.setProperty("--orm-bg-scroll-x", "0px");
+      els.stage.style.setProperty("--orm-bg-scroll-y", "0px");
+      els.stage.style.setProperty("--orm-bg-duration", "0s");
+      els.stage.style.setProperty("--orm-bg-scale", `${state.layout.backgroundScale}%`);
+    }
+  } else {
+    els.stage.style.removeProperty("--orm-bg-scroll-x");
+    els.stage.style.removeProperty("--orm-bg-scroll-y");
+    els.stage.style.removeProperty("--orm-bg-duration");
+    els.stage.style.removeProperty("--orm-bg-scale");
+  }
   els.activeCount.textContent = `${activeRunners.length} active`;
   els.layoutSummary.textContent = `${STAGE.width}x${STAGE.height} canvas, ${state.layout.aspectPreset} game frames`;
   syncGeometryControls();
@@ -3006,8 +3274,14 @@ function update() {
 
 function applyTimerBorderPreviewGeometry() {
   const visible = state.layout.timerBorder.enabled && state.layout.elements.timerBorder;
+  const stageScale = els.stage.clientWidth / STAGE.width;
+  const timerRect = absoluteRect(state.layout.timerBorder);
   els.timerBorder.className = `timer-border drag-target ${state.layout.borderPreset}${visible ? "" : " hidden"}`;
-  els.timerBorder.style.transitionDuration = `${state.layout.animationMs}ms`;
+  els.timerBorder.style.cssText = [
+    `transition-duration:${state.layout.animationMs}ms`,
+    "background:transparent;border:none;box-shadow:none;padding:0;overflow:visible;",
+    `border-radius:${frameRadius("timer") * stageScale}px`
+  ].join(";");
   applyNormalizedStyle(els.timerBorder, state.layout.timerBorder);
 }
 
@@ -3033,7 +3307,7 @@ function applyTitleBarPreviewGeometry() {
     `font-size:${Math.max(8, Number(config.fontSize) || 34) * stageScale}px`,
     `text-shadow:${shadowValue}`,
     strokeCss,
-    raceInfoPlateFrameCss(config, sourceWidth, sourceHeight)
+    raceInfoPlateFrameCss(config, sourceWidth, sourceHeight, stageScale)
   ].join(";");
   els.titleBarPreview.querySelector(".title-main").textContent = config.title;
   const subtitle = els.titleBarPreview.querySelector(".title-sub");
@@ -3044,22 +3318,32 @@ function applyTitleBarPreviewGeometry() {
 }
 
 function applyTimerTextPreviewGeometry() {
+  const config = state.layout.timerText;
   const visible = state.layout.elements.builtInTimer;
   const sourceSize = timerTextSourceSize();
   const stageScale = els.stage.clientWidth / STAGE.width;
-  const fontSize = timerEffectiveFontSize(state.layout.timerText, sourceSize) * stageScale;
+  const fontSize = timerEffectiveFontSize(config, sourceSize) * stageScale;
+  const timerRect = absoluteRect(state.layout.timerBorder);
+  
   els.timerTextPreview.classList.toggle("hidden", !visible);
   els.timerTextPreview.textContent = formatTimerDisplay(currentTimerElapsedMs());
-  els.timerTextPreview.style.fontFamily = cssFontStack(state.layout.timerText.fontFamily);
-  els.timerTextPreview.style.fontSize = `${fontSize}px`;
-  els.timerTextPreview.style.color = timerTextColor();
-  els.timerTextPreview.style.textShadow = timerTextShadowValue(state.layout.timerText, stageScale);
-  els.timerTextPreview.style.webkitTextStroke = state.layout.timerText.strokeEnabled && Number(state.layout.timerText.strokeWidth) > 0
-    ? `${Number(state.layout.timerText.strokeWidth) * stageScale}px ${state.layout.timerText.strokeColor}`
-    : "0 transparent";
-  els.timerTextPreview.style.paintOrder = state.layout.timerText.strokeEnabled ? "stroke fill" : "normal";
-  els.timerTextPreview.style.overflow = timerTextIsUnframed() ? "visible" : "hidden";
+
+  const strokeCss = config.strokeEnabled && Number(config.strokeWidth) > 0
+    ? `-webkit-text-stroke:${Number(config.strokeWidth) * stageScale}px ${config.strokeColor};paint-order:stroke fill;`
+    : "";
+
+  const drawPlateInTextPreview = config.showBox;
+  els.timerTextPreview.style.cssText = [
+    `font-family:${cssFontStack(config.fontFamily)}`,
+    `font-size:${fontSize}px`,
+    `color:${timerTextColor()}`,
+    `text-shadow:${timerTextShadowValue(config, stageScale)}`,
+    strokeCss,
+    drawPlateInTextPreview ? timerPlateFrameCss(config, timerRect.width, timerRect.height, stageScale) : "background:transparent;border:none;box-shadow:none;padding:0;overflow:visible;"
+  ].join(";");
+
   applyNormalizedStyle(els.timerTextPreview, state.layout.timerBorder);
+  els.timerTextPreview.style.overflow = drawPlateInTextPreview ? "hidden" : "visible";
 }
 
 function applyNormalizedStyle(element, rect) {
@@ -3170,11 +3454,12 @@ function generateLayout(count, layout) {
 
   const rows = rowPattern(count);
   const aspect = aspectValue(layout.aspectPreset);
+  const titleHeightValue = layout.elements.titleBar ? layout.titleHeight : 0;
   const available = {
     x: layout.margin,
-    y: layout.margin,
+    y: layout.margin + titleHeightValue,
     width: STAGE.width - layout.margin * 2,
-    height: STAGE.height - layout.timerHeight - layout.margin * 2
+    height: STAGE.height - layout.timerHeight - titleHeightValue - layout.margin * 2
   };
   const maxCols = Math.max(...rows);
   const rowCount = rows.length;
@@ -3212,11 +3497,12 @@ function generateSpotlightLayout(activeRunners, layout) {
   const showOthers = Boolean(layout.spotlight.showOthers);
   const side = layout.spotlight.side;
   const spotlightGap = Number(layout.spotlight.gap) || layout.gap;
+  const titleHeightValue = layout.elements.titleBar ? layout.titleHeight : 0;
   const available = {
     x: layout.margin,
-    y: layout.margin,
+    y: layout.margin + titleHeightValue,
     width: STAGE.width - layout.margin * 2,
-    height: STAGE.height - layout.timerHeight - layout.margin * 2
+    height: STAGE.height - layout.timerHeight - titleHeightValue - layout.margin * 2
   };
   const otherBand = showOthers && others.length > 0
     ? Math.max(0.08, Math.min(0.45, Number(layout.spotlight.otherScale) / 100))
@@ -3366,7 +3652,19 @@ function applyPanelGeometry(runner, rect, visible = runner.active) {
   panel.style.width = `${(rect.width / STAGE.width) * 100}%`;
   panel.style.height = `${(rect.height / STAGE.height) * 100}%`;
 
-  applyNormalizedStyle(viewport, state.layout.panelGeometry.feed);
+  const feedGeometry = gameFeedViewportGeometry();
+  applyNormalizedStyle(viewport, feedGeometry);
+  const stageScale = els.stage.clientWidth / STAGE.width;
+  const borderEnabled = state.layout.elements.feedBorder;
+  const panelScaleX = rect.width / Math.max(1, Number(state.layout.feedWidth) || 1);
+  const panelScaleY = rect.height / Math.max(1, Number(state.layout.feedHeight) || 1);
+  const shellRadius = borderEnabled ? scaledFrameRadius("feed", panelScaleX * stageScale, panelScaleY * stageScale) : 0;
+  const feedRadius = borderEnabled ? scaledFrameRadius("feed", panelScaleX * stageScale, panelScaleY * stageScale, true) : 0;
+  viewport.style.borderRadius = `${feedRadius}px`;
+  viewport.style.clipPath = feedRadius > 0 ? `inset(0 round ${feedRadius}px)` : "none";
+
+  const shell = panel.querySelector(".runner-shell");
+  shell.style.borderRadius = shellRadius > 0 ? `${shellRadius}px` : "";
   applyNormalizedStyle(nameplate, nameTransformGeometry());
   applyNormalizedStyle(finish, finishGeometry(runner, rect));
   viewport.classList.toggle("hidden-element", !state.layout.elements.feed);
@@ -3542,10 +3840,11 @@ function syncDynamicPreviewStyles() {
   }
   style.textContent = [
     borderAnimationCss(getBorderStyle("feed"), state.layout.feedWidth, state.layout.feedHeight),
-    borderAnimationCss(getBorderStyle("timer"), STAGE.width, STAGE.height),
+    borderAnimationCss(getBorderStyle("timer"), timerBorderSourceSize().width, timerBorderSourceSize().height),
     borderAnimationCss(getBorderStyle("title"), STAGE.width * state.layout.raceInfo.rect.width, STAGE.height * state.layout.raceInfo.rect.height),
     nameplateAnimationCss(state.layout.nameplate),
-    nameplateAnimationCss(state.layout.raceInfo, STAGE.width * state.layout.raceInfo.rect.width, STAGE.height * state.layout.raceInfo.rect.height, "ormRaceInfoTexture")
+    nameplateAnimationCss(state.layout.raceInfo, STAGE.width * state.layout.raceInfo.rect.width, STAGE.height * state.layout.raceInfo.rect.height, "ormRaceInfoTexture"),
+    nameplateAnimationCss(state.layout.timerText, timerTextSourceSize().width, timerTextSourceSize().height, "ormTimerTexture")
   ].join("\n");
 }
 
@@ -3575,7 +3874,7 @@ function applyBorderPreview(element, targetOrTimer) {
 
   const target = typeof targetOrTimer === "string" ? targetOrTimer : targetOrTimer ? "timer" : "feed";
   const sourceSize = target === "timer"
-    ? { width: STAGE.width, height: STAGE.height }
+    ? timerBorderSourceSize()
     : target === "title"
       ? titleBarSourceSize()
       : { width: state.layout.feedWidth, height: state.layout.feedHeight };
@@ -3655,6 +3954,7 @@ function buildObsPayload(rectBySlot) {
     layout: {
       aspectPreset: state.layout.aspectPreset,
       timerHeight: state.layout.timerHeight,
+      titleHeight: state.layout.titleHeight,
       margin: state.layout.margin,
       gap: state.layout.gap,
       animationMs: state.layout.animationMs,
@@ -3815,6 +4115,12 @@ async function createRunnerObsInputs(runner, rect = null) {
 
 async function createBrowserInput(partName, sceneName, url, width, height, enabled, options = {}) {
   const inputName = `${MANAGED_PREFIX}${partName}`;
+  
+  let css = "html, body { background: rgba(0, 0, 0, 0) !important; overflow: hidden; }";
+  if (partName.includes("Feed")) {
+    css = runnerFeedBrowserCss();
+  }
+
   const response = await obsCall("CreateInput", {
     sceneName,
     inputName,
@@ -3823,7 +4129,7 @@ async function createBrowserInput(partName, sceneName, url, width, height, enabl
       url,
       width,
       height,
-      css: "html, body { background: rgba(0, 0, 0, 0) !important; overflow: hidden; }",
+      css,
       reroute_audio: Boolean(options.rerouteAudio),
       shutdown: false,
       restart_when_active: false
@@ -3905,8 +4211,24 @@ async function updateRunnerFeedInput(runner) {
     url: buildFeedUrl(runner),
     width: state.layout.feedWidth,
     height: state.layout.feedHeight,
+    css: runnerFeedBrowserCss(),
     reroute_audio: true
   });
+}
+
+async function updateRunnerFeedClipCss(runner) {
+  await setBrowserInputSettings(runnerPart(runner.slot, "Feed"), {
+    css: runnerFeedBrowserCss()
+  });
+}
+
+function runnerFeedBrowserCss() {
+  const feedRadius = runnerFeedClipRadius();
+  return `html, body { background: rgba(0, 0, 0, 0) !important; overflow: hidden !important; border-radius: ${feedRadius}px !important; clip-path: inset(0 round ${feedRadius}px) !important; background-clip: padding-box !important; transform: translate3d(0, 0, 0) !important; position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important; }`;
+}
+
+function runnerFeedClipRadius() {
+  return state.layout.elements.feedBorder ? innerFrameRadius("feed") : 0;
 }
 
 async function updateRunnerNameInput(runner, rect = null) {
@@ -4014,7 +4336,7 @@ async function ensureManagedGlobalSources() {
   const globals = [
     ["Background", htmlDataUrl(buildBackgroundHtml()), STAGE.width, STAGE.height, true],
     ["TitleBar", htmlDataUrl(buildTitleBarHtml()), titleSize.width, titleSize.height, state.layout.elements.titleBar],
-    ["TimerBorder", htmlDataUrl(buildTimerBorderHtml()), STAGE.width, STAGE.height, state.layout.timerBorder.enabled && state.layout.elements.timerBorder],
+    ["TimerBorder", htmlDataUrl(buildTimerBorderHtml()), timerBorderSourceSize().width, timerBorderSourceSize().height, state.layout.timerBorder.enabled && state.layout.elements.timerBorder],
     ["TimerText", htmlDataUrl(buildTimerTextHtml()), timerTextSize.width, timerTextSize.height, state.layout.elements.builtInTimer]
   ];
 
@@ -4032,6 +4354,15 @@ async function updateTimerTextInput() {
   const size = timerTextSourceSize();
   await setBrowserInputSettings("TimerText", {
     url: htmlDataUrl(buildTimerTextHtml()),
+    width: size.width,
+    height: size.height
+  });
+}
+
+async function updateTimerBorderInput() {
+  const size = timerBorderSourceSize();
+  await setBrowserInputSettings("TimerBorder", {
+    url: htmlDataUrl(buildTimerBorderHtml()),
     width: size.width,
     height: size.height
   });
@@ -4106,21 +4437,25 @@ async function enforceSceneLayerOrder() {
   const requests = [];
   let index = 0;
 
-  requests.push(sceneItemIndexRequest("Background", index));
-  index += 1;
+  const pushLayer = (partName) => {
+    requests.push(sceneItemIndexRequest(partName, index));
+    index += 1;
+  };
+
+  pushLayer("Background");
 
   for (const runner of state.runners) {
-    for (const part of RUNNER_PARTS) {
-      requests.push(sceneItemIndexRequest(runnerPart(runner.slot, part), index));
-      index += 1;
+    // Keep each runner's visible chrome above the live feed. This matters most
+    // with high-radius generated borders, where the feed can otherwise cover
+    // the rounded border stroke in OBS even though the preview clip looks OK.
+    for (const part of ["Feed", "Border", "Name", "Finish"]) {
+      pushLayer(runnerPart(runner.slot, part));
     }
   }
 
-  requests.push(sceneItemIndexRequest("TitleBar", index));
-  index += 1;
-  requests.push(sceneItemIndexRequest("TimerBorder", index));
-  index += 1;
-  requests.push(sceneItemIndexRequest("TimerText", index));
+  pushLayer("TitleBar");
+  pushLayer("TimerText");
+  pushLayer("TimerBorder");
 
   await obsBatch(requests);
 }
@@ -4194,6 +4529,50 @@ function viewportRect(rect, viewport) {
     width: rect.width * viewport.width,
     height: rect.height * viewport.height
   };
+}
+
+function insetRect(rect, insetX, insetY = insetX) {
+  const safeInsetX = Math.max(0, Number(insetX) || 0);
+  const safeInsetY = Math.max(0, Number(insetY) || 0);
+  const maxInsetX = Math.max(0, Number(rect.width) || 0) / 2;
+  const maxInsetY = Math.max(0, Number(rect.height) || 0) / 2;
+  const x = Math.min(safeInsetX, maxInsetX);
+  const y = Math.min(safeInsetY, maxInsetY);
+
+  return {
+    x: rect.x + x,
+    y: rect.y + y,
+    width: Math.max(0, rect.width - x * 2),
+    height: Math.max(0, rect.height - y * 2)
+  };
+}
+
+function frameBorderWidth(target) {
+  const style = getBorderStyle(target);
+  return Math.max(0, Number(style.lineWidth) || 0);
+}
+
+function frameRadius(target) {
+  const style = getBorderStyle(target);
+  return Math.max(0, Number(style.radius) || 0);
+}
+
+function innerFrameRadius(target) {
+  return Math.max(0, frameRadius(target) - frameBorderWidth(target));
+}
+
+function gameFeedViewportGeometry() {
+  const base = state.layout.panelGeometry.feed;
+  if (!state.layout.elements.feedBorder) return base;
+
+  const insetX = frameBorderWidth("feed") / Math.max(1, Number(state.layout.feedWidth) || 1);
+  const insetY = frameBorderWidth("feed") / Math.max(1, Number(state.layout.feedHeight) || 1);
+  return insetRect(base, insetX, insetY);
+}
+
+function scaledFrameRadius(target, scaleX = 1, scaleY = scaleX, inner = false) {
+  const radius = inner ? innerFrameRadius(target) : frameRadius(target);
+  return Math.max(0, radius * Math.min(Math.abs(scaleX) || 1, Math.abs(scaleY) || Math.abs(scaleX) || 1));
 }
 
 function cropPixels(crop) {
@@ -4311,6 +4690,14 @@ function timerTextSourceSize() {
   };
 }
 
+function timerBorderSourceSize() {
+  const rect = absoluteRect(state.layout.timerBorder);
+  return {
+    width: Math.max(1, Math.round(rect.width)),
+    height: Math.max(1, Math.round(rect.height))
+  };
+}
+
 function titleBarSourceSize() {
   const rect = absoluteRect(state.layout.raceInfo.rect);
   return {
@@ -4320,8 +4707,17 @@ function titleBarSourceSize() {
 }
 
 function buildBackgroundHtml() {
-  if (state.layout.backgroundImage) {
-    return `<!doctype html><html><body><img src="${escapeAttribute(state.layout.backgroundImage)}" alt="" class="bg"></body><style>${baseHtmlCss()} .bg{width:100vw;height:100vh;object-fit:cover;display:block;}</style></html>`;
+  const layout = state.layout;
+  if (layout.backgroundImage) {
+    const loop = textureLoop(layout.backgroundScrollX, layout.backgroundScrollY, STAGE.width, STAGE.height, layout.backgroundScale);
+    const animation = loop
+      ? `animation:ormBackgroundScroll ${loop.duration}s linear infinite;`
+      : "";
+    const scrollVars = loop
+      ? `--orm-bg-scroll-x:${loop.dx}px;--orm-bg-scroll-y:${loop.dy}px;`
+      : "";
+
+    return `<!doctype html><html><body><div class="bg"></div></body><style>${baseHtmlCss()} @keyframes ormBackgroundScroll{from{background-position:0px 0px;}to{background-position:var(--orm-bg-scroll-x) var(--orm-bg-scroll-y);}} .bg{width:100vw;height:100vh;background-image:url("${escapeCssString(layout.backgroundImage)}");background-repeat:repeat;background-size:${layout.backgroundScale}% auto;background-position:0px 0px;${scrollVars}${animation}}</style></html>`;
   }
 
   return `<!doctype html><html><body><div class="bg"></div></body><style>${baseHtmlCss()} .bg{width:100vw;height:100vh;background:linear-gradient(135deg,rgba(45,198,163,.25),transparent 38%),linear-gradient(315deg,rgba(240,184,74,.2),transparent 38%),#11161a;}</style></html>`;
@@ -4338,7 +4734,11 @@ function buildTitleBarHtml() {
     ? `-webkit-text-stroke:${Number(config.strokeWidth)}px ${config.strokeColor};paint-order:stroke fill;`
     : "";
   const textEffects = `${shadowCss}${strokeCss}`;
-  return `<!doctype html><html><body><div class="title"><strong>${escapeHtml(config.title)}</strong><span>${escapeHtml(config.subtitle)}</span><div class="title-border" aria-hidden="true"></div></div></body><style>${baseHtmlCss()} ${nameplateAnimationCss(config, size.width, size.height, "ormRaceInfoTexture")}${borderAnimationCss(getBorderStyle("title"), size.width, size.height)}body{font-family:${cssFontStack(config.fontFamily)};}.title{position:absolute;inset:0;${raceInfoPlateFrameCss(config, size.width, size.height)}color:${config.textColor};}.title-border{${titleBorder}}strong,span{position:relative;z-index:1;${textEffects}}strong{font-size:${Math.max(8, Number(config.fontSize) || 34)}px;font-weight:900;line-height:1;}span{font-size:${Math.max(8, Number(config.fontSize) || 34) * 0.58}px;font-weight:800;line-height:1;color:${hexToRgba(config.textColor, 0.68)};}</style></html>`;
+
+  const frameClip = `border-radius:${frameRadius("title")}px;overflow:hidden;`;
+  const plateStyle = `position:absolute;inset:0;${raceInfoPlateFrameCss(config, size.width, size.height, 1.0)}`;
+
+  return `<!doctype html><html><body><div class="title-container"><div class="title-plate-bg" style="${plateStyle}"></div><div class="title"><strong>${escapeHtml(config.title)}</strong><span>${escapeHtml(config.subtitle)}</span><div class="title-border" aria-hidden="true"></div></div></div></body><style>${baseHtmlCss()} ${nameplateAnimationCss(config, size.width, size.height, "ormRaceInfoTexture")}${borderAnimationCss(getBorderStyle("title"), size.width, size.height)}body{font-family:${cssFontStack(config.fontFamily)};}.title-container{position:absolute;inset:0;${frameClip}}.title{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:18px;overflow:hidden;white-space:nowrap;color:${config.textColor};}.title-border{${titleBorder}}strong,span{position:relative;z-index:1;${textEffects}}strong{font-size:${Math.max(8, Number(config.fontSize) || 34)}px;font-weight:900;line-height:1;}span{font-size:${Math.max(8, Number(config.fontSize) || 34) * 0.58}px;font-weight:800;line-height:1;color:${hexToRgba(config.textColor, 0.68)};}</style></html>`;
 }
 
 function titleBorderHtmlCss(width, height) {
@@ -4350,17 +4750,32 @@ function titleBorderHtmlCss(width, height) {
   return `${base}${borderFrameCss(false, getBorderStyle("title"), width, height)}`;
 }
 
-function raceInfoPlateFrameCss(config, sourceWidth = 960, sourceHeight = 120) {
-  const padding = Math.max(0, Number(config.platePaddingX) || 0);
-  let background = "background:transparent;";
+function raceInfoPlateFrameCss(config, sourceWidth = 960, sourceHeight = 120, scale = 1.0) {
+  const padding = Math.max(0, Number(config.platePaddingX) || 0) * scale;
+  const radius = frameRadius("title") * scale;
 
-  if (config.showBox && config.plateMode === "image" && config.plateImage) {
-    background = `background-color:transparent;background-image:url("${escapeCssString(config.plateImage)}");background-size:100% 100%;background-repeat:no-repeat;background-position:center;`;
-  } else if (config.showBox && config.plateMode !== "image") {
-    background = nameplateBackgroundCss(config, sourceWidth, sourceHeight, "ormRaceInfoTexture");
+  return `display:flex;align-items:center;justify-content:center;gap:18px;padding:0 ${padding}px;overflow:hidden;white-space:nowrap;${plateBackgroundFrameCss(config, sourceWidth, sourceHeight, "ormRaceInfoTexture")}border:none;border-radius:${radius}px;box-sizing:border-box;background-clip:padding-box;`;
+}
+
+function timerPlateFrameCss(config, sourceWidth = 320, sourceHeight = 80, scale = 1.0) {
+  const padding = Math.max(0, Number(config.platePaddingX) || 0) * scale;
+  const radius = frameRadius("timer") * scale;
+
+  return `display:flex;align-items:center;justify-content:center;padding:0 ${padding}px;overflow:hidden;white-space:nowrap;${plateBackgroundFrameCss(config, sourceWidth, sourceHeight, "ormTimerTexture")}border:none;border-radius:${radius}px;box-sizing:border-box;background-clip:padding-box;width:100%;height:100%;`;
+}
+
+function plateBackgroundFrameCss(config, sourceWidth, sourceHeight, textureAnimationName) {
+  if (!config.showBox) return "background:transparent;";
+
+  if (config.plateMode === "image" && config.plateImage) {
+    return `background-color:transparent;background-image:url("${escapeCssString(config.plateImage)}");background-size:100% 100%;background-repeat:no-repeat;background-position:center;`;
   }
 
-  return `display:flex;align-items:center;justify-content:center;gap:18px;padding:0 ${padding}px;overflow:hidden;white-space:nowrap;${background}border:none;border-radius:${Math.max(0, Number(config.plateRadius) || 0)}px;box-sizing:border-box;background-clip:padding-box;`;
+  if (config.plateMode !== "image") {
+    return nameplateBackgroundCss(config, sourceWidth, sourceHeight, textureAnimationName);
+  }
+
+  return "background:transparent;";
 }
 
 function buildFeedUrl(runner) {
@@ -4474,12 +4889,22 @@ function buildBorderHtml() {
 }
 
 function buildTimerBorderHtml() {
-  const image = getBorderImage("timer");
-  if (image) {
-    return `<!doctype html><html><body><img src="${escapeAttribute(image)}" alt=""></body><style>${baseHtmlCss()} img{width:100vw;height:100vh;object-fit:fill;display:block;}</style></html>`;
-  }
+  return buildTimerFrameHtml();
+}
 
-  return buildGeneratedBorderHtml(true, getBorderStyle("timer"));
+function buildTimerFrameHtml() {
+  const style = getBorderStyle("timer");
+  const image = getBorderImage("timer");
+  const size = timerBorderSourceSize();
+  const borderHtml = image
+    ? `<img class="timer-frame-border" src="${escapeAttribute(image)}" alt="">`
+    : `<div class="timer-frame-border" aria-hidden="true"></div>`;
+  const borderCss = image
+    ? `.timer-frame-border{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:block;z-index:2;pointer-events:none;}`
+    : `.timer-frame-border{${borderFrameCss(true, style, size.width, size.height)}z-index:2;pointer-events:none;}`;
+  const animationCss = image ? "" : borderAnimationCss(style, size.width, size.height);
+
+  return `<!doctype html><html><body><div class="timer-frame">${borderHtml}</div></body><style>${baseHtmlCss()} ${animationCss}.timer-frame{position:absolute;inset:0;overflow:visible;border-radius:${frameRadius("timer")}px;}${borderCss}</style></html>`;
 }
 
 function buildTimerTextHtml() {
@@ -4502,7 +4927,16 @@ function buildTimerTextHtml() {
     x: anchor.x,
     y: anchor.y
   });
-  return `<!doctype html><html><body>${svg}<script>const state=${JSON.stringify(config.state)};const startedAt=${start};const format=${JSON.stringify(config.format)};let elapsed=${elapsed};function fmt(ms){const totalSeconds=Math.floor(ms/1000);const hours=Math.floor(totalSeconds/3600);const totalMinutes=Math.floor(totalSeconds/60);const minutes=Math.floor((totalSeconds%3600)/60);const seconds=totalSeconds%60;if(format==="mmss")return String(totalMinutes).padStart(2,"0")+":"+String(seconds).padStart(2,"0");if(format==="mmssms")return String(totalMinutes).padStart(2,"0")+":"+String(seconds).padStart(2,"0")+"."+String(Math.floor(ms%1000)).padStart(3,"0");return [hours,minutes,seconds].map(v=>String(v).padStart(2,"0")).join(":");}function tick(){if(state==="running") elapsed=Math.max(0,Date.now()-startedAt);document.getElementById("timerText").textContent=fmt(elapsed);}tick();if(state==="running") setInterval(tick,format==="mmssms"?33:200);</script></body><style>${baseHtmlCss()} body{display:grid;place-items:center;}</style></html>`;
+
+  const drawPlateInTextSource = config.showBox;
+  const plateRect = timerTextIsUnframed()
+    ? absoluteRect(state.layout.timerBorder)
+    : { x: 0, y: 0, width: size.width, height: size.height };
+  const plateHtml = drawPlateInTextSource ? `<div class="timer-plate" aria-hidden="true"></div>${svg}` : svg;
+  const plateCss = drawPlateInTextSource ? `.timer-plate{position:absolute;left:${round(plateRect.x)}px;top:${round(plateRect.y)}px;width:${round(plateRect.width)}px;height:${round(plateRect.height)}px;${timerPlateFrameCss(config, plateRect.width, plateRect.height, 1.0)}}` : "";
+  const animCss = drawPlateInTextSource ? nameplateAnimationCss(config, plateRect.width, plateRect.height, "ormTimerTexture") : "";
+
+  return `<!doctype html><html><body>${plateHtml}<script>const state=${JSON.stringify(config.state)};const startedAt=${start};const format=${JSON.stringify(config.format)};let elapsed=${elapsed};function fmt(ms){const totalSeconds=Math.floor(ms/1000);const hours=Math.floor(totalSeconds/3600);const totalMinutes=Math.floor(totalSeconds/60);const minutes=Math.floor((totalSeconds%3600)/60);const seconds=totalSeconds%60;if(format==="mmss")return String(totalMinutes).padStart(2,"0")+":"+String(seconds).padStart(2,"0");if(format==="mmssms")return String(totalMinutes).padStart(2,"0")+":"+String(seconds).padStart(2,"0")+"."+String(Math.floor(ms%1000)).padStart(3,"0");return [hours,minutes,seconds].map(v=>String(v).padStart(2,"0")).join(":");}function tick(){if(state==="running") elapsed=Math.max(0,Date.now()-startedAt);document.getElementById("timerText").textContent=fmt(elapsed);}tick();if(state==="running") setInterval(tick,format==="mmssms"?33:200);</script></body><style>${baseHtmlCss()} ${animCss} body{position:relative;width:100vw;height:100vh;margin:0;overflow:hidden;background:transparent;} .svg-text{position:absolute;left:0;top:0;z-index:3;} ${plateCss}</style></html>`;
 }
 
 function timerEffectiveFontSize(config, size) {
@@ -4578,9 +5012,9 @@ function textureLoop(scrollX, scrollY, sourceWidth, sourceHeight, textureScale) 
 
   if (ax > 0 && ay > 0) {
     let best = { nx: 1, ny: 1, duration: (tileW / ax + tileH / ay) / 2, error: Number.POSITIVE_INFINITY };
-    for (let xMultiple = 1; xMultiple <= 12; xMultiple += 1) {
+    for (let xMultiple = 1; xMultiple <= 24; xMultiple += 1) {
       const xDuration = xMultiple * tileW / ax;
-      for (let yMultiple = 1; yMultiple <= 12; yMultiple += 1) {
+      for (let yMultiple = 1; yMultiple <= 24; yMultiple += 1) {
         const yDuration = yMultiple * tileH / ay;
         const error = Math.abs(xDuration - yDuration);
         if (error < best.error) {
@@ -4593,7 +5027,7 @@ function textureLoop(scrollX, scrollY, sourceWidth, sourceHeight, textureScale) 
     duration = best.duration;
   }
 
-  duration = clampNumber(duration, 0.25, 120, 4);
+  duration = clampNumber(duration, 0.25, 86400, 4);
   return {
     dx: sx === 0 ? 0 : Math.sign(sx) * nx * tileW,
     dy: sy === 0 ? 0 : Math.sign(sy) * ny * tileH,
@@ -4702,7 +5136,10 @@ function nameplateFrameCss(config, width = "100%", height = "100%", sourceWidth 
   const generatedPlate = config.plateMode !== "image";
   const plateBackground = generatedPlate && config.showBox ? background : "transparent";
   const plateBorder = generatedPlate ? border : `${borderWidth}px solid transparent`;
-  return `position:absolute;left:0;top:0;width:${typeof width === "number" ? `${width}px` : width};height:${typeof height === "number" ? `${height}px` : height};display:flex;align-items:center;justify-content:space-between;gap:2%;padding:0 ${Math.max(0, Number(config.platePaddingX) || 0)}px;${plateBackground}border:${plateBorder};border-radius:${Math.max(0, Number(config.plateRadius) || 0)}px;overflow:hidden;box-sizing:border-box;transform-origin:0 0;background-clip:padding-box;`;
+
+  const radius = Math.max(0, Number(config.plateRadius) || 0);
+
+  return `position:absolute;left:0;top:0;width:${typeof width === "number" ? `${width}px` : width};height:${typeof height === "number" ? `${height}px` : height};display:flex;align-items:center;justify-content:space-between;gap:2%;padding:0 ${Math.max(0, Number(config.platePaddingX) || 0)}px;${plateBackground}border:${plateBorder};border-radius:${radius}px;overflow:hidden;box-sizing:border-box;transform-origin:0 0;background-clip:padding-box;`;
 }
 
 function nameplateBackgroundCss(config, sourceWidth = 960, sourceHeight = 120, textureAnimationName = "ormNameplateTexture") {
@@ -5331,37 +5768,37 @@ function normalizeSpotlight(config) {
   config.disableSmallNameplates = Boolean(config.disableSmallNameplates);
   config.side = ["right", "left", "bottom"].includes(config.side) ? config.side : "bottom";
   config.stackOrder = ["horizontal", "vertical"].includes(config.stackOrder) ? config.stackOrder : "horizontal";
-  config.mainScale = clampNumber(config.mainScale, 55, 92, 78);
-  config.otherScale = clampNumber(config.otherScale, 8, 40, 22);
-  config.gap = clampNumber(config.gap, 0, 64, 20);
+  config.mainScale = normalizeNumber(config.mainScale, 55, 92, 78);
+  config.otherScale = normalizeNumber(config.otherScale, 8, 40, 22);
+  config.gap = normalizeNumber(config.gap, 0, 64, 20);
 }
 
 function normalizeRaceInfo(config) {
   config.title = String(config.title || "Race Title");
   config.subtitle = String(config.subtitle || "");
   config.fontFamily = String(config.fontFamily || "Segoe UI");
-  config.fontSize = clampNumber(config.fontSize, 1, 1000, 34);
+  config.fontSize = normalizeNumber(config.fontSize, 1, 1000, 34);
   config.textColor = normalizeHexColor(config.textColor, "#ffffff");
   config.plateImage = String(config.plateImage || "");
   config.plateBackgroundColor = normalizeHexColor(config.plateBackgroundColor || config.backgroundColor, "#10161a");
-  config.plateBackgroundOpacity = clampNumber(config.plateBackgroundOpacity, 0, 100, 84);
+  config.plateBackgroundOpacity = normalizeNumber(config.plateBackgroundOpacity, 0, 100, 84);
   config.plateBorderColor = normalizeHexColor(config.plateBorderColor, "#ffffff");
-  config.plateBorderOpacity = clampNumber(config.plateBorderOpacity, 0, 100, 14);
-  config.plateBorderWidth = clampNumber(config.plateBorderWidth, 0, 20, 1);
-  config.plateRadius = clampNumber(config.plateRadius, 0, 60, 8);
-  config.platePaddingX = clampNumber(config.platePaddingX, 0, 160, 18);
+  config.plateBorderOpacity = normalizeNumber(config.plateBorderOpacity, 0, 100, 14);
+  config.plateBorderWidth = normalizeNumber(config.plateBorderWidth, 0, 20, 1);
+  config.plateRadius = normalizeNumber(config.plateRadius, 0, 60, 8);
+  config.platePaddingX = normalizeNumber(config.platePaddingX, 0, 160, 18);
   config.plateFillMode = ["solid", "gradient", "texture"].includes(config.plateFillMode) ? config.plateFillMode : "solid";
   config.plateGradientFrom = normalizeHexColor(config.plateGradientFrom, config.plateBackgroundColor);
   config.plateGradientTo = normalizeHexColor(config.plateGradientTo, "#26343b");
-  config.plateGradientAngle = clampNumber(config.plateGradientAngle, 0, 360, 135);
+  config.plateGradientAngle = normalizeNumber(config.plateGradientAngle, 0, 360, 135);
   config.plateAnimateGradientAngle = Boolean(config.plateAnimateGradientAngle);
-  config.plateGradientAngleSpeed = clampNumber(config.plateGradientAngleSpeed, -360, 360, 45);
+  config.plateGradientAngleSpeed = normalizeNumber(config.plateGradientAngleSpeed, -360, 360, 45);
   config.plateTextureImage = String(config.plateTextureImage || "");
-  config.plateTextureScale = clampNumber(config.plateTextureScale, 25, 400, 100);
-  config.plateTextureX = clampNumber(config.plateTextureX, 0, 100, 50);
-  config.plateTextureY = clampNumber(config.plateTextureY, 0, 100, 50);
-  config.plateTextureScrollX = clampNumber(config.plateTextureScrollX, -200, 200, 0);
-  config.plateTextureScrollY = clampNumber(config.plateTextureScrollY, -200, 200, 0);
+  config.plateTextureScale = normalizeNumber(config.plateTextureScale, 25, 400, 100);
+  config.plateTextureX = normalizeNumber(config.plateTextureX, 0, 100, 50);
+  config.plateTextureY = normalizeNumber(config.plateTextureY, 0, 100, 50);
+  config.plateTextureScrollX = normalizeNumber(config.plateTextureScrollX, -200, 200, 0);
+  config.plateTextureScrollY = normalizeNumber(config.plateTextureScrollY, -200, 200, 0);
   config.plateMode = ["generated", "image"].includes(config.plateMode) ? config.plateMode : "generated";
   config.showBox = config.showBox !== false;
   config.showBorder = config.showBorder !== false;
@@ -5397,79 +5834,100 @@ function normalizeLoadedRunners(runners) {
 
 function normalizeTimerText(config) {
   config.fontFamily = String(config.fontFamily || DEFAULT_TIMER_TEXT.fontFamily);
-  config.fontSize = clampNumber(config.fontSize, 1, 1000, DEFAULT_TIMER_TEXT.fontSize);
+  config.fontSize = normalizeNumber(config.fontSize, 1, 1000, DEFAULT_TIMER_TEXT.fontSize);
   config.format = ["hhmmss", "mmss", "mmssms"].includes(config.format) ? config.format : DEFAULT_TIMER_TEXT.format;
   config.idleColor = normalizeHexColor(config.idleColor, DEFAULT_TIMER_TEXT.idleColor);
   config.stoppedColor = normalizeHexColor(config.stoppedColor, DEFAULT_TIMER_TEXT.stoppedColor);
   config.runningColor = normalizeHexColor(config.runningColor, DEFAULT_TIMER_TEXT.runningColor);
   config.strokeEnabled = Boolean(config.strokeEnabled);
   config.strokeColor = normalizeHexColor(config.strokeColor, DEFAULT_TIMER_TEXT.strokeColor);
-  config.strokeWidth = clampNumber(config.strokeWidth, 0, 10, DEFAULT_TIMER_TEXT.strokeWidth);
+  config.strokeWidth = normalizeNumber(config.strokeWidth, 0, 10, DEFAULT_TIMER_TEXT.strokeWidth);
   config.shadowEnabled = Boolean(config.shadowEnabled);
   config.shadowColor = normalizeHexColor(config.shadowColor, DEFAULT_TIMER_TEXT.shadowColor);
-  config.shadowBlur = clampNumber(config.shadowBlur, 0, 30, DEFAULT_TIMER_TEXT.shadowBlur);
-  config.shadowX = clampNumber(config.shadowX, -20, 20, DEFAULT_TIMER_TEXT.shadowX);
-  config.shadowY = clampNumber(config.shadowY, -20, 20, DEFAULT_TIMER_TEXT.shadowY);
+  config.shadowBlur = normalizeNumber(config.shadowBlur, 0, 30, DEFAULT_TIMER_TEXT.shadowBlur);
+  config.shadowX = normalizeNumber(config.shadowX, -20, 20, DEFAULT_TIMER_TEXT.shadowX);
+  config.shadowY = normalizeNumber(config.shadowY, -20, 20, DEFAULT_TIMER_TEXT.shadowY);
   config.state = ["idle", "stopped", "running"].includes(config.state) ? config.state : "idle";
-  config.elapsedMs = clampNumber(config.elapsedMs, 0, Number.MAX_SAFE_INTEGER, 0);
-  config.startedAt = clampNumber(config.startedAt, 0, Number.MAX_SAFE_INTEGER, 0);
+  config.elapsedMs = normalizeNumber(config.elapsedMs, 0, Number.MAX_SAFE_INTEGER, 0);
+  config.startedAt = normalizeNumber(config.startedAt, 0, Number.MAX_SAFE_INTEGER, 0);
+  
+  // Timer Plate normalization
+  config.plateImage = String(config.plateImage || "");
+  config.plateBackgroundColor = normalizeHexColor(config.plateBackgroundColor, "#10161a");
+  config.plateBackgroundOpacity = normalizeNumber(config.plateBackgroundOpacity, 0, 100, 84);
+  config.plateRadius = normalizeNumber(config.plateRadius, 0, 60, 8);
+  config.platePaddingX = normalizeNumber(config.platePaddingX, 0, 160, 18);
+  config.plateFillMode = ["solid", "gradient", "texture"].includes(config.plateFillMode) ? config.plateFillMode : "solid";
+  config.plateGradientFrom = normalizeHexColor(config.plateGradientFrom, config.plateBackgroundColor);
+  config.plateGradientTo = normalizeHexColor(config.plateGradientTo, "#26343b");
+  config.plateGradientAngle = normalizeNumber(config.plateGradientAngle, 0, 360, 135);
+  config.plateAnimateGradientAngle = Boolean(config.plateAnimateGradientAngle);
+  config.plateGradientAngleSpeed = normalizeNumber(config.plateGradientAngleSpeed, -360, 360, 45);
+  config.plateTextureImage = String(config.plateTextureImage || "");
+  config.plateTextureScale = normalizeNumber(config.plateTextureScale, 25, 400, 100);
+  config.plateTextureX = normalizeNumber(config.plateTextureX, 0, 100, 50);
+  config.plateTextureY = normalizeNumber(config.plateTextureY, 0, 100, 50);
+  config.plateTextureScrollX = normalizeNumber(config.plateTextureScrollX, -200, 200, 0);
+  config.plateTextureScrollY = normalizeNumber(config.plateTextureScrollY, -200, 200, 0);
+  config.plateMode = ["generated", "image"].includes(config.plateMode) ? config.plateMode : "generated";
+  config.showBox = Boolean(config.showBox);
 }
 
 function normalizeFinishedTime(config) {
   config.fontFamily = String(config.fontFamily || DEFAULT_FINISHED_TIME.fontFamily);
-  config.fontSize = clampNumber(config.fontSize, 1, 1000, DEFAULT_FINISHED_TIME.fontSize);
+  config.fontSize = normalizeNumber(config.fontSize, 1, 1000, DEFAULT_FINISHED_TIME.fontSize);
   config.color = normalizeHexColor(config.color, DEFAULT_FINISHED_TIME.color);
   config.align = ["left", "center", "right"].includes(config.align) ? config.align : DEFAULT_FINISHED_TIME.align;
   config.lockToNameplate = Boolean(config.lockToNameplate);
   config.strokeEnabled = Boolean(config.strokeEnabled);
   config.strokeColor = normalizeHexColor(config.strokeColor, DEFAULT_FINISHED_TIME.strokeColor);
-  config.strokeWidth = clampNumber(config.strokeWidth, 0, 10, DEFAULT_FINISHED_TIME.strokeWidth);
+  config.strokeWidth = normalizeNumber(config.strokeWidth, 0, 10, DEFAULT_FINISHED_TIME.strokeWidth);
   config.shadowEnabled = Boolean(config.shadowEnabled);
   config.shadowColor = normalizeHexColor(config.shadowColor, DEFAULT_FINISHED_TIME.shadowColor);
-  config.shadowBlur = clampNumber(config.shadowBlur, 0, 30, DEFAULT_FINISHED_TIME.shadowBlur);
-  config.shadowX = clampNumber(config.shadowX, -20, 20, DEFAULT_FINISHED_TIME.shadowX);
-  config.shadowY = clampNumber(config.shadowY, -20, 20, DEFAULT_FINISHED_TIME.shadowY);
+  config.shadowBlur = normalizeNumber(config.shadowBlur, 0, 30, DEFAULT_FINISHED_TIME.shadowBlur);
+  config.shadowX = normalizeNumber(config.shadowX, -20, 20, DEFAULT_FINISHED_TIME.shadowX);
+  config.shadowY = normalizeNumber(config.shadowY, -20, 20, DEFAULT_FINISHED_TIME.shadowY);
 }
 
 function normalizeNameplateStyle(config) {
   config.fontFamily = String(config.fontFamily || "Segoe UI");
-  config.fontSize = clampNumber(config.fontSize, 1, 1000, state.layout.nameplate.fontSize);
+  config.fontSize = normalizeNumber(config.fontSize, 1, 1000, state.layout.nameplate.fontSize);
   config.textColor = normalizeHexColor(config.textColor, state.layout.nameplate.textColor);
   config.plateImage = String(config.plateImage || "");
   config.plateBackgroundColor = normalizeHexColor(config.plateBackgroundColor, state.layout.nameplate.plateBackgroundColor);
-  config.plateBackgroundOpacity = clampNumber(config.plateBackgroundOpacity, 0, 100, state.layout.nameplate.plateBackgroundOpacity);
+  config.plateBackgroundOpacity = normalizeNumber(config.plateBackgroundOpacity, 0, 100, state.layout.nameplate.plateBackgroundOpacity);
   config.plateBorderColor = normalizeHexColor(config.plateBorderColor, state.layout.nameplate.plateBorderColor);
-  config.plateBorderOpacity = clampNumber(config.plateBorderOpacity, 0, 100, state.layout.nameplate.plateBorderOpacity);
-  config.plateBorderWidth = clampNumber(config.plateBorderWidth, 0, 20, state.layout.nameplate.plateBorderWidth);
-  config.plateRadius = clampNumber(config.plateRadius, 0, 80, state.layout.nameplate.plateRadius);
-  config.platePaddingX = clampNumber(config.platePaddingX, 0, 160, state.layout.nameplate.platePaddingX);
+  config.plateBorderOpacity = normalizeNumber(config.plateBorderOpacity, 0, 100, state.layout.nameplate.plateBorderOpacity);
+  config.plateBorderWidth = normalizeNumber(config.plateBorderWidth, 0, 20, state.layout.nameplate.plateBorderWidth);
+  config.plateRadius = normalizeNumber(config.plateRadius, 0, 80, state.layout.nameplate.plateRadius);
+  config.platePaddingX = normalizeNumber(config.platePaddingX, 0, 160, state.layout.nameplate.platePaddingX);
   config.badgeColor = normalizeHexColor(config.badgeColor, state.layout.nameplate.badgeColor);
   config.plateFillMode = ["solid", "gradient", "texture"].includes(config.plateFillMode) ? config.plateFillMode : "solid";
   config.plateGradientFrom = normalizeHexColor(config.plateGradientFrom, state.layout.nameplate.plateGradientFrom);
   config.plateGradientTo = normalizeHexColor(config.plateGradientTo, state.layout.nameplate.plateGradientTo);
-  config.plateGradientAngle = clampNumber(config.plateGradientAngle, 0, 360, state.layout.nameplate.plateGradientAngle);
+  config.plateGradientAngle = normalizeNumber(config.plateGradientAngle, 0, 360, state.layout.nameplate.plateGradientAngle);
   config.plateAnimateGradientAngle = Boolean(config.plateAnimateGradientAngle);
-  config.plateGradientAngleSpeed = clampNumber(config.plateGradientAngleSpeed, -360, 360, state.layout.nameplate.plateGradientAngleSpeed);
+  config.plateGradientAngleSpeed = normalizeNumber(config.plateGradientAngleSpeed, -360, 360, state.layout.nameplate.plateGradientAngleSpeed);
   config.plateTextureImage = String(config.plateTextureImage || "");
-  config.plateTextureScale = clampNumber(config.plateTextureScale, 25, 400, state.layout.nameplate.plateTextureScale);
-  config.plateTextureX = clampNumber(config.plateTextureX, 0, 100, state.layout.nameplate.plateTextureX);
-  config.plateTextureY = clampNumber(config.plateTextureY, 0, 100, state.layout.nameplate.plateTextureY);
-  config.plateTextureScrollX = clampNumber(config.plateTextureScrollX, -200, 200, state.layout.nameplate.plateTextureScrollX);
-  config.plateTextureScrollY = clampNumber(config.plateTextureScrollY, -200, 200, state.layout.nameplate.plateTextureScrollY);
-  config.textX = clampNumber(config.textX, -500, 500, state.layout.nameplate.textX);
-  config.textY = clampNumber(config.textY, -200, 200, state.layout.nameplate.textY);
+  config.plateTextureScale = normalizeNumber(config.plateTextureScale, 25, 400, state.layout.nameplate.plateTextureScale);
+  config.plateTextureX = normalizeNumber(config.plateTextureX, 0, 100, state.layout.nameplate.plateTextureX);
+  config.plateTextureY = normalizeNumber(config.plateTextureY, 0, 100, state.layout.nameplate.plateTextureY);
+  config.plateTextureScrollX = normalizeNumber(config.plateTextureScrollX, -200, 200, state.layout.nameplate.plateTextureScrollX);
+  config.plateTextureScrollY = normalizeNumber(config.plateTextureScrollY, -200, 200, state.layout.nameplate.plateTextureScrollY);
+  config.textX = normalizeNumber(config.textX, -500, 500, state.layout.nameplate.textX);
+  config.textY = normalizeNumber(config.textY, -200, 200, state.layout.nameplate.textY);
   config.plateMode = config.plateMode === "image" ? "image" : "generated";
   config.showBox = Boolean(config.showBox);
   config.showBorder = Boolean(config.showBorder);
   config.showPlacement = Boolean(config.showPlacement);
   config.strokeEnabled = Boolean(config.strokeEnabled);
   config.strokeColor = normalizeHexColor(config.strokeColor, state.layout.nameplate.strokeColor);
-  config.strokeWidth = clampNumber(config.strokeWidth, 0, 8, state.layout.nameplate.strokeWidth);
+  config.strokeWidth = normalizeNumber(config.strokeWidth, 0, 8, state.layout.nameplate.strokeWidth);
   config.shadowEnabled = Boolean(config.shadowEnabled);
   config.shadowColor = normalizeHexColor(config.shadowColor, state.layout.nameplate.shadowColor);
-  config.shadowBlur = clampNumber(config.shadowBlur, 0, 30, state.layout.nameplate.shadowBlur);
-  config.shadowX = clampNumber(config.shadowX, -20, 20, state.layout.nameplate.shadowX);
-  config.shadowY = clampNumber(config.shadowY, -20, 20, state.layout.nameplate.shadowY);
+  config.shadowBlur = normalizeNumber(config.shadowBlur, 0, 30, state.layout.nameplate.shadowBlur);
+  config.shadowX = normalizeNumber(config.shadowX, -20, 20, state.layout.nameplate.shadowX);
+  config.shadowY = normalizeNumber(config.shadowY, -20, 20, state.layout.nameplate.shadowY);
 }
 
 function normalizeBorderStyle(style) {
@@ -5478,17 +5936,17 @@ function normalizeBorderStyle(style) {
   style.glowColor = normalizeHexColor(style.glowColor, BORDER_PRESETS.graphite.glowColor);
   style.gradientFrom = normalizeHexColor(style.gradientFrom ?? style.highlightFrom, BORDER_PRESETS.graphite.gradientFrom);
   style.gradientTo = normalizeHexColor(style.gradientTo ?? style.highlightTo, BORDER_PRESETS.graphite.gradientTo);
-  style.lineWidth = clampNumber(style.lineWidth, 0, 40, BORDER_PRESETS.graphite.lineWidth);
-  style.radius = clampNumber(style.radius, 0, 60, BORDER_PRESETS.graphite.radius);
-  style.gradientAngle = clampNumber(style.gradientAngle, 0, 360, BORDER_PRESETS.graphite.gradientAngle);
+  style.lineWidth = normalizeNumber(style.lineWidth, 0, 40, BORDER_PRESETS.graphite.lineWidth);
+  style.radius = normalizeNumber(style.radius, 0, 60, BORDER_PRESETS.graphite.radius);
+  style.gradientAngle = normalizeNumber(style.gradientAngle, 0, 360, BORDER_PRESETS.graphite.gradientAngle);
   style.animateGradientAngle = Boolean(style.animateGradientAngle);
-  style.gradientAngleSpeed = clampNumber(style.gradientAngleSpeed, -360, 360, BORDER_PRESETS.graphite.gradientAngleSpeed);
+  style.gradientAngleSpeed = normalizeNumber(style.gradientAngleSpeed, -360, 360, BORDER_PRESETS.graphite.gradientAngleSpeed);
   style.textureImage = String(style.textureImage || "");
-  style.textureScale = clampNumber(style.textureScale, 25, 400, BORDER_PRESETS.graphite.textureScale);
-  style.textureX = clampNumber(style.textureX, 0, 100, BORDER_PRESETS.graphite.textureX);
-  style.textureY = clampNumber(style.textureY, 0, 100, BORDER_PRESETS.graphite.textureY);
-  style.textureScrollX = clampNumber(style.textureScrollX, -200, 200, BORDER_PRESETS.graphite.textureScrollX);
-  style.textureScrollY = clampNumber(style.textureScrollY, -200, 200, BORDER_PRESETS.graphite.textureScrollY);
+  style.textureScale = normalizeNumber(style.textureScale, 25, 400, BORDER_PRESETS.graphite.textureScale);
+  style.textureX = normalizeNumber(style.textureX, 0, 100, BORDER_PRESETS.graphite.textureX);
+  style.textureY = normalizeNumber(style.textureY, 0, 100, BORDER_PRESETS.graphite.textureY);
+  style.textureScrollX = normalizeNumber(style.textureScrollX, -200, 200, BORDER_PRESETS.graphite.textureScrollX);
+  style.textureScrollY = normalizeNumber(style.textureScrollY, -200, 200, BORDER_PRESETS.graphite.textureScrollY);
 }
 
 function normalizeHexColor(value, fallback) {
@@ -5501,17 +5959,28 @@ function clampNumber(value, min, max, fallback) {
   return Math.max(min, Math.min(max, number));
 }
 
+function normalizeNumber(value, min, max, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return number;
+}
+
 function syncGlobalControlsFromState() {
   els.aspectPreset.value = state.layout.aspectPreset;
-  els.timerHeight.value = state.layout.timerHeight;
+  syncRangeInput(els.timerHeight, state.layout.timerHeight);
   els.timerHeightValue.textContent = `${state.layout.timerHeight} px`;
-  els.marginSize.value = state.layout.margin;
+  syncRangeInput(els.titleHeight, state.layout.titleHeight);
+  els.titleHeightValue.textContent = `${state.layout.titleHeight} px`;
+  const titleActive = state.layout.elements.titleBar;
+  els.titleHeight.disabled = !titleActive;
+  document.getElementById("titleHeightRow").classList.toggle("disabled-control", !titleActive);
+  syncRangeInput(els.marginSize, state.layout.margin);
   els.marginValue.textContent = `${state.layout.margin} px`;
-  els.gapSize.value = state.layout.gap;
+  syncRangeInput(els.gapSize, state.layout.gap);
   els.gapValue.textContent = `${state.layout.gap} px`;
-  els.animationMs.value = state.layout.animationMs;
+  syncRangeInput(els.animationMs, state.layout.animationMs);
   els.animationValue.textContent = `${state.layout.animationMs} ms`;
-  els.animationFps.value = state.layout.animationFps;
+  syncRangeInput(els.animationFps, state.layout.animationFps);
   els.animationFpsValue.textContent = `${state.layout.animationFps} fps`;
   els.animationStyle.value = state.layout.animationStyle;
   els.animateObsLayout.checked = obsBridge.animateLayout;
@@ -5522,35 +5991,18 @@ function syncGlobalControlsFromState() {
   els.feedWidth.value = state.layout.feedWidth;
   els.feedHeight.value = state.layout.feedHeight;
   els.builtInTimerEnabled.checked = state.layout.elements.builtInTimer;
-  els.timerFormat.value = state.layout.timerText.format;
-  els.timerFont.value = state.layout.timerText.fontFamily;
-  els.timerFontBrowser.value = Array.from(els.timerFontBrowser.options).some((option) => option.value === state.layout.timerText.fontFamily)
-    ? state.layout.timerText.fontFamily
-    : "";
-  els.timerFontSize.value = state.layout.timerText.fontSize;
-  els.timerFontSizeValue.textContent = `${state.layout.timerText.fontSize} px`;
-  els.timerIdleColor.value = state.layout.timerText.idleColor;
-  els.timerStoppedColor.value = state.layout.timerText.stoppedColor;
-  els.timerRunningColor.value = state.layout.timerText.runningColor;
-  els.timerStrokeEnabled.checked = state.layout.timerText.strokeEnabled;
-  els.timerStrokeColor.value = state.layout.timerText.strokeColor;
-  els.timerStrokeWidth.value = state.layout.timerText.strokeWidth;
-  els.timerShadowEnabled.checked = state.layout.timerText.shadowEnabled;
-  els.timerShadowColor.value = state.layout.timerText.shadowColor;
-  els.timerShadowBlur.value = state.layout.timerText.shadowBlur;
-  els.timerShadowX.value = state.layout.timerText.shadowX;
-  els.timerShadowY.value = state.layout.timerText.shadowY;
+  syncTimerTextControlsFromState();
   els.spotlightEnabled.checked = state.layout.spotlight.enabled;
   els.spotlightSlots.value = state.layout.spotlight.slots;
   els.spotlightShowOthers.checked = state.layout.spotlight.showOthers;
   els.spotlightDisableSmallNameplates.checked = state.layout.spotlight.disableSmallNameplates;
   els.spotlightSide.value = state.layout.spotlight.side;
   els.spotlightStackOrder.value = state.layout.spotlight.stackOrder;
-  els.spotlightMainScale.value = state.layout.spotlight.mainScale;
+  syncRangeInput(els.spotlightMainScale, state.layout.spotlight.mainScale);
   els.spotlightMainScaleValue.textContent = `${state.layout.spotlight.mainScale}%`;
-  els.spotlightOtherScale.value = state.layout.spotlight.otherScale;
+  syncRangeInput(els.spotlightOtherScale, state.layout.spotlight.otherScale);
   els.spotlightOtherScaleValue.textContent = `${state.layout.spotlight.otherScale}%`;
-  els.spotlightGap.value = state.layout.spotlight.gap;
+  syncRangeInput(els.spotlightGap, state.layout.spotlight.gap);
   els.spotlightGapValue.textContent = `${state.layout.spotlight.gap} px`;
   els.titleBarVisible.checked = state.layout.elements.titleBar;
   els.raceInfoEnabled.checked = state.layout.elements.titleBar;
@@ -5570,6 +6022,19 @@ function syncGlobalControlsFromState() {
   els.raceInfoShadowBlur.value = state.layout.raceInfo.shadowBlur;
   els.raceInfoShadowX.value = state.layout.raceInfo.shadowX;
   els.raceInfoShadowY.value = state.layout.raceInfo.shadowY;
+  const hasBg = Boolean(state.layout.backgroundImage);
+  els.clearBackgroundImage.disabled = !hasBg;
+  syncRangeInput(els.backgroundScale, state.layout.backgroundScale);
+  els.backgroundScaleValue.textContent = `${state.layout.backgroundScale}%`;
+  syncRangeInput(els.backgroundScrollX, state.layout.backgroundScrollX);
+  els.backgroundScrollXValue.textContent = `${state.layout.backgroundScrollX} px/s`;
+  syncRangeInput(els.backgroundScrollY, state.layout.backgroundScrollY);
+  els.backgroundScrollYValue.textContent = `${state.layout.backgroundScrollY} px/s`;
+  els.backgroundScale.disabled = !hasBg;
+  els.backgroundScrollX.disabled = !hasBg;
+  els.backgroundScrollY.disabled = !hasBg;
+  document.getElementById("themeBackgroundControls").classList.toggle("disabled-control", !hasBg);
+
   syncRaceInfoControlsFromState();
   populateSetupPreviewSlotOptions();
   if (state.layout.timerText.state === "running") startTimerPreviewTicker();
@@ -5590,19 +6055,19 @@ function syncBorderStyleControlsFromState() {
   els.borderGradientFrom.value = style.gradientFrom;
   els.borderGradientTo.value = style.gradientTo;
   els.borderGradientAngle.value = style.gradientAngle;
-  els.borderGradientAngleSlider.value = style.gradientAngle;
+  syncRangeInput(els.borderGradientAngleSlider, style.gradientAngle);
   els.borderAnimateGradientAngle.checked = Boolean(style.animateGradientAngle);
-  els.borderGradientAngleSpeed.value = style.gradientAngleSpeed;
+  syncRangeInput(els.borderGradientAngleSpeed, style.gradientAngleSpeed);
   els.borderGradientAngleSpeedValue.textContent = `${style.gradientAngleSpeed} deg/s`;
   els.borderLineWidth.value = style.lineWidth;
   els.borderRadius.value = style.radius;
-  els.borderTextureScale.value = style.textureScale;
+  syncRangeInput(els.borderTextureScale, style.textureScale);
   els.borderTextureScaleValue.textContent = `${style.textureScale}%`;
-  els.borderTextureX.value = style.textureX;
-  els.borderTextureY.value = style.textureY;
-  els.borderTextureScrollX.value = style.textureScrollX;
+  syncRangeInput(els.borderTextureX, style.textureX);
+  syncRangeInput(els.borderTextureY, style.textureY);
+  syncRangeInput(els.borderTextureScrollX, style.textureScrollX);
   els.borderTextureScrollXValue.textContent = `${style.textureScrollX} px/s`;
-  els.borderTextureScrollY.value = style.textureScrollY;
+  syncRangeInput(els.borderTextureScrollY, style.textureScrollY);
   els.borderTextureScrollYValue.textContent = `${style.textureScrollY} px/s`;
   syncBorderSourceSections();
   syncBorderModeSections();
@@ -5641,21 +6106,21 @@ function syncRaceInfoControlsFromState() {
   els.raceInfoPlateGradientFrom.value = config.plateGradientFrom;
   els.raceInfoPlateGradientTo.value = config.plateGradientTo;
   els.raceInfoPlateGradientAngle.value = config.plateGradientAngle;
-  els.raceInfoPlateGradientAngleSlider.value = config.plateGradientAngle;
+  syncRangeInput(els.raceInfoPlateGradientAngleSlider, config.plateGradientAngle);
   els.raceInfoPlateAnimateGradientAngle.checked = Boolean(config.plateAnimateGradientAngle);
-  els.raceInfoPlateGradientAngleSpeed.value = config.plateGradientAngleSpeed;
+  syncRangeInput(els.raceInfoPlateGradientAngleSpeed, config.plateGradientAngleSpeed);
   els.raceInfoPlateGradientAngleSpeedValue.textContent = `${config.plateGradientAngleSpeed} deg/s`;
   els.clearRaceInfoPlateTextureImage.disabled = !config.plateTextureImage;
-  els.raceInfoPlateTextureScale.value = config.plateTextureScale;
+  syncRangeInput(els.raceInfoPlateTextureScale, config.plateTextureScale);
   els.raceInfoPlateTextureScaleValue.textContent = `${config.plateTextureScale}%`;
-  els.raceInfoPlateTextureX.value = config.plateTextureX;
-  els.raceInfoPlateTextureY.value = config.plateTextureY;
-  els.raceInfoPlateTextureScrollX.value = config.plateTextureScrollX;
+  syncRangeInput(els.raceInfoPlateTextureX, config.plateTextureX);
+  syncRangeInput(els.raceInfoPlateTextureY, config.plateTextureY);
+  syncRangeInput(els.raceInfoPlateTextureScrollX, config.plateTextureScrollX);
   els.raceInfoPlateTextureScrollXValue.textContent = `${config.plateTextureScrollX} px/s`;
-  els.raceInfoPlateTextureScrollY.value = config.plateTextureScrollY;
+  syncRangeInput(els.raceInfoPlateTextureScrollY, config.plateTextureScrollY);
   els.raceInfoPlateTextureScrollYValue.textContent = `${config.plateTextureScrollY} px/s`;
   els.raceInfoPlateBackgroundOpacity.value = config.plateBackgroundOpacity;
-  els.raceInfoPlateRadius.value = config.plateRadius;
+  if (els.raceInfoPlateRadius) els.raceInfoPlateRadius.value = frameRadius("title");
   els.raceInfoPlatePaddingX.value = config.platePaddingX;
   syncRaceInfoModeSections();
   syncRaceInfoFillSections();
@@ -5672,6 +6137,70 @@ function syncRaceInfoFillSections() {
     section.hidden = section.dataset.raceInfoFillSection !== state.layout.raceInfo.plateFillMode;
   }
   els.raceInfoPlateGradientSpeedRow.hidden = !(state.layout.raceInfo.plateFillMode === "gradient" && state.layout.raceInfo.plateAnimateGradientAngle);
+}
+
+function syncTimerTextControlsFromState() {
+  const config = state.layout.timerText;
+  els.timerFormat.value = config.format;
+  els.timerFont.value = config.fontFamily;
+  els.timerFontBrowser.value = Array.from(els.timerFontBrowser.options).some((option) => option.value === config.fontFamily)
+    ? config.fontFamily
+    : "";
+  els.timerFontSize.value = config.fontSize;
+  els.timerFontSizeValue.textContent = `${config.fontSize} px`;
+  els.timerIdleColor.value = config.idleColor;
+  els.timerStoppedColor.value = config.stoppedColor;
+  els.timerRunningColor.value = config.runningColor;
+  els.timerStrokeEnabled.checked = config.strokeEnabled;
+  els.timerStrokeColor.value = config.strokeColor;
+  els.timerStrokeWidth.value = config.strokeWidth;
+  els.timerShadowEnabled.checked = config.shadowEnabled;
+  els.timerShadowColor.value = config.shadowColor;
+  els.timerShadowBlur.value = config.shadowBlur;
+  els.timerShadowX.value = config.shadowX;
+  els.timerShadowY.value = config.shadowY;
+
+  // Timer Plate
+  els.timerPlateMode.value = config.plateMode;
+  els.clearTimerPlateImage.disabled = !config.plateImage;
+  els.timerShowBox.checked = config.showBox;
+  els.timerPlateFillMode.value = config.plateFillMode;
+  els.timerPlateBackgroundColor.value = config.plateBackgroundColor;
+  els.timerPlateGradientFrom.value = config.plateGradientFrom;
+  els.timerPlateGradientTo.value = config.plateGradientTo;
+  els.timerPlateGradientAngle.value = config.plateGradientAngle;
+  syncRangeInput(els.timerPlateGradientAngleSlider, config.plateGradientAngle);
+  els.timerPlateAnimateGradientAngle.checked = Boolean(config.plateAnimateGradientAngle);
+  syncRangeInput(els.timerPlateGradientAngleSpeed, config.plateGradientAngleSpeed);
+  els.timerPlateGradientAngleSpeedValue.textContent = `${config.plateGradientAngleSpeed} deg/s`;
+  els.clearTimerPlateTextureImage.disabled = !config.plateTextureImage;
+  syncRangeInput(els.timerPlateTextureScale, config.plateTextureScale);
+  els.timerPlateTextureScaleValue.textContent = `${config.plateTextureScale}%`;
+  syncRangeInput(els.timerPlateTextureX, config.plateTextureX);
+  syncRangeInput(els.timerPlateTextureY, config.plateTextureY);
+  syncRangeInput(els.timerPlateTextureScrollX, config.plateTextureScrollX);
+  els.timerPlateTextureScrollXValue.textContent = `${config.plateTextureScrollX} px/s`;
+  syncRangeInput(els.timerPlateTextureScrollY, config.plateTextureScrollY);
+  els.timerPlateTextureScrollYValue.textContent = `${config.plateTextureScrollY} px/s`;
+  els.timerPlateBackgroundOpacity.value = config.plateBackgroundOpacity;
+  if (els.timerPlateRadius) els.timerPlateRadius.value = frameRadius("timer");
+  els.timerPlatePaddingX.value = config.platePaddingX;
+
+  syncTimerPlateModeSections();
+  syncTimerPlateFillSections();
+}
+
+function syncTimerPlateModeSections() {
+  for (const section of document.querySelectorAll("[data-timer-plate-section]")) {
+    section.hidden = section.dataset.timerPlateSection !== state.layout.timerText.plateMode;
+  }
+}
+
+function syncTimerPlateFillSections() {
+  for (const section of document.querySelectorAll("[data-timer-plate-fill-section]")) {
+    section.hidden = section.dataset.timerPlateFillSection !== state.layout.timerText.plateFillMode;
+  }
+  els.timerPlateGradientSpeedRow.hidden = !(state.layout.timerText.plateFillMode === "gradient" && state.layout.timerText.plateAnimateGradientAngle);
 }
 
 function syncNameplateControlsFromState() {
@@ -5694,18 +6223,18 @@ function syncNameplateControlsFromState() {
   els.namePlateGradientFrom.value = config.plateGradientFrom;
   els.namePlateGradientTo.value = config.plateGradientTo;
   els.namePlateGradientAngle.value = config.plateGradientAngle;
-  els.namePlateGradientAngleSlider.value = config.plateGradientAngle;
+  syncRangeInput(els.namePlateGradientAngleSlider, config.plateGradientAngle);
   els.namePlateAnimateGradientAngle.checked = config.plateAnimateGradientAngle;
-  els.namePlateGradientAngleSpeed.value = config.plateGradientAngleSpeed;
+  syncRangeInput(els.namePlateGradientAngleSpeed, config.plateGradientAngleSpeed);
   els.namePlateGradientAngleSpeedValue.textContent = `${config.plateGradientAngleSpeed} deg/s`;
   els.clearNamePlateTextureImage.disabled = !config.plateTextureImage;
-  els.namePlateTextureScale.value = config.plateTextureScale;
+  syncRangeInput(els.namePlateTextureScale, config.plateTextureScale);
   els.namePlateTextureScaleValue.textContent = `${config.plateTextureScale}%`;
-  els.namePlateTextureX.value = config.plateTextureX;
-  els.namePlateTextureY.value = config.plateTextureY;
-  els.namePlateTextureScrollX.value = config.plateTextureScrollX;
+  syncRangeInput(els.namePlateTextureX, config.plateTextureX);
+  syncRangeInput(els.namePlateTextureY, config.plateTextureY);
+  syncRangeInput(els.namePlateTextureScrollX, config.plateTextureScrollX);
   els.namePlateTextureScrollXValue.textContent = `${config.plateTextureScrollX} px/s`;
-  els.namePlateTextureScrollY.value = config.plateTextureScrollY;
+  syncRangeInput(els.namePlateTextureScrollY, config.plateTextureScrollY);
   els.namePlateTextureScrollYValue.textContent = `${config.plateTextureScrollY} px/s`;
   els.namePlateBackgroundOpacity.value = config.plateBackgroundOpacity;
   els.namePlateBorderColor.value = config.plateBorderColor;
@@ -5765,4 +6294,112 @@ function round(value) {
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, Number(value)));
+}
+
+function makeOutputsEditable() {
+  document.body.addEventListener("click", (event) => {
+    const output = event.target.closest("output");
+    if (!output || output.querySelector("input")) return;
+
+    const label = output.closest("label");
+    if (!label) return;
+    const range = label.querySelector("input[type='range']");
+    if (!range) return;
+
+    // Prevent default label click behavior which targets range input
+    event.preventDefault();
+
+    const originalText = output.textContent;
+    const numMatch = originalText.match(/-?[\d.]+/);
+    if (!numMatch) return;
+    const originalVal = Number(numMatch[0]);
+    const suffix = originalText.substring(originalText.indexOf(numMatch[0]) + numMatch[0].length);
+
+    const input = document.createElement("input");
+    input.type = "number";
+    input.className = "output-edit-input";
+    input.value = originalVal;
+    input.step = range.step !== "" ? range.step : 1;
+
+    // Stop propagation of events so clicking the input doesn't trigger the label focus
+    input.addEventListener("click", (e) => e.stopPropagation());
+    input.addEventListener("pointerdown", (e) => e.stopPropagation());
+    input.addEventListener("mousedown", (e) => e.stopPropagation());
+
+    output.textContent = "";
+    output.appendChild(input);
+    input.focus();
+    input.select();
+
+    let committed = false;
+
+    function commit() {
+      if (committed) return;
+      committed = true;
+
+      let newVal = Number(input.value);
+      if (isNaN(newVal) || input.value === "") newVal = originalVal;
+
+      // Keep original min/max bounds
+      const originalMax = range.max;
+      const originalMin = range.min;
+
+      // Temporarily expand bounds so the range input doesn't clamp the value when dispatched
+      if (range.max !== "" && newVal > Number(range.max)) {
+        range.max = newVal;
+      }
+      if (range.min !== "" && newVal < Number(range.min)) {
+        range.min = newVal;
+      }
+
+      // Record history
+      beginContinuousHistory(range.id || "value-edit");
+
+      // Set value and trigger range input's handlers
+      range.value = newVal;
+      range.dispatchEvent(new Event("input", { bubbles: true }));
+      range.dispatchEvent(new Event("change", { bubbles: true }));
+
+      // Restore original range bounds
+      range.max = originalMax;
+      range.min = originalMin;
+
+      // Restore display
+      output.textContent = `${newVal}${suffix}`;
+      cleanup();
+    }
+
+    function cancel() {
+      if (committed) return;
+      committed = true;
+      output.textContent = originalText;
+      cleanup();
+    }
+
+    function cleanup() {
+      input.removeEventListener("blur", commit);
+      input.removeEventListener("keydown", handleKey);
+    }
+
+    function handleKey(e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        commit();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        cancel();
+      }
+    }
+
+    input.addEventListener("blur", commit);
+    input.addEventListener("keydown", handleKey);
+  });
+}
+
+function syncRangeInput(element, value) {
+  if (!element) return;
+  const val = Number(value);
+  if (!isNaN(val)) {
+    element.value = val;
+  }
 }

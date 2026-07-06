@@ -141,9 +141,49 @@ label {
   font-weight: 650;
 }
 
+.disabled-control {
+  opacity: 0.42;
+  pointer-events: none;
+}
+
 output {
   color: var(--text);
   font-size: 12px;
+  cursor: text;
+  display: inline-block;
+  min-width: 30px;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.3);
+  text-align: right;
+}
+
+output:hover {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+.output-edit-input {
+  width: 50px;
+  min-height: 18px;
+  height: 18px;
+  padding: 0 3px;
+  font-size: 11px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: #121619;
+  color: var(--text);
+  margin: 0;
+  text-align: right;
+  outline: none;
+}
+
+/* Hide standard number input spinners for maximum compactness */
+.output-edit-input::-webkit-outer-spin-button,
+.output-edit-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.output-edit-input[type="number"] {
+  -moz-appearance: textfield;
 }
 
 .font-picker {
@@ -486,6 +526,36 @@ body.layers-locked .drag-target {
   display: none;
 }
 
+.quick-finish-button {
+  display: none;
+  min-height: 26px;
+  min-width: 28px;
+  padding: 0 4px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  border: 1px solid #3a454f;
+  border-radius: 6px;
+  background: #1c2228;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.quick-finish-button:hover {
+  border-color: rgba(240, 184, 74, 0.7);
+  background: #252c33;
+}
+
+.runner-card.collapsed .quick-finish-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.runner-card.runner-done .quick-finish-button {
+  border-color: rgba(240, 184, 74, 0.65);
+  box-shadow: 0 0 8px rgba(240, 184, 74, 0.25);
+}
+
 .runner-card.runner-done {
   border-color: rgba(240, 184, 74, 0.55);
 }
@@ -647,8 +717,19 @@ body.layers-locked .drag-target {
 }
 
 .stage.custom-background {
-  background-size: cover;
-  background-position: center;
+  background-repeat: repeat;
+  background-size: var(--orm-bg-scale, 100%) auto;
+  background-position: 0px 0px;
+  animation: ormBackgroundScroll var(--orm-bg-duration, 0s) linear infinite;
+}
+
+@keyframes ormBackgroundScroll {
+  from {
+    background-position: 0px 0px;
+  }
+  to {
+    background-position: var(--orm-bg-scroll-x, 0px) var(--orm-bg-scroll-y, 0px);
+  }
 }
 
 .title-bar-preview {
@@ -788,6 +869,7 @@ body.layers-locked .drag-target {
   overflow: hidden;
   border-radius: 4px;
   background: #060809;
+  transform: translate3d(0, 0, 0);
 }
 
 .feed-art {
@@ -979,6 +1061,7 @@ body.layers-locked .drag-target {
 
 .timer-border {
   position: absolute;
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: center;

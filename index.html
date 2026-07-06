@@ -193,6 +193,11 @@
             <input id="timerHeight" type="range" min="80" max="220" value="130">
             <output id="timerHeightValue">130 px</output>
           </label>
+          <label id="titleHeightRow">
+            Reserved title area
+            <input id="titleHeight" type="range" min="40" max="220" value="100">
+            <output id="titleHeightValue">100 px</output>
+          </label>
           <label>
             Outer margin
             <input id="marginSize" type="range" min="16" max="80" value="36">
@@ -392,10 +397,6 @@
                 <input id="raceInfoPlateBackgroundOpacity" type="number" min="0" max="100" step="1" value="84">
               </label>
               <label>
-                Radius
-                <input id="raceInfoPlateRadius" type="number" min="0" max="60" step="1" value="8">
-              </label>
-              <label>
                 Side padding
                 <input id="raceInfoPlatePaddingX" type="number" min="0" max="160" step="1" value="18">
               </label>
@@ -498,6 +499,110 @@
               <input id="timerShadowY" type="number" min="-20" max="20" step="1" value="2">
             </label>
           </div>
+          <div class="section-subhead">Timer Plate</div>
+          <label>
+            Customize
+            <select id="timerPlateMode">
+              <option value="generated">Create Timer Plate</option>
+              <option value="image">Upload timer plate image</option>
+            </select>
+          </label>
+          <label class="toggle-row obs-toggle">
+            <input id="timerShowBox" type="checkbox">
+            <span>Show timer plate</span>
+          </label>
+          <section data-timer-plate-section="generated">
+            <label>
+              Plate type
+              <select id="timerPlateFillMode">
+                <option value="solid">Solid color</option>
+                <option value="gradient">Gradient</option>
+                <option value="texture">Texture image</option>
+              </select>
+            </label>
+            <section class="nameplate-editor-section" data-timer-plate-fill-section="solid">
+              <label>
+                Plate color
+                <input id="timerPlateBackgroundColor" type="color" value="#10161a">
+              </label>
+            </section>
+            <section class="nameplate-editor-section" data-timer-plate-fill-section="gradient">
+              <div class="obs-grid">
+                <label>
+                  From color
+                  <input id="timerPlateGradientFrom" type="color" value="#10161a">
+                </label>
+                <label>
+                  To color
+                  <input id="timerPlateGradientTo" type="color" value="#26343b">
+                </label>
+                <label>
+                  Gradient angle
+                  <input id="timerPlateGradientAngleSlider" type="range" min="0" max="360" step="1" value="135">
+                  <input id="timerPlateGradientAngle" type="number" min="0" max="360" step="1" value="135">
+                </label>
+                <label class="toggle-row obs-toggle wide-control">
+                  <input id="timerPlateAnimateGradientAngle" type="checkbox">
+                  <span>Animate Gradient Angle</span>
+                </label>
+                <label id="timerPlateGradientSpeedRow" class="wide-control">
+                  Speed
+                  <input id="timerPlateGradientAngleSpeed" type="range" min="-360" max="360" step="1" value="45">
+                  <output id="timerPlateGradientAngleSpeedValue">45 deg/s</output>
+                </label>
+              </div>
+            </section>
+            <section class="nameplate-editor-section" data-timer-plate-fill-section="texture">
+              <label>
+                Texture image
+                <input id="timerPlateTextureImage" type="file" accept="image/*">
+              </label>
+              <button id="clearTimerPlateTextureImage" class="secondary-button" type="button">Clear Texture Image</button>
+              <div class="obs-grid">
+                <label>
+                  Scale
+                  <input id="timerPlateTextureScale" type="range" min="25" max="400" step="1" value="100">
+                  <output id="timerPlateTextureScaleValue">100%</output>
+                </label>
+                <label>
+                  X position
+                  <input id="timerPlateTextureX" type="range" min="0" max="100" step="1" value="50">
+                </label>
+                <label>
+                  Y position
+                  <input id="timerPlateTextureY" type="range" min="0" max="100" step="1" value="50">
+                </label>
+                <label>
+                  Scroll X
+                  <input id="timerPlateTextureScrollX" type="range" min="-200" max="200" step="1" value="0">
+                  <output id="timerPlateTextureScrollXValue">0 px/s</output>
+                </label>
+                <label>
+                  Scroll Y
+                  <input id="timerPlateTextureScrollY" type="range" min="-200" max="200" step="1" value="0">
+                  <output id="timerPlateTextureScrollYValue">0 px/s</output>
+                </label>
+              </div>
+            </section>
+            <div class="obs-grid">
+              <label>
+                Plate opacity
+                <input id="timerPlateBackgroundOpacity" type="number" min="0" max="100" step="1" value="84">
+              </label>
+              <label>
+                Side padding
+                <input id="timerPlatePaddingX" type="number" min="0" max="160" step="1" value="18">
+              </label>
+            </div>
+          </section>
+          <section data-timer-plate-section="image">
+            <div class="section-subhead">Image Plate</div>
+            <label>
+              Timer plate image
+              <input id="timerPlateImage" type="file" accept="image/*">
+            </label>
+            <button id="clearTimerPlateImage" class="secondary-button" type="button">Clear Timer Plate Image</button>
+          </section>
         </details>
 
         <details class="settings-group" data-settings-panel="spotlight">
@@ -1124,6 +1229,24 @@
             Background image
             <input id="backgroundImage" type="file" accept="image/*">
           </label>
+          <button id="clearBackgroundImage" class="secondary-button wide-button" type="button">Clear Background Image</button>
+          <div class="obs-grid" id="themeBackgroundControls">
+            <label>
+              Scale
+              <input id="backgroundScale" type="range" min="10" max="400" step="1" value="100">
+              <output id="backgroundScaleValue">100%</output>
+            </label>
+            <label>
+              Scroll X
+              <input id="backgroundScrollX" type="range" min="-200" max="200" step="1" value="0">
+              <output id="backgroundScrollXValue">0 px/s</output>
+            </label>
+            <label>
+              Scroll Y
+              <input id="backgroundScrollY" type="range" min="-200" max="200" step="1" value="0">
+              <output id="backgroundScrollYValue">0 px/s</output>
+            </label>
+          </div>
           <div class="note compact-note">Transparent image formats are preserved, though the OBS canvas background will still show behind transparent pixels.</div>
         </details>
       </aside>
@@ -1138,6 +1261,7 @@
           <span data-role="slotTitle">Runner</span>
         </label>
         <div class="runner-card-tools">
+          <button data-action="quickFinish" type="button" class="quick-finish-button" aria-label="Toggle finished" title="Mark as finished">🏁</button>
           <span data-role="placeBadge" class="place-badge">P1</span>
           <button data-action="toggleCollapse" type="button" class="chevron-button" aria-label="Collapse runner"></button>
         </div>
