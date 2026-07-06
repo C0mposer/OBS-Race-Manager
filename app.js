@@ -77,7 +77,7 @@ const DEFAULT_FINISHED_TIME = {
   fontSize: 34,
   color: "#f0b84a",
   align: "right",
-  lockToNameplate: true,
+  lockToNameplate: false,
   strokeEnabled: false,
   strokeColor: "#000000",
   strokeWidth: 2,
@@ -201,6 +201,14 @@ const state = {
       fontFamily: "Segoe UI",
       fontSize: 34,
       textColor: "#ffffff",
+      strokeEnabled: false,
+      strokeColor: "#000000",
+      strokeWidth: 2,
+      shadowEnabled: true,
+      shadowColor: "#000000",
+      shadowBlur: 8,
+      shadowX: 0,
+      shadowY: 2,
       plateImage: "",
       plateBackgroundColor: "#10161a",
       plateBackgroundOpacity: 84,
@@ -560,11 +568,18 @@ function bindElements() {
   els.raceInfoBrowseFonts = document.getElementById("raceInfoBrowseFonts");
   els.raceInfoFontSize = document.getElementById("raceInfoFontSize");
   els.raceInfoTextColor = document.getElementById("raceInfoTextColor");
+  els.raceInfoStrokeEnabled = document.getElementById("raceInfoStrokeEnabled");
+  els.raceInfoStrokeColor = document.getElementById("raceInfoStrokeColor");
+  els.raceInfoStrokeWidth = document.getElementById("raceInfoStrokeWidth");
+  els.raceInfoShadowEnabled = document.getElementById("raceInfoShadowEnabled");
+  els.raceInfoShadowColor = document.getElementById("raceInfoShadowColor");
+  els.raceInfoShadowBlur = document.getElementById("raceInfoShadowBlur");
+  els.raceInfoShadowX = document.getElementById("raceInfoShadowX");
+  els.raceInfoShadowY = document.getElementById("raceInfoShadowY");
   els.raceInfoPlateMode = document.getElementById("raceInfoPlateMode");
   els.raceInfoPlateImage = document.getElementById("raceInfoPlateImage");
   els.clearRaceInfoPlateImage = document.getElementById("clearRaceInfoPlateImage");
   els.raceInfoShowBox = document.getElementById("raceInfoShowBox");
-  els.raceInfoShowBorder = document.getElementById("raceInfoShowBorder");
   els.raceInfoPlateBackgroundColor = document.getElementById("raceInfoPlateBackgroundColor");
   els.raceInfoPlateFillMode = document.getElementById("raceInfoPlateFillMode");
   els.raceInfoPlateGradientFrom = document.getElementById("raceInfoPlateGradientFrom");
@@ -586,9 +601,6 @@ function bindElements() {
   els.raceInfoPlateTextureScrollY = document.getElementById("raceInfoPlateTextureScrollY");
   els.raceInfoPlateTextureScrollYValue = document.getElementById("raceInfoPlateTextureScrollYValue");
   els.raceInfoPlateBackgroundOpacity = document.getElementById("raceInfoPlateBackgroundOpacity");
-  els.raceInfoPlateBorderColor = document.getElementById("raceInfoPlateBorderColor");
-  els.raceInfoPlateBorderOpacity = document.getElementById("raceInfoPlateBorderOpacity");
-  els.raceInfoPlateBorderWidth = document.getElementById("raceInfoPlateBorderWidth");
   els.raceInfoPlateRadius = document.getElementById("raceInfoPlateRadius");
   els.raceInfoPlatePaddingX = document.getElementById("raceInfoPlatePaddingX");
   els.nameFont = document.getElementById("nameFont");
@@ -817,6 +829,45 @@ function bindGlobalControls() {
     scheduleObsApply("raceInfo", 100);
   });
   els.raceInfoFontSize.addEventListener("change", endContinuousHistory);
+
+  for (const [input, key] of [
+    [els.raceInfoStrokeEnabled, "strokeEnabled"],
+    [els.raceInfoShadowEnabled, "shadowEnabled"]
+  ]) {
+    input.addEventListener("change", () => {
+      pushHistory(`race-info-${key}`);
+      state.layout.raceInfo[key] = input.checked;
+      update();
+      scheduleObsApply("raceInfo", 120);
+    });
+  }
+  for (const [input, key] of [
+    [els.raceInfoStrokeColor, "strokeColor"],
+    [els.raceInfoShadowColor, "shadowColor"]
+  ]) {
+    input.addEventListener("pointerdown", () => beginContinuousHistory(`race-info-${key}`));
+    input.addEventListener("input", () => {
+      state.layout.raceInfo[key] = input.value;
+      update();
+      scheduleObsApply("raceInfo", 80);
+    });
+    input.addEventListener("change", endContinuousHistory);
+  }
+  for (const [input, key] of [
+    [els.raceInfoStrokeWidth, "strokeWidth"],
+    [els.raceInfoShadowBlur, "shadowBlur"],
+    [els.raceInfoShadowX, "shadowX"],
+    [els.raceInfoShadowY, "shadowY"]
+  ]) {
+    input.addEventListener("focus", () => beginContinuousHistory(`race-info-${key}`));
+    input.addEventListener("change", endContinuousHistory);
+    input.addEventListener("input", () => {
+      state.layout.raceInfo[key] = Number(input.value);
+      update();
+      scheduleObsApply("raceInfo", 160);
+    });
+  }
+
   bindRaceInfoPlateControls();
   els.timerStart.addEventListener("click", startBuiltInTimer);
   els.timerStop.addEventListener("click", stopBuiltInTimer);
@@ -1142,8 +1193,6 @@ function bindGeometryInputs() {
 function bindRaceInfoPlateControls() {
   const numberBindings = [
     [els.raceInfoPlateBackgroundOpacity, "plateBackgroundOpacity", null, ""],
-    [els.raceInfoPlateBorderOpacity, "plateBorderOpacity", null, ""],
-    [els.raceInfoPlateBorderWidth, "plateBorderWidth", null, ""],
     [els.raceInfoPlateRadius, "plateRadius", null, ""],
     [els.raceInfoPlatePaddingX, "platePaddingX", null, ""],
     [els.raceInfoPlateGradientAngle, "plateGradientAngle", null, ""],
@@ -1237,7 +1286,6 @@ function bindRaceInfoPlateControls() {
     [els.raceInfoPlateBackgroundColor, "plateBackgroundColor"],
     [els.raceInfoPlateGradientFrom, "plateGradientFrom"],
     [els.raceInfoPlateGradientTo, "plateGradientTo"],
-    [els.raceInfoPlateBorderColor, "plateBorderColor"]
   ]) {
     input.addEventListener("pointerdown", () => beginContinuousHistory(`race-info-${key}`));
     input.addEventListener("input", () => {
@@ -1249,8 +1297,7 @@ function bindRaceInfoPlateControls() {
   }
 
   for (const [input, key] of [
-    [els.raceInfoShowBox, "showBox"],
-    [els.raceInfoShowBorder, "showBorder"]
+    [els.raceInfoShowBox, "showBox"]
   ]) {
     input.addEventListener("change", () => {
       pushHistory(`race-info-${key}`);
@@ -2971,11 +3018,21 @@ function applyTitleBarPreviewGeometry() {
   const sourceWidth = Math.max(1, STAGE.width * config.rect.width);
   const sourceHeight = Math.max(1, STAGE.height * config.rect.height);
   els.titleBarPreview.classList.toggle("hidden-element", !visible);
+
+  const shadowValue = config.shadowEnabled
+    ? `${Number(config.shadowX) * stageScale}px ${Number(config.shadowY) * stageScale}px ${Number(config.shadowBlur) * stageScale}px ${config.shadowColor}`
+    : "none";
+  const strokeCss = config.strokeEnabled && Number(config.strokeWidth) > 0
+    ? `-webkit-text-stroke:${Number(config.strokeWidth) * stageScale}px ${config.strokeColor};paint-order:stroke fill;`
+    : "";
+
   els.titleBarPreview.style.cssText = [
     `transition-duration:${state.layout.animationMs}ms`,
     `font-family:${cssFontStack(config.fontFamily)}`,
     `color:${config.textColor}`,
     `font-size:${Math.max(8, Number(config.fontSize) || 34) * stageScale}px`,
+    `text-shadow:${shadowValue}`,
+    strokeCss,
     raceInfoPlateFrameCss(config, sourceWidth, sourceHeight)
   ].join(";");
   els.titleBarPreview.querySelector(".title-main").textContent = config.title;
@@ -4274,7 +4331,14 @@ function buildTitleBarHtml() {
   const config = state.layout.raceInfo;
   const size = titleBarSourceSize();
   const titleBorder = titleBorderHtmlCss(size.width, size.height);
-  return `<!doctype html><html><body><div class="title"><strong>${escapeHtml(config.title)}</strong><span>${escapeHtml(config.subtitle)}</span><div class="title-border" aria-hidden="true"></div></div></body><style>${baseHtmlCss()} ${nameplateAnimationCss(config, size.width, size.height, "ormRaceInfoTexture")}${borderAnimationCss(getBorderStyle("title"), size.width, size.height)}body{font-family:${cssFontStack(config.fontFamily)};}.title{position:absolute;inset:0;${raceInfoPlateFrameCss(config, size.width, size.height)}color:${config.textColor};}.title-border{${titleBorder}}strong,span{position:relative;z-index:1;}strong{font-size:${Math.max(8, Number(config.fontSize) || 34)}px;font-weight:900;line-height:1;}span{font-size:${Math.max(8, Number(config.fontSize) || 34) * 0.58}px;font-weight:800;line-height:1;color:${hexToRgba(config.textColor, 0.68)};}</style></html>`;
+  const shadowCss = config.shadowEnabled
+    ? `text-shadow:${Number(config.shadowX)}px ${Number(config.shadowY)}px ${Number(config.shadowBlur)}px ${config.shadowColor};`
+    : "text-shadow:none;";
+  const strokeCss = config.strokeEnabled && Number(config.strokeWidth) > 0
+    ? `-webkit-text-stroke:${Number(config.strokeWidth)}px ${config.strokeColor};paint-order:stroke fill;`
+    : "";
+  const textEffects = `${shadowCss}${strokeCss}`;
+  return `<!doctype html><html><body><div class="title"><strong>${escapeHtml(config.title)}</strong><span>${escapeHtml(config.subtitle)}</span><div class="title-border" aria-hidden="true"></div></div></body><style>${baseHtmlCss()} ${nameplateAnimationCss(config, size.width, size.height, "ormRaceInfoTexture")}${borderAnimationCss(getBorderStyle("title"), size.width, size.height)}body{font-family:${cssFontStack(config.fontFamily)};}.title{position:absolute;inset:0;${raceInfoPlateFrameCss(config, size.width, size.height)}color:${config.textColor};}.title-border{${titleBorder}}strong,span{position:relative;z-index:1;${textEffects}}strong{font-size:${Math.max(8, Number(config.fontSize) || 34)}px;font-weight:900;line-height:1;}span{font-size:${Math.max(8, Number(config.fontSize) || 34) * 0.58}px;font-weight:800;line-height:1;color:${hexToRgba(config.textColor, 0.68)};}</style></html>`;
 }
 
 function titleBorderHtmlCss(width, height) {
@@ -4287,9 +4351,6 @@ function titleBorderHtmlCss(width, height) {
 }
 
 function raceInfoPlateFrameCss(config, sourceWidth = 960, sourceHeight = 120) {
-  const borderWidth = Math.max(0, Number(config.plateBorderWidth) || 0);
-  const borderColor = hexToRgba(config.plateBorderColor, Number(config.plateBorderOpacity) / 100);
-  const border = config.showBorder ? `${borderWidth}px solid ${borderColor}` : `${borderWidth}px solid transparent`;
   const padding = Math.max(0, Number(config.platePaddingX) || 0);
   let background = "background:transparent;";
 
@@ -4299,7 +4360,7 @@ function raceInfoPlateFrameCss(config, sourceWidth = 960, sourceHeight = 120) {
     background = nameplateBackgroundCss(config, sourceWidth, sourceHeight, "ormRaceInfoTexture");
   }
 
-  return `display:flex;align-items:center;justify-content:center;gap:18px;padding:0 ${padding}px;overflow:hidden;white-space:nowrap;${background}border:${border};border-radius:${Math.max(0, Number(config.plateRadius) || 0)}px;box-sizing:border-box;`;
+  return `display:flex;align-items:center;justify-content:center;gap:18px;padding:0 ${padding}px;overflow:hidden;white-space:nowrap;${background}border:none;border-radius:${Math.max(0, Number(config.plateRadius) || 0)}px;box-sizing:border-box;background-clip:padding-box;`;
 }
 
 function buildFeedUrl(runner) {
@@ -4467,7 +4528,7 @@ function borderFrameCss(isTimer, style = getBorderStyle(isTimer ? "timer" : "fee
     ? `animation:${gradientAnimationName(style)} ${gradientAnimationDuration(style)}s linear infinite;`
     : "";
   const borderPaint = style.mode === "gradient"
-    ? `--orm-gradient-angle-start:${style.gradientAngle}deg;--orm-gradient-angle:${style.gradientAngle}deg;border:${lineWidth}px solid transparent;background:linear-gradient(${angle}, ${style.gradientFrom}, ${style.gradientTo}) border-box;-webkit-mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;${animation}`
+    ? `--orm-gradient-angle-start:${style.gradientAngle}deg;--orm-gradient-angle:${style.gradientAngle}deg;border:${lineWidth}px solid transparent;background:linear-gradient(${angle}, ${style.gradientFrom}, ${style.gradientTo}) border-box;-webkit-mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;${animation}will-change:--orm-gradient-angle;`
     : style.mode === "texture" && style.textureImage
       ? `border:${lineWidth}px solid transparent;background-image:url("${escapeCssString(style.textureImage)}");background-size:${style.textureScale}% ${style.textureScale}%;background-position:${style.textureX}% ${style.textureY}%;background-repeat:repeat;-webkit-mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;${textureScrollAnimationCss(style.textureScrollX, style.textureScrollY, "ormBorderTexture", sourceWidth, sourceHeight, style.textureScale)}`
     : `border:${lineWidth}px solid ${style.lineColor};`;
@@ -4478,7 +4539,11 @@ function borderFrameCss(isTimer, style = getBorderStyle(isTimer ? "timer" : "fee
 function borderAnimationCss(style, sourceWidth = state.layout.feedWidth, sourceHeight = state.layout.feedHeight) {
   let css = "";
   if (style.mode === "gradient" && style.animateGradientAngle && Number(style.gradientAngleSpeed) !== 0) {
-    css += `@property --orm-gradient-angle{syntax:"<angle>";inherits:false;initial-value:${style.gradientAngle}deg;}@keyframes ormGradientAnglePositive{to{--orm-gradient-angle:calc(var(--orm-gradient-angle-start) + 360deg);}}@keyframes ormGradientAngleNegative{to{--orm-gradient-angle:calc(var(--orm-gradient-angle-start) - 360deg);}}`;
+    const startAngle = Number(style.gradientAngle) || 0;
+    const positive = Number(style.gradientAngleSpeed) >= 0;
+    const fromAngle = startAngle;
+    const toAngle = positive ? startAngle + 360 : startAngle - 360;
+    css += `@property --orm-gradient-angle{syntax:"<angle>";inherits:false;initial-value:${fromAngle}deg;}@keyframes ormGradientAnglePositive{from{--orm-gradient-angle:${fromAngle}deg;}to{--orm-gradient-angle:${startAngle + 360}deg;}}@keyframes ormGradientAngleNegative{from{--orm-gradient-angle:${fromAngle}deg;}to{--orm-gradient-angle:${startAngle - 360}deg;}}`;
   }
   if (style.mode === "texture" && style.textureImage && (Number(style.textureScrollX) !== 0 || Number(style.textureScrollY) !== 0)) {
     css += textureScrollKeyframesCss(style.textureScrollX, style.textureScrollY, "ormBorderTexture", sourceWidth, sourceHeight, style.textureScale, style.textureX, style.textureY);
@@ -4637,7 +4702,7 @@ function nameplateFrameCss(config, width = "100%", height = "100%", sourceWidth 
   const generatedPlate = config.plateMode !== "image";
   const plateBackground = generatedPlate && config.showBox ? background : "transparent";
   const plateBorder = generatedPlate ? border : `${borderWidth}px solid transparent`;
-  return `position:absolute;left:0;top:0;width:${typeof width === "number" ? `${width}px` : width};height:${typeof height === "number" ? `${height}px` : height};display:flex;align-items:center;justify-content:space-between;gap:2%;padding:0 ${Math.max(0, Number(config.platePaddingX) || 0)}px;${plateBackground}border:${plateBorder};border-radius:${Math.max(0, Number(config.plateRadius) || 0)}px;overflow:hidden;box-sizing:border-box;transform-origin:0 0;`;
+  return `position:absolute;left:0;top:0;width:${typeof width === "number" ? `${width}px` : width};height:${typeof height === "number" ? `${height}px` : height};display:flex;align-items:center;justify-content:space-between;gap:2%;padding:0 ${Math.max(0, Number(config.platePaddingX) || 0)}px;${plateBackground}border:${plateBorder};border-radius:${Math.max(0, Number(config.plateRadius) || 0)}px;overflow:hidden;box-sizing:border-box;transform-origin:0 0;background-clip:padding-box;`;
 }
 
 function nameplateBackgroundCss(config, sourceWidth = 960, sourceHeight = 120, textureAnimationName = "ormNameplateTexture") {
@@ -5497,6 +5562,14 @@ function syncGlobalControlsFromState() {
     : "";
   els.raceInfoFontSize.value = state.layout.raceInfo.fontSize;
   els.raceInfoTextColor.value = state.layout.raceInfo.textColor;
+  els.raceInfoStrokeEnabled.checked = state.layout.raceInfo.strokeEnabled;
+  els.raceInfoStrokeColor.value = state.layout.raceInfo.strokeColor;
+  els.raceInfoStrokeWidth.value = state.layout.raceInfo.strokeWidth;
+  els.raceInfoShadowEnabled.checked = state.layout.raceInfo.shadowEnabled;
+  els.raceInfoShadowColor.value = state.layout.raceInfo.shadowColor;
+  els.raceInfoShadowBlur.value = state.layout.raceInfo.shadowBlur;
+  els.raceInfoShadowX.value = state.layout.raceInfo.shadowX;
+  els.raceInfoShadowY.value = state.layout.raceInfo.shadowY;
   syncRaceInfoControlsFromState();
   populateSetupPreviewSlotOptions();
   if (state.layout.timerText.state === "running") startTimerPreviewTicker();
@@ -5563,7 +5636,6 @@ function syncRaceInfoControlsFromState() {
   els.raceInfoPlateMode.value = config.plateMode;
   els.clearRaceInfoPlateImage.disabled = !config.plateImage;
   els.raceInfoShowBox.checked = config.showBox;
-  els.raceInfoShowBorder.checked = config.showBorder;
   els.raceInfoPlateFillMode.value = config.plateFillMode;
   els.raceInfoPlateBackgroundColor.value = config.plateBackgroundColor;
   els.raceInfoPlateGradientFrom.value = config.plateGradientFrom;
@@ -5583,9 +5655,6 @@ function syncRaceInfoControlsFromState() {
   els.raceInfoPlateTextureScrollY.value = config.plateTextureScrollY;
   els.raceInfoPlateTextureScrollYValue.textContent = `${config.plateTextureScrollY} px/s`;
   els.raceInfoPlateBackgroundOpacity.value = config.plateBackgroundOpacity;
-  els.raceInfoPlateBorderColor.value = config.plateBorderColor;
-  els.raceInfoPlateBorderOpacity.value = config.plateBorderOpacity;
-  els.raceInfoPlateBorderWidth.value = config.plateBorderWidth;
   els.raceInfoPlateRadius.value = config.plateRadius;
   els.raceInfoPlatePaddingX.value = config.platePaddingX;
   syncRaceInfoModeSections();

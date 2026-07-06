@@ -24,14 +24,20 @@
 }
 
 @keyframes ormGradientAnglePositive {
+  from {
+    --orm-gradient-angle: 0deg;
+  }
   to {
-    --orm-gradient-angle: calc(var(--orm-gradient-angle-start) + 360deg);
+    --orm-gradient-angle: 360deg;
   }
 }
 
 @keyframes ormGradientAngleNegative {
+  from {
+    --orm-gradient-angle: 0deg;
+  }
   to {
-    --orm-gradient-angle: calc(var(--orm-gradient-angle-start) - 360deg);
+    --orm-gradient-angle: -360deg;
   }
 }
 

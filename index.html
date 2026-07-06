@@ -147,7 +147,7 @@
           </div>
           <nav class="settings-tabs" aria-label="Settings sections">
             <button type="button" class="active" data-settings-target="layout">Layout</button>
-            <button type="button" data-settings-target="raceInfo">Race Info</button>
+            <button type="button" data-settings-target="raceInfo">Title Bar</button>
             <button type="button" data-settings-target="positions">Item Positions</button>
             <button type="button" data-settings-target="nameText">Name Text</button>
             <button type="button" data-settings-target="nameplates">Nameplates</button>
@@ -222,7 +222,7 @@
           </label>
           <label class="toggle-row obs-toggle">
             <input id="titleBarVisible" type="checkbox">
-            <span>Show title bar / race info</span>
+            <span>Show title bar</span>
           </label>
           <label class="toggle-row obs-toggle">
             <input id="timerBorderEnabled" type="checkbox" checked>
@@ -231,10 +231,10 @@
         </details>
 
         <details class="settings-group" data-settings-panel="raceInfo">
-          <summary>Race Info</summary>
+          <summary>Title Bar</summary>
           <label class="toggle-row obs-toggle">
             <input id="raceInfoEnabled" type="checkbox">
-            <span>Show title bar / race info</span>
+            <span>Show title bar</span>
           </label>
           <label>
             Title
@@ -263,6 +263,42 @@
             <label>
               Text color
               <input id="raceInfoTextColor" type="color" value="#ffffff">
+            </label>
+          </div>
+          <label class="toggle-row obs-toggle">
+            <input id="raceInfoStrokeEnabled" type="checkbox">
+            <span>Text stroke</span>
+          </label>
+          <div class="obs-grid">
+            <label>
+              Stroke color
+              <input id="raceInfoStrokeColor" type="color" value="#000000">
+            </label>
+            <label>
+              Stroke width
+              <input id="raceInfoStrokeWidth" type="number" min="0" max="10" step="1" value="2">
+            </label>
+          </div>
+          <label class="toggle-row obs-toggle">
+            <input id="raceInfoShadowEnabled" type="checkbox" checked>
+            <span>Drop shadow</span>
+          </label>
+          <div class="obs-grid">
+            <label>
+              Shadow color
+              <input id="raceInfoShadowColor" type="color" value="#000000">
+            </label>
+            <label>
+              Blur
+              <input id="raceInfoShadowBlur" type="number" min="0" max="30" step="1" value="8">
+            </label>
+            <label>
+              X
+              <input id="raceInfoShadowX" type="number" min="-20" max="20" step="1" value="0">
+            </label>
+            <label>
+              Y
+              <input id="raceInfoShadowY" type="number" min="-20" max="20" step="1" value="2">
             </label>
           </div>
           <div class="section-subhead">Title Plate</div>
@@ -350,26 +386,10 @@
                 </label>
               </div>
             </section>
-            <label class="toggle-row obs-toggle">
-              <input id="raceInfoShowBorder" type="checkbox" checked>
-              <span>Show title plate border</span>
-            </label>
             <div class="obs-grid">
               <label>
                 Plate opacity
                 <input id="raceInfoPlateBackgroundOpacity" type="number" min="0" max="100" step="1" value="84">
-              </label>
-              <label>
-                Border color
-                <input id="raceInfoPlateBorderColor" type="color" value="#ffffff">
-              </label>
-              <label>
-                Border opacity
-                <input id="raceInfoPlateBorderOpacity" type="number" min="0" max="100" step="1" value="14">
-              </label>
-              <label>
-                Border width
-                <input id="raceInfoPlateBorderWidth" type="number" min="0" max="20" step="1" value="1">
               </label>
               <label>
                 Radius
@@ -892,7 +912,7 @@
         <details class="settings-group" data-settings-panel="finishedTime">
           <summary>Finished Time</summary>
           <label class="toggle-row obs-toggle">
-            <input id="finishLockToNameplate" type="checkbox" checked>
+            <input id="finishLockToNameplate" type="checkbox">
             <span>Lock to nameplate</span>
           </label>
           <label>
