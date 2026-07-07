@@ -406,12 +406,14 @@ const state = {
     borderStyles: {
       feed: structuredClone(BORDER_PRESETS.graphite),
       timer: structuredClone(BORDER_PRESETS.graphite),
-      title: structuredClone(BORDER_PRESETS.graphite)
+      title: structuredClone(BORDER_PRESETS.graphite),
+      commentators: structuredClone(BORDER_PRESETS.graphite)
     },
     borderImages: {
       feed: "",
       timer: "",
-      title: ""
+      title: "",
+      commentators: ""
     },
     borderStyle: structuredClone(BORDER_PRESETS.graphite),
     borderImage: "",
@@ -668,12 +670,6 @@ function bindElements() {
   els.commTextureScrollY = document.getElementById("commTextureScrollY");
   els.commTextureScrollYValue = document.getElementById("commTextureScrollYValue");
   els.commPadding = document.getElementById("commPadding");
-  els.commRadius = document.getElementById("commRadius");
-  els.commShowBorder = document.getElementById("commShowBorder");
-  els.commBorderColor = document.getElementById("commBorderColor");
-  els.commBorderWidth = document.getElementById("commBorderWidth");
-  els.commBorderOpacity = document.getElementById("commBorderOpacity");
-  els.commBorderOpacityValue = document.getElementById("commBorderOpacityValue");
   els.timerBorder = document.getElementById("timerBorder");
   els.timerTextPreview = document.getElementById("timerTextPreview");
   els.activeCount = document.getElementById("activeCount");
@@ -3499,7 +3495,7 @@ async function updateInputsForReason(reason = "", rectBySlot = getCurrentRectByS
   if (manual || ["finishedScreen", "finish", "done", "active", "active-runners", "runner-add", "runner-remove"].includes(reason)) {
     await setInputUrl("FinishedScreen", htmlDataUrl(buildFinishedScreenHtml()));
   }
-  if (manual || ["commentators"].includes(reason)) {
+  if (manual || ["commentators", "border", "border-image"].includes(reason)) {
     await updateCommentatorsInput();
   }
 
@@ -4302,8 +4298,6 @@ function bindCommentatorsControls() {
   bindText(els.commGradFrom, "plateGradientFrom");
   bindText(els.commGradTo, "plateGradientTo");
   bindNum(els.commPadding, "platePaddingX");
-  bindNum(els.commRadius, "plateRadius");
-  bindChk(els.commShowBorder, "showBorder");
 
   // Plate mode + fill mode drive which sub-sections are visible.
   if (els.commPlateMode) els.commPlateMode.addEventListener("change", (event) => { pushHistory("commentators"); state.layout.commentators.plateMode = event.target.value; syncCommPlateSections(); changed(); });
@@ -4337,9 +4331,6 @@ function bindCommentatorsControls() {
     readImageFile(event.target.files?.[0], (dataUrl) => { pushHistory("commentators"); state.layout.commentators.plateTextureImage = dataUrl; changed(); });
   });
   if (els.commClearTexture) els.commClearTexture.addEventListener("click", () => { pushHistory("commentators"); state.layout.commentators.plateTextureImage = ""; if (els.commTextureImage) els.commTextureImage.value = ""; changed(); });
-  bindText(els.commBorderColor, "plateBorderColor");
-  bindRange(els.commBorderOpacity, "plateBorderOpacity", els.commBorderOpacityValue, " %");
-  bindNum(els.commBorderWidth, "plateBorderWidth");
 
   if (els.commFontBrowser) els.commFontBrowser.addEventListener("change", (event) => {
     if (!event.target.value) return;
@@ -4396,12 +4387,6 @@ function syncCommentatorsControls() {
   if (els.commPlateImage && !c.plateImage) els.commPlateImage.value = "";
   if (els.commTextureImage && !c.plateTextureImage) els.commTextureImage.value = "";
   setVal(els.commPadding, c.platePaddingX);
-  setVal(els.commRadius, c.plateRadius);
-  setChk(els.commShowBorder, c.showBorder);
-  setVal(els.commBorderColor, c.plateBorderColor);
-  setVal(els.commBorderWidth, c.plateBorderWidth);
-  setVal(els.commBorderOpacity, c.plateBorderOpacity);
-  setOut(els.commBorderOpacityValue, `${c.plateBorderOpacity} %`);
   syncCommPlateSections();
 }
 
@@ -4929,6 +4914,7 @@ function refreshMeasuredPreviews(rectBySlot) {
   syncDynamicPreviewStyles();
   applyBorderPreview(els.timerBorder, "timer");
   applyBorderPreview(els.titleBarPreview, "title");
+  if (els.commentatorsPreview && state.layout.commentators.enabled) applyBorderPreview(els.commentatorsPreview, "commentators");
 
   for (const runner of state.runners) {
     const panel = els.runnerLayer.querySelector(`[data-slot='${runner.slot}']`);
@@ -4951,7 +4937,8 @@ function syncDynamicPreviewStyles() {
     borderAnimationCss(getBorderStyle("feed"), state.layout.feedWidth, state.layout.feedHeight),
     borderAnimationCss(getBorderStyle("timer"), timerBorderSourceSize().width, timerBorderSourceSize().height),
     borderAnimationCss(getBorderStyle("title"), STAGE.width * state.layout.raceInfo.rect.width, STAGE.height * state.layout.raceInfo.rect.height),
-    nameplateAnimationCss(state.layout.nameplate),
+    borderAnimationCss(getBorderStyle("commentators"), commentatorsSourceSize().width, commentatorsSourceSize().height),
+    nameplateAnimationCss(state.layout.commentators, commentatorsSourceSize().width, commentatorsSourceSize().height, "ormCommentatorsTexture"),
     nameplateAnimationCss(state.layout.raceInfo, STAGE.width * state.layout.raceInfo.rect.width, STAGE.height * state.layout.raceInfo.rect.height, "ormRaceInfoTexture"),
     nameplateAnimationCss(state.layout.timerText, timerTextSourceSize().width, timerTextSourceSize().height, "ormTimerTexture")
   ].join("\n");
@@ -4986,7 +4973,9 @@ function applyBorderPreview(element, targetOrTimer) {
     ? timerBorderSourceSize()
     : target === "title"
       ? titleBarSourceSize()
-      : { width: state.layout.feedWidth, height: state.layout.feedHeight };
+      : target === "commentators"
+        ? commentatorsSourceSize()
+        : { width: state.layout.feedWidth, height: state.layout.feedHeight };
   const previewWidth = Math.max(1, element.clientWidth);
   const previewHeight = Math.max(1, element.clientHeight);
   const basePreviewStyle = `width:${sourceSize.width}px;height:${sourceSize.height}px;transform:scale(${previewWidth / sourceSize.width}, ${previewHeight / sourceSize.height});`;
@@ -6078,17 +6067,23 @@ function getCommentatorNames(config = state.layout.commentators) {
 // same fill/gradient options apply.
 function commentatorsPlateCss(config, sourceWidth, sourceHeight, scale = 1) {
   const padding = Math.max(0, Number(config.platePaddingX) || 0) * scale;
-  const radius = Math.max(0, Number(config.plateRadius) || 0) * scale;
-  const borderWidth = Math.max(0, Number(config.plateBorderWidth) || 0) * scale;
-  const borderColor = hexToRgba(config.plateBorderColor, Number(config.plateBorderOpacity) / 100);
-  const generated = config.plateMode !== "image";
+  // Corner radius comes from the shared border target (like the title/timer plates).
+  const radius = frameRadius("commentators") * scale;
   const fill = !config.showBox
     ? "background:transparent;"
     : (config.plateMode === "image" && config.plateImage
       ? `background-color:transparent;background-image:url("${escapeCssString(config.plateImage)}");background-size:100% 100%;background-repeat:no-repeat;background-position:center;`
       : nameplateBackgroundCss(config, sourceWidth, sourceHeight, "ormCommentatorsTexture"));
-  const border = (generated && config.showBorder) ? `${borderWidth}px solid ${borderColor}` : `${borderWidth}px solid transparent`;
-  return `display:flex;flex-direction:column;align-items:center;justify-content:center;gap:${Math.round(3 * scale)}px;padding:0 ${padding}px;overflow:hidden;text-align:center;${fill}border:${border};border-radius:${radius}px;box-sizing:border-box;background-clip:padding-box;`;
+  return `display:flex;flex-direction:column;align-items:center;justify-content:center;gap:${Math.round(3 * scale)}px;padding:0 ${padding}px;overflow:hidden;text-align:center;${fill}border:none;border-radius:${radius}px;box-sizing:border-box;background-clip:padding-box;`;
+}
+
+function commentatorsBorderHtmlCss(width, height) {
+  const image = getBorderImage("commentators");
+  const base = "position:absolute;inset:0;z-index:2;pointer-events:none;";
+  if (image) {
+    return `${base}background-color:transparent;background-image:url("${escapeCssString(image)}");background-size:100% 100%;background-repeat:no-repeat;`;
+  }
+  return `${base}${borderFrameCss(false, getBorderStyle("commentators"), width, height)}`;
 }
 
 function commentatorsTextEffectCss(config) {
@@ -6116,9 +6111,12 @@ function buildCommentatorsHtml() {
   const tx = Number(config.textX) || 0;
   const ty = Number(config.textY) || 0;
 
+  const borderCss = commentatorsBorderHtmlCss(size.width, size.height);
+
   return `<!doctype html><html><body><div class="c-plate" style="position:absolute;inset:0;${plateCss}">`
-    + `<div class="c-content" style="transform:translate(${tx}px, ${ty}px);">${labelHtml}<div class="c-names">${namesHtml}</div></div></div></body>`
-    + `<style>${baseHtmlCss()} ${nameplateAnimationCss(config, size.width, size.height, "ormCommentatorsTexture")}`
+    + `<div class="c-content" style="transform:translate(${tx}px, ${ty}px);">${labelHtml}<div class="c-names">${namesHtml}</div></div>`
+    + `<div class="c-border" style="${borderCss}"></div></div></body>`
+    + `<style>${baseHtmlCss()} ${nameplateAnimationCss(config, size.width, size.height, "ormCommentatorsTexture")}${borderAnimationCss(getBorderStyle("commentators"), size.width, size.height)}`
     + `body{font-family:${cssFontStack(config.fontFamily)};color:${config.textColor};}`
     + `.c-content{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:${Math.round(fontSize * 0.12)}px;}`
     + `.c-names{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:0 ${Math.round(fontSize * 0.4)}px;}`
@@ -6221,12 +6219,12 @@ function getBorderImage(target) {
 
 function setEditingBorderImage(value) {
   const key = borderTargetKey(state.layout.borderTarget);
-  state.layout.borderImages ??= { feed: "", timer: "", title: "" };
+  state.layout.borderImages ??= { feed: "", timer: "", title: "", commentators: "" };
   state.layout.borderImages[key] = value;
 }
 
 function borderTargetKey(target) {
-  return target === "timer" || target === "title" ? target : "feed";
+  return ["timer", "title", "commentators"].includes(target) ? target : "feed";
 }
 
 function buildBorderHtml() {
@@ -7388,12 +7386,18 @@ function normalizeLoadedLayout(layout) {
         ...legacyBorderStyle,
         ...state.layout.borderStyles?.title,
         ...layout.borderStyles?.title
+      },
+      commentators: {
+        ...legacyBorderStyle,
+        ...state.layout.borderStyles?.commentators,
+        ...layout.borderStyles?.commentators
       }
     },
     borderImages: {
       feed: layout.borderImages?.feed ?? layout.borderImage ?? state.layout.borderImages?.feed ?? "",
       timer: layout.borderImages?.timer ?? layout.borderImage ?? state.layout.borderImages?.timer ?? "",
-      title: layout.borderImages?.title ?? state.layout.borderImages?.title ?? ""
+      title: layout.borderImages?.title ?? state.layout.borderImages?.title ?? "",
+      commentators: layout.borderImages?.commentators ?? state.layout.borderImages?.commentators ?? ""
     },
     panelGeometry: {
       feed: { ...DEFAULT_PANEL_GEOMETRY.feed, ...layout.panelGeometry?.feed },
@@ -7419,7 +7423,8 @@ function normalizeLoadedLayout(layout) {
   normalizeBorderStyle(next.borderStyles.feed);
   normalizeBorderStyle(next.borderStyles.timer);
   normalizeBorderStyle(next.borderStyles.title);
-  next.borderTarget = ["feed", "timer", "title"].includes(next.borderTarget) ? next.borderTarget : "feed";
+  normalizeBorderStyle(next.borderStyles.commentators);
+  next.borderTarget = ["feed", "timer", "title", "commentators"].includes(next.borderTarget) ? next.borderTarget : "feed";
   next.borderModeSource = ["generated", "image", "template"].includes(next.borderModeSource) ? next.borderModeSource : "generated";
   next.borderStyle = structuredClone(next.borderStyles.feed);
   next.borderImage = next.borderImages.feed;

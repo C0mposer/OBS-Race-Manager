@@ -1613,10 +1613,6 @@
                 <input id="commPadding" type="number" min="0" step="1" value="16">
               </label>
             </div>
-            <label>
-              Corner radius
-              <input id="commRadius" type="number" min="0" step="1" value="10">
-            </label>
           </section>
           <section data-comm-plate-section="image">
             <div class="section-subhead">Image Plate</div>
@@ -1627,27 +1623,7 @@
             <button id="commClearPlateImage" class="secondary-button" type="button">Clear Plate Image</button>
             <div class="note compact-note">Transparent PNGs render with transparency in both preview and OBS.</div>
           </section>
-
-          <div class="section-subhead">Border</div>
-          <label class="toggle-row obs-toggle">
-            <input id="commShowBorder" type="checkbox" checked>
-            <span>Show border</span>
-          </label>
-          <div class="obs-grid">
-            <label>
-              Border color
-              <input id="commBorderColor" type="color" value="#ffffff">
-            </label>
-            <label>
-              Border width
-              <input id="commBorderWidth" type="number" min="0" max="20" step="1" value="2">
-            </label>
-          </div>
-          <label>
-            Border opacity
-            <input id="commBorderOpacity" type="range" min="0" max="100" step="1" value="18">
-            <output id="commBorderOpacityValue">18 %</output>
-          </label>
+          <div class="note compact-note">Border options for commentators live in the <strong>Borders</strong> tab &mdash; pick "Commentators border" there.</div>
         </details>
 
         <details class="settings-group" data-settings-panel="borders">
@@ -1658,6 +1634,7 @@
               <option value="feed">Game feed borders</option>
               <option value="timer">Timer border</option>
               <option value="title">Title bar border</option>
+              <option value="commentators">Commentators border</option>
             </select>
           </label>
           <label>
