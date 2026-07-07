@@ -2,7 +2,7 @@ const STAGE = { width: 1920, height: 1080 };
 const MANAGED_PREFIX = "ORM__";
 const MAX_RUNNERS = 20;
 const RUNNER_PARTS = ["Feed", "Border", "Name", "Finish"];
-const GLOBAL_PARTS = ["Background", "TitleBar", "TimerBorder", "TimerText"];
+const GLOBAL_PARTS = ["Background", "TitleBar", "TimerBorder", "TimerText", "Commentators", "FinishedScreen"];
 const NAME_FONT_HEIGHT_RATIO = 0.48;
 const COMMON_FONT_FACES = [
   "Segoe UI",
@@ -33,9 +33,9 @@ const COMMON_FONT_FACES = [
   "Verdana"
 ];
 const DEFAULT_PANEL_GEOMETRY = {
-  feed: { x: 0.042, y: 0.054, width: 0.916, height: 0.726 },
-  name: { x: 0.042, y: 0.81, width: 0.916, height: 0.14 },
-  finish: { x: 0.76, y: 0.84, width: 0.18, height: 0.08 }
+  feed: { x: 0, y: 0, width: 1, height: 1 },
+  name: { x: 0, y: 0.9384331443891731, width: 0.12478820808892653, height: 0.061566855610826816 },
+  finish: { x: 0.8183807439824945, y: 0.9183078045222466, width: 0.18161925601750548, height: 0.08169219547775347 }
 };
 const DEFAULT_TIMER_BORDER = {
   enabled: true,
@@ -48,14 +48,14 @@ const DEFAULT_ELEMENTS = {
   feed: true,
   feedBorder: true,
   name: true,
-  titleBar: false,
+  titleBar: true,
   timerBorder: true,
   builtInTimer: true,
   finishedTime: true
 };
 const DEFAULT_TIMER_TEXT = {
   fontFamily: "Segoe UI",
-  fontSize: 54,
+  fontSize: 50,
   format: "hhmmss",
   idleColor: "#9aa7ae",
   stoppedColor: "#f0b84a",
@@ -106,12 +106,109 @@ const DEFAULT_FINISHED_TIME = {
   shadowX: 0,
   shadowY: 2
 };
+const DEFAULT_FINISHED_SCREEN = {
+  accentColor: "#f0b84a",
+  backdropColor: "#080b10",
+  backdropOpacity: 82,
+  rowSpeedMs: 520,
+  rowStaggerMs: 120,
+  showIcons: false,
+  topIcon1: "",
+  topIcon2: "",
+  topIcon3: "",
+  showGaps: false,
+  showUnderline: true,
+  showOnlyBackground: false,
+  // Header text
+  heading: "FINAL RESULTS",
+  headingFontFamily: "Segoe UI",
+  headingFontSize: 64,
+  headingColor: "#ffffff",
+  headingStrokeEnabled: false,
+  headingStrokeColor: "#000000",
+  headingStrokeWidth: 2,
+  headingShadowEnabled: true,
+  headingShadowColor: "#000000",
+  headingShadowBlur: 24,
+  headingShadowX: 0,
+  headingShadowY: 4,
+  // Runner rows text
+  runnerFontFamily: "Segoe UI",
+  runnerFontSize: 40,
+  runnerColor: "#ffffff",
+  runnerStrokeEnabled: false,
+  runnerStrokeColor: "#000000",
+  runnerStrokeWidth: 2,
+  runnerShadowEnabled: true,
+  runnerShadowColor: "#000000",
+  runnerShadowBlur: 8,
+  runnerShadowX: 0,
+  runnerShadowY: 2
+};
+const DEFAULT_COMMENTATORS = {
+  enabled: false,
+  label: "COMMENTARY",
+  names: ["Commentator 1", "Commentator 2"],
+  rect: { x: 0.03, y: 0.86, width: 0.30, height: 0.10 },
+  fontFamily: "Segoe UI",
+  fontSize: 34,
+  textColor: "#ffffff",
+  textX: 0,
+  textY: 0,
+  strokeEnabled: false,
+  strokeColor: "#000000",
+  strokeWidth: 2,
+  shadowEnabled: true,
+  shadowColor: "#000000",
+  shadowBlur: 8,
+  shadowX: 0,
+  shadowY: 2,
+  plateMode: "generated",
+  plateImage: "",
+  showBox: true,
+  showBorder: true,
+  plateFillMode: "solid",
+  plateBackgroundColor: "#070a0c",
+  plateBackgroundOpacity: 82,
+  plateGradientFrom: "#070a0c",
+  plateGradientTo: "#1f2d34",
+  plateGradientAngle: 135,
+  plateAnimateGradientAngle: false,
+  plateGradientAngleSpeed: 45,
+  plateTextureImage: "",
+  plateTextureScale: 100,
+  plateTextureX: 50,
+  plateTextureY: 50,
+  plateTextureScrollX: 0,
+  plateTextureScrollY: 0,
+  plateBorderColor: "#ffffff",
+  plateBorderOpacity: 18,
+  plateBorderWidth: 2,
+  plateRadius: 10,
+  platePaddingX: 16
+};
+const DEFAULT_PRONOUNS_TEXT = {
+  enabled: true,
+  fontFamily: "Bangers",
+  fontSize: 40,
+  textColor: "#00ffcc",
+  textX: 0,
+  textY: 0,
+  strokeEnabled: true,
+  strokeColor: "#ff0000",
+  strokeWidth: 3,
+  shadowEnabled: false,
+  shadowColor: "#2bff00",
+  shadowBlur: 0,
+  shadowX: 10,
+  shadowY: 10
+};
 const BORDER_PRESETS = {
   graphite: {
     mode: "solid",
     lineColor: "#566570",
     glowColor: "#566570",
-    lineWidth: 14,
+    lineWidth: 4,
     timerLineWidth: 8,
     radius: 18,
     gradientFrom: "#566570",
@@ -190,7 +287,8 @@ const state = {
     aspectPreset: "4:3",
     timerHeight: 130,
     titleHeight: 100,
-    margin: 36,
+    marginLeft: 36,
+    marginRight: 36,
     gap: 20,
     viewMode: "edit",
     layerLock: false,
@@ -198,6 +296,9 @@ const state = {
     animationMs: 360,
     animationFps: 60,
     animationStyle: "moveFade",
+    finishAnimationMs: 360,
+    finishAnimationFps: 60,
+    finishAnimationStyle: "scaleFade",
     feedWidth: 1920,
     feedHeight: 1080,
     elements: { ...DEFAULT_ELEMENTS },
@@ -215,9 +316,11 @@ const state = {
     },
     timerText: { ...DEFAULT_TIMER_TEXT },
     finishedTime: { ...DEFAULT_FINISHED_TIME },
+    finishedScreen: { ...DEFAULT_FINISHED_SCREEN },
+    commentators: structuredClone(DEFAULT_COMMENTATORS),
     raceInfo: {
       title: "Race Title",
-      subtitle: "Game - Category",
+      subtitle: "",
       fontFamily: "Segoe UI",
       fontSize: 34,
       textColor: "#ffffff",
@@ -296,6 +399,7 @@ const state = {
       shadowX: 0,
       shadowY: 2
     },
+    pronounsText: { ...DEFAULT_PRONOUNS_TEXT },
     borderPreset: "graphite",
     borderTarget: "feed",
     borderModeSource: "generated",
@@ -330,6 +434,10 @@ const selection = {
   kind: "",
   activePanel: "layout"
 };
+// Transient UI state (not persisted with the project).
+const uiState = {
+  finishedScreenVisible: false
+};
 const obsBridge = {
   client: null,
   connected: false,
@@ -344,6 +452,7 @@ const obsBridge = {
   opacitySupported: false,
   lastRects: new Map(),
   lastVisibility: new Map(),
+  lastFinishVisibility: new Map(),
   lastSceneItemEnabled: new Map()
 };
 let previewRefreshFrame = 0;
@@ -387,7 +496,10 @@ function createRunner(slot, name, source, active, crop) {
     audioMuted: false,
     audioVolume: 100,
     crop,
-    collapsed: false
+    collapsed: false,
+    pronounPrimary: "",
+    pronounSecondary: "",
+    pronounCustom: ""
   };
 }
 
@@ -509,6 +621,59 @@ function bindElements() {
   els.snapGuideV = document.getElementById("snapGuideV");
   els.snapGuideH = document.getElementById("snapGuideH");
   els.titleBarPreview = document.getElementById("titleBarPreview");
+  els.commentatorsPreview = document.getElementById("commentatorsPreview");
+  els.commEnabled = document.getElementById("commEnabled");
+  els.commLabel = document.getElementById("commLabel");
+  els.commNames = document.getElementById("commNames");
+  els.commFont = document.getElementById("commFont");
+  els.commFontChoices = document.getElementById("commFontChoices");
+  els.commFontBrowser = document.getElementById("commFontBrowser");
+  els.commBrowseFonts = document.getElementById("commBrowseFonts");
+  els.commFontSize = document.getElementById("commFontSize");
+  els.commColor = document.getElementById("commColor");
+  els.commTextX = document.getElementById("commTextX");
+  els.commTextY = document.getElementById("commTextY");
+  els.commStrokeEnabled = document.getElementById("commStrokeEnabled");
+  els.commStrokeColor = document.getElementById("commStrokeColor");
+  els.commStrokeWidth = document.getElementById("commStrokeWidth");
+  els.commShadowEnabled = document.getElementById("commShadowEnabled");
+  els.commShadowColor = document.getElementById("commShadowColor");
+  els.commShadowBlur = document.getElementById("commShadowBlur");
+  els.commShadowX = document.getElementById("commShadowX");
+  els.commShadowY = document.getElementById("commShadowY");
+  els.commPlateMode = document.getElementById("commPlateMode");
+  els.commPlateImage = document.getElementById("commPlateImage");
+  els.commClearPlateImage = document.getElementById("commClearPlateImage");
+  els.commShowBox = document.getElementById("commShowBox");
+  els.commFillMode = document.getElementById("commFillMode");
+  els.commBgColor = document.getElementById("commBgColor");
+  els.commBgOpacity = document.getElementById("commBgOpacity");
+  els.commBgOpacityValue = document.getElementById("commBgOpacityValue");
+  els.commGradFrom = document.getElementById("commGradFrom");
+  els.commGradTo = document.getElementById("commGradTo");
+  els.commGradAngle = document.getElementById("commGradAngle");
+  els.commGradAngleSlider = document.getElementById("commGradAngleSlider");
+  els.commGradAnimate = document.getElementById("commGradAnimate");
+  els.commGradSpeedRow = document.getElementById("commGradSpeedRow");
+  els.commGradSpeed = document.getElementById("commGradSpeed");
+  els.commGradSpeedValue = document.getElementById("commGradSpeedValue");
+  els.commTextureImage = document.getElementById("commTextureImage");
+  els.commClearTexture = document.getElementById("commClearTexture");
+  els.commTextureScale = document.getElementById("commTextureScale");
+  els.commTextureScaleValue = document.getElementById("commTextureScaleValue");
+  els.commTextureX = document.getElementById("commTextureX");
+  els.commTextureY = document.getElementById("commTextureY");
+  els.commTextureScrollX = document.getElementById("commTextureScrollX");
+  els.commTextureScrollXValue = document.getElementById("commTextureScrollXValue");
+  els.commTextureScrollY = document.getElementById("commTextureScrollY");
+  els.commTextureScrollYValue = document.getElementById("commTextureScrollYValue");
+  els.commPadding = document.getElementById("commPadding");
+  els.commRadius = document.getElementById("commRadius");
+  els.commShowBorder = document.getElementById("commShowBorder");
+  els.commBorderColor = document.getElementById("commBorderColor");
+  els.commBorderWidth = document.getElementById("commBorderWidth");
+  els.commBorderOpacity = document.getElementById("commBorderOpacity");
+  els.commBorderOpacityValue = document.getElementById("commBorderOpacityValue");
   els.timerBorder = document.getElementById("timerBorder");
   els.timerTextPreview = document.getElementById("timerTextPreview");
   els.activeCount = document.getElementById("activeCount");
@@ -516,7 +681,10 @@ function bindElements() {
   els.aspectPreset = document.getElementById("aspectPreset");
   els.timerHeight = document.getElementById("timerHeight");
   els.titleHeight = document.getElementById("titleHeight");
-  els.marginSize = document.getElementById("marginSize");
+  els.marginLeft = document.getElementById("marginLeft");
+  els.marginLeftValue = document.getElementById("marginLeftValue");
+  els.marginRight = document.getElementById("marginRight");
+  els.marginRightValue = document.getElementById("marginRightValue");
   els.gapSize = document.getElementById("gapSize");
   els.builtInTimerEnabled = document.getElementById("builtInTimerEnabled");
   els.timerStart = document.getElementById("timerStart");
@@ -584,9 +752,13 @@ function bindElements() {
   els.animationMs = document.getElementById("animationMs");
   els.animationStyle = document.getElementById("animationStyle");
   els.animationFps = document.getElementById("animationFps");
+  els.finishAnimationMs = document.getElementById("finishAnimationMs");
+  els.finishAnimationStyle = document.getElementById("finishAnimationStyle");
+  els.finishAnimationFps = document.getElementById("finishAnimationFps");
+  els.finishAnimationValue = document.getElementById("finishAnimationValue");
+  els.finishAnimationFpsValue = document.getElementById("finishAnimationFpsValue");
   els.timerHeightValue = document.getElementById("timerHeightValue");
   els.titleHeightValue = document.getElementById("titleHeightValue");
-  els.marginValue = document.getElementById("marginValue");
   els.gapValue = document.getElementById("gapValue");
   els.animationValue = document.getElementById("animationValue");
   els.animationFpsValue = document.getElementById("animationFpsValue");
@@ -713,6 +885,24 @@ function bindElements() {
   els.nameShadowBlur = document.getElementById("nameShadowBlur");
   els.nameShadowX = document.getElementById("nameShadowX");
   els.nameShadowY = document.getElementById("nameShadowY");
+  els.pronounsEnabled = document.getElementById("pronounsEnabled");
+  els.pronounsFont = document.getElementById("pronounsFont");
+  els.pronounsFontChoices = document.getElementById("pronounsFontChoices");
+  els.pronounsFontBrowser = document.getElementById("pronounsFontBrowser");
+  els.browsePronounsFonts = document.getElementById("browsePronounsFonts");
+  els.pronounsFontSize = document.getElementById("pronounsFontSize");
+  els.pronounsFontSizeValue = document.getElementById("pronounsFontSizeValue");
+  els.pronounsTextColor = document.getElementById("pronounsTextColor");
+  els.pronounsTextX = document.getElementById("pronounsTextX");
+  els.pronounsTextY = document.getElementById("pronounsTextY");
+  els.pronounsStrokeEnabled = document.getElementById("pronounsStrokeEnabled");
+  els.pronounsStrokeColor = document.getElementById("pronounsStrokeColor");
+  els.pronounsStrokeWidth = document.getElementById("pronounsStrokeWidth");
+  els.pronounsShadowEnabled = document.getElementById("pronounsShadowEnabled");
+  els.pronounsShadowColor = document.getElementById("pronounsShadowColor");
+  els.pronounsShadowBlur = document.getElementById("pronounsShadowBlur");
+  els.pronounsShadowX = document.getElementById("pronounsShadowX");
+  els.pronounsShadowY = document.getElementById("pronounsShadowY");
   els.finishLockToNameplate = document.getElementById("finishLockToNameplate");
   els.finishFont = document.getElementById("finishFont");
   els.finishFontChoices = document.getElementById("finishFontChoices");
@@ -785,6 +975,65 @@ function bindElements() {
   els.loadProject = document.getElementById("loadProject");
   els.viewEditMode = document.getElementById("viewEditMode");
   els.viewControlMode = document.getElementById("viewControlMode");
+  els.viewFinishedScreen = document.getElementById("viewFinishedScreen");
+  els.finishedScreenLayer = document.getElementById("finishedScreenLayer");
+  els.finishedScreenScale = document.getElementById("finishedScreenScale");
+  els.finishedScreenBar = document.getElementById("finishedScreenBar");
+  els.finishedScreenReplay = document.getElementById("finishedScreenReplay");
+  els.finishedScreenHide = document.getElementById("finishedScreenHide");
+  els.finishedScreenShow = document.getElementById("finishedScreenShow");
+  els.finishedScreenHideBtn = document.getElementById("finishedScreenHideBtn");
+  els.finishedScreenAccent = document.getElementById("finishedScreenAccent");
+  els.finishedScreenBackdrop = document.getElementById("finishedScreenBackdrop");
+  els.finishedScreenBackdropOpacity = document.getElementById("finishedScreenBackdropOpacity");
+  els.finishedScreenBackdropOpacityValue = document.getElementById("finishedScreenBackdropOpacityValue");
+  els.finishedScreenRowSpeed = document.getElementById("finishedScreenRowSpeed");
+  els.finishedScreenRowSpeedValue = document.getElementById("finishedScreenRowSpeedValue");
+  els.finishedScreenRowStagger = document.getElementById("finishedScreenRowStagger");
+  els.finishedScreenRowStaggerValue = document.getElementById("finishedScreenRowStaggerValue");
+  els.finishedScreenIcons = document.getElementById("finishedScreenIcons");
+  els.finishedScreenIcon1 = document.getElementById("finishedScreenIcon1");
+  els.finishedScreenIcon2 = document.getElementById("finishedScreenIcon2");
+  els.finishedScreenIcon3 = document.getElementById("finishedScreenIcon3");
+  els.finishedScreenIcon1Preview = document.getElementById("finishedScreenIcon1Preview");
+  els.finishedScreenIcon2Preview = document.getElementById("finishedScreenIcon2Preview");
+  els.finishedScreenIcon3Preview = document.getElementById("finishedScreenIcon3Preview");
+  els.finishedScreenIcon1Clear = document.getElementById("finishedScreenIcon1Clear");
+  els.finishedScreenIcon2Clear = document.getElementById("finishedScreenIcon2Clear");
+  els.finishedScreenIcon3Clear = document.getElementById("finishedScreenIcon3Clear");
+  els.finishedScreenGaps = document.getElementById("finishedScreenGaps");
+  els.finishedScreenUnderline = document.getElementById("finishedScreenUnderline");
+  els.finishedScreenOnlyBackground = document.getElementById("finishedScreenOnlyBackground");
+  els.finishedScreenFontChoices = document.getElementById("finishedScreenFontChoices");
+  // Header text
+  els.finishedScreenHeading = document.getElementById("finishedScreenHeading");
+  els.finishedScreenHeadingFont = document.getElementById("finishedScreenHeadingFont");
+  els.finishedScreenHeadingFontBrowser = document.getElementById("finishedScreenHeadingFontBrowser");
+  els.finishedScreenHeadingBrowseFonts = document.getElementById("finishedScreenHeadingBrowseFonts");
+  els.finishedScreenHeadingFontSize = document.getElementById("finishedScreenHeadingFontSize");
+  els.finishedScreenHeadingColor = document.getElementById("finishedScreenHeadingColor");
+  els.finishedScreenHeadingStrokeEnabled = document.getElementById("finishedScreenHeadingStrokeEnabled");
+  els.finishedScreenHeadingStrokeColor = document.getElementById("finishedScreenHeadingStrokeColor");
+  els.finishedScreenHeadingStrokeWidth = document.getElementById("finishedScreenHeadingStrokeWidth");
+  els.finishedScreenHeadingShadowEnabled = document.getElementById("finishedScreenHeadingShadowEnabled");
+  els.finishedScreenHeadingShadowColor = document.getElementById("finishedScreenHeadingShadowColor");
+  els.finishedScreenHeadingShadowBlur = document.getElementById("finishedScreenHeadingShadowBlur");
+  els.finishedScreenHeadingShadowX = document.getElementById("finishedScreenHeadingShadowX");
+  els.finishedScreenHeadingShadowY = document.getElementById("finishedScreenHeadingShadowY");
+  // Runner text
+  els.finishedScreenRunnerFont = document.getElementById("finishedScreenRunnerFont");
+  els.finishedScreenRunnerFontBrowser = document.getElementById("finishedScreenRunnerFontBrowser");
+  els.finishedScreenRunnerBrowseFonts = document.getElementById("finishedScreenRunnerBrowseFonts");
+  els.finishedScreenRunnerFontSize = document.getElementById("finishedScreenRunnerFontSize");
+  els.finishedScreenRunnerColor = document.getElementById("finishedScreenRunnerColor");
+  els.finishedScreenRunnerStrokeEnabled = document.getElementById("finishedScreenRunnerStrokeEnabled");
+  els.finishedScreenRunnerStrokeColor = document.getElementById("finishedScreenRunnerStrokeColor");
+  els.finishedScreenRunnerStrokeWidth = document.getElementById("finishedScreenRunnerStrokeWidth");
+  els.finishedScreenRunnerShadowEnabled = document.getElementById("finishedScreenRunnerShadowEnabled");
+  els.finishedScreenRunnerShadowColor = document.getElementById("finishedScreenRunnerShadowColor");
+  els.finishedScreenRunnerShadowBlur = document.getElementById("finishedScreenRunnerShadowBlur");
+  els.finishedScreenRunnerShadowX = document.getElementById("finishedScreenRunnerShadowX");
+  els.finishedScreenRunnerShadowY = document.getElementById("finishedScreenRunnerShadowY");
   els.resetAllFinishes = document.getElementById("resetAllFinishes");
   els.raceControlPanel = document.getElementById("raceControlPanel");
   els.controlTimerReadout = document.getElementById("controlTimerReadout");
@@ -805,6 +1054,9 @@ function bindGlobalControls() {
   els.loadProject.addEventListener("change", loadProjectFromFile);
   els.viewEditMode.addEventListener("click", () => setViewMode("edit"));
   els.viewControlMode.addEventListener("click", () => setViewMode("control"));
+  els.viewFinishedScreen.addEventListener("click", toggleFinishedScreen);
+  bindFinishedScreenControls();
+  bindCommentatorsControls();
   els.resetAllFinishes.addEventListener("click", resetAllFinishes);
   els.controlTimerStart.addEventListener("click", startBuiltInTimer);
   els.controlTimerStop.addEventListener("click", stopBuiltInTimer);
@@ -1082,10 +1334,13 @@ function bindGlobalControls() {
   for (const [element, key, output, suffix] of [
     [els.timerHeight, "timerHeight", els.timerHeightValue, " px"],
     [els.titleHeight, "titleHeight", els.titleHeightValue, " px"],
-    [els.marginSize, "margin", els.marginValue, " px"],
+    [els.marginLeft, "marginLeft", els.marginLeftValue, " px"],
+    [els.marginRight, "marginRight", els.marginRightValue, " px"],
     [els.gapSize, "gap", els.gapValue, " px"],
     [els.animationMs, "animationMs", els.animationValue, " ms"],
-    [els.animationFps, "animationFps", els.animationFpsValue, " fps"]
+    [els.animationFps, "animationFps", els.animationFpsValue, " fps"],
+    [els.finishAnimationMs, "finishAnimationMs", els.finishAnimationValue, " ms"],
+    [els.finishAnimationFps, "finishAnimationFps", els.finishAnimationFpsValue, " fps"]
   ]) {
     element.addEventListener("pointerdown", () => beginContinuousHistory(key));
     element.addEventListener("keydown", () => beginContinuousHistory(key));
@@ -1105,6 +1360,13 @@ function bindGlobalControls() {
     scheduleObsApply("animationStyle", 0);
   });
 
+  els.finishAnimationStyle.addEventListener("change", (event) => {
+    pushHistory("finish animation style");
+    state.layout.finishAnimationStyle = event.target.value;
+    update();
+    scheduleObsApply("finishAnimationStyle", 0);
+  });
+
   for (const [element, key] of [
     [els.feedWidth, "feedWidth"],
     [els.feedHeight, "feedHeight"]
@@ -1120,6 +1382,7 @@ function bindGlobalControls() {
 
   bindGeometryInputs();
   bindNameplateControls();
+  bindPronounsTextControls();
   bindFinishedTimeControls();
   bindBorderStyleControls();
   bindPreviewDragging();
@@ -1677,6 +1940,77 @@ function bindNameplateControls() {
   }
 }
 
+function bindPronounsTextControls() {
+  const numberBindings = [
+    [els.pronounsFontSize, "fontSize", els.pronounsFontSizeValue, " px"],
+    [els.pronounsTextX, "textX", null, ""],
+    [els.pronounsTextY, "textY", null, ""],
+    [els.pronounsStrokeWidth, "strokeWidth", null, ""],
+    [els.pronounsShadowBlur, "shadowBlur", null, ""],
+    [els.pronounsShadowX, "shadowX", null, ""],
+    [els.pronounsShadowY, "shadowY", null, ""]
+  ];
+
+  els.pronounsFont.addEventListener("change", (event) => {
+    pushHistory("pronouns font");
+    state.layout.pronounsText.fontFamily = event.target.value;
+    update();
+    scheduleObsApply("pronounsText", 120);
+  });
+  els.pronounsFont.addEventListener("input", (event) => {
+    state.layout.pronounsText.fontFamily = event.target.value;
+    update();
+    scheduleObsApply("pronounsText", 240);
+  });
+  els.pronounsFontBrowser.addEventListener("change", (event) => {
+    if (!event.target.value) return;
+    pushHistory("pronouns font");
+    state.layout.pronounsText.fontFamily = event.target.value;
+    syncPronounsTextControlsFromState();
+    update();
+    scheduleObsApply("pronounsText", 120);
+  });
+  els.browsePronounsFonts.addEventListener("click", browseInstalledFonts);
+
+  for (const [input, key, output, suffix] of numberBindings) {
+    input.addEventListener("focus", () => beginContinuousHistory(`pronouns-${key}`));
+    input.addEventListener("change", endContinuousHistory);
+    input.addEventListener("input", () => {
+      state.layout.pronounsText[key] = Number(input.value);
+      if (output) output.textContent = `${state.layout.pronounsText[key]}${suffix}`;
+      update();
+      scheduleObsApply("pronounsText", 160);
+    });
+  }
+
+  for (const [input, key] of [
+    [els.pronounsTextColor, "textColor"],
+    [els.pronounsStrokeColor, "strokeColor"],
+    [els.pronounsShadowColor, "shadowColor"]
+  ]) {
+    input.addEventListener("pointerdown", () => beginContinuousHistory(`pronouns-${key}`));
+    input.addEventListener("input", () => {
+      state.layout.pronounsText[key] = input.value;
+      update();
+      scheduleObsApply("pronounsText", 80);
+    });
+    input.addEventListener("change", endContinuousHistory);
+  }
+
+  for (const [input, key] of [
+    [els.pronounsEnabled, "enabled"],
+    [els.pronounsStrokeEnabled, "strokeEnabled"],
+    [els.pronounsShadowEnabled, "shadowEnabled"]
+  ]) {
+    input.addEventListener("change", () => {
+      pushHistory(`pronouns-${key}`);
+      state.layout.pronounsText[key] = input.checked;
+      update();
+      scheduleObsApply("pronounsText", 120);
+    });
+  }
+}
+
 function bindFinishedTimeControls() {
   els.finishFont.addEventListener("change", (event) => {
     pushHistory("finish font");
@@ -1878,11 +2212,11 @@ function bindPreviewDragging() {
 
     const kind = handle?.dataset.resizeHandle || target.dataset.dragTarget;
     setSelectedDragTarget(kind);
-    const textDrag = kind === "nameText";
-    const rect = textDrag ? getNameTextDragRect() : getDragRect(kind, target);
+    const textDrag = kind === "nameText" || kind === "pronounsText";
+    const rect = textDrag ? getTextDragRect(kind) : getDragRect(kind, target);
     const container = getDragContainer(kind, target);
-    const sourceSize = textDrag ? getNameTextDragSourceSize(target) : null;
-    const textBounds = textDrag ? getNameTextDragBounds(target) : null;
+    const sourceSize = textDrag ? getTextDragSourceSize(kind, target) : null;
+    const textBounds = textDrag ? getTextDragBounds(kind, target) : null;
 
     drag = {
       kind,
@@ -1906,7 +2240,7 @@ function bindPreviewDragging() {
   els.stage.addEventListener("pointermove", (event) => {
     if (!drag || event.pointerId !== drag.pointerId) return;
 
-    if (drag.kind === "nameText") {
+    if (drag.kind === "nameText" || drag.kind === "pronounsText") {
       const scaleX = drag.sourceSize.width / Math.max(1, drag.container.width);
       const scaleY = drag.sourceSize.height / Math.max(1, drag.container.height);
       drag.current = {
@@ -1961,6 +2295,10 @@ function bindPreviewDragging() {
       state.layout.nameplate.textX = round(drag.current.textX);
       state.layout.nameplate.textY = round(drag.current.textY);
       syncNameplateControlsFromState();
+    } else if (drag.kind === "pronounsText") {
+      state.layout.pronounsText.textX = round(drag.current.textX);
+      state.layout.pronounsText.textY = round(drag.current.textY);
+      syncPronounsTextControlsFromState();
     } else if (drag.kind === "finish") {
       Object.assign(state.layout.panelGeometry.finish, storedFinishGeometry(drag.current));
     } else {
@@ -1968,15 +2306,19 @@ function bindPreviewDragging() {
     }
     const reason = drag.kind === "nameText"
       ? "nameplate"
-      : drag.kind === "finish"
-        ? "finishGeometry"
-        : drag.kind === "timer"
-          ? "timerBorder"
-          : drag.kind === "title"
-            ? "raceInfo"
-          : drag.kind === "name"
-            ? "geometry"
-            : "drag-end";
+      : drag.kind === "pronounsText"
+        ? "pronounsText"
+        : drag.kind === "finish"
+          ? "finishGeometry"
+          : drag.kind === "timer"
+            ? "timerBorder"
+            : drag.kind === "title"
+              ? "raceInfo"
+            : drag.kind === "commentators"
+              ? "commentators"
+            : drag.kind === "name"
+              ? "geometry"
+              : "drag-end";
     drag = null;
     endContinuousHistory();
     update();
@@ -1995,28 +2337,35 @@ function focusRunnerName(slot) {
 }
 
 function getDragContainer(kind, target) {
-  if (kind === "timer" || kind === "title") return els.stage.getBoundingClientRect();
-  if (kind === "nameText") return target.closest(".runner-nameplate").getBoundingClientRect();
+  if (kind === "timer" || kind === "title" || kind === "commentators") return els.stage.getBoundingClientRect();
+  if (kind === "nameText" || kind === "pronounsText") return target.closest(".runner-nameplate").getBoundingClientRect();
   return target.closest(".runner-panel").getBoundingClientRect();
 }
 
-function getNameTextDragRect() {
+function getTextDragRect(kind) {
+  if (kind === "pronounsText") {
+    return {
+      textX: Number(state.layout.pronounsText.textX) || 0,
+      textY: Number(state.layout.pronounsText.textY) || 0
+    };
+  }
   return {
     textX: Number(state.layout.nameplate.textX) || 0,
     textY: Number(state.layout.nameplate.textY) || 0
   };
 }
 
-function getNameTextDragSourceSize(target) {
+function getTextDragSourceSize(kind, target) {
   const panel = target.closest(".runner-panel");
   const slot = Number(panel?.dataset.slot);
   return nameSourceSize(getCurrentRectBySlot().get(slot));
 }
 
-function getNameTextDragBounds(target) {
+function getTextDragBounds(kind, target) {
   const plate = target.closest(".runner-nameplate");
-  const visual = plate?.querySelector(".name-visual-text");
-  const sourceSize = getNameTextDragSourceSize(target);
+  const visualSelector = kind === "pronounsText" ? ".pronouns-visual-text" : ".name-visual-text";
+  const visual = plate?.querySelector(visualSelector);
+  const sourceSize = getTextDragSourceSize(kind, target);
   if (visual?.getBBox) {
     try {
       const box = visual.getBBox();
@@ -2051,6 +2400,7 @@ function getDragRect(kind, target = null) {
   if (kind === "feed") return state.layout.panelGeometry.feed;
   if (kind === "name") return state.layout.panelGeometry.name;
   if (kind === "title") return state.layout.raceInfo.rect;
+  if (kind === "commentators") return state.layout.commentators.rect;
   if (kind === "finish") {
     const slot = Number(target?.closest(".runner-panel")?.dataset.slot);
     const runner = state.runners.find((candidate) => candidate.slot === slot);
@@ -2200,6 +2550,26 @@ function paintDragPreview(kind, rect) {
     return;
   }
 
+  if (kind === "pronounsText") {
+    const currentX = Number(state.layout.pronounsText.textX) || 0;
+    const currentY = Number(state.layout.pronounsText.textY) || 0;
+    const deltaX = round(rect.textX - currentX);
+    const deltaY = round(rect.textY - currentY);
+    for (const content of els.runnerLayer.querySelectorAll(".pronouns-content")) {
+      content.style.transform = `translate(${round(rect.textX)}px, calc(-50% + ${round(rect.textY)}px))`;
+    }
+    for (const text of els.runnerLayer.querySelectorAll(".pronouns-visual-text")) {
+      const svg = text.closest("svg");
+      const [, , width, height] = String(svg?.getAttribute("viewBox") || "0 0 0 0").split(/\s+/).map(Number);
+      const anchor = pronounsTextAnchor({ width: width || 1, height: height || 1 });
+      text.setAttribute("x", round(anchor.x + deltaX));
+      text.setAttribute("y", round(anchor.y + deltaY));
+    }
+    if (document.activeElement !== els.pronounsTextX) els.pronounsTextX.value = round(rect.textX);
+    if (document.activeElement !== els.pronounsTextY) els.pronounsTextY.value = round(rect.textY);
+    return;
+  }
+
   if (kind === "timer") {
     applyNormalizedStyle(els.timerBorder, rect);
     applyNormalizedStyle(els.timerTextPreview, rect);
@@ -2208,6 +2578,11 @@ function paintDragPreview(kind, rect) {
 
   if (kind === "title") {
     applyNormalizedStyle(els.titleBarPreview, rect);
+    return;
+  }
+
+  if (kind === "commentators") {
+    applyNormalizedStyle(els.commentatorsPreview, rect);
     return;
   }
 
@@ -2350,6 +2725,237 @@ function setViewMode(mode) {
   update();
 }
 
+// --- Finished Screen (results leaderboard) UI ------------------------------
+
+let lastFinishedScreenSignature = "";
+
+function toggleFinishedScreen() {
+  if (uiState.finishedScreenVisible) {
+    hideFinishedScreen();
+  } else {
+    showFinishedScreen({ replay: true });
+  }
+}
+
+function showFinishedScreen({ replay = true } = {}) {
+  uiState.finishedScreenVisible = true;
+  renderFinishedScreen({ replay });
+  update();
+  syncFinishedScreenObs({ replay });
+}
+
+function hideFinishedScreen() {
+  uiState.finishedScreenVisible = false;
+  renderFinishedScreen({ replay: false });
+  update();
+  syncFinishedScreenObs({ replay: false });
+}
+
+function replayFinishedScreen() {
+  if (!uiState.finishedScreenVisible) {
+    showFinishedScreen({ replay: true });
+    return;
+  }
+  renderFinishedScreen({ replay: true });
+  syncFinishedScreenObs({ replay: true });
+}
+
+function finishedScreenSignature() {
+  const cfg = { ...DEFAULT_FINISHED_SCREEN, ...(state.layout.finishedScreen || {}) };
+  return JSON.stringify({ rows: finishedScreenStandings().map((r) => [r.place, r.name, r.time, r.dnf]), cfg });
+}
+
+function updateFinishedScreenScale() {
+  if (!els.finishedScreenScale || !els.stage) return;
+  const scale = (els.stage.clientWidth || STAGE.width) / STAGE.width;
+  els.finishedScreenScale.style.transform = `scale(${scale})`;
+}
+
+function updateFinishedScreenIconPreview(preview, dataUrl) {
+  if (!preview) return;
+  if (dataUrl) {
+    preview.src = dataUrl;
+    preview.hidden = false;
+  } else {
+    preview.removeAttribute("src");
+    preview.hidden = true;
+  }
+}
+
+function renderFinishedScreen({ replay = false } = {}) {
+  if (!els.finishedScreenLayer) return;
+  updateFinishedScreenScale();
+  const visible = uiState.finishedScreenVisible;
+  els.finishedScreenLayer.classList.toggle("show-finished-screen", visible);
+  els.finishedScreenLayer.setAttribute("aria-hidden", visible ? "false" : "true");
+  if (els.finishedScreenBar) els.finishedScreenBar.classList.toggle("hidden", !visible);
+  if (els.viewFinishedScreen) els.viewFinishedScreen.classList.toggle("active", visible);
+
+  if (!visible) return;
+  const signature = finishedScreenSignature();
+  if (replay || signature !== lastFinishedScreenSignature || !els.finishedScreenScale.innerHTML) {
+    els.finishedScreenScale.innerHTML = finishedScreenMarkup();
+    lastFinishedScreenSignature = signature;
+  }
+}
+
+function bindFinishedScreenControls() {
+  if (els.finishedScreenReplay) els.finishedScreenReplay.addEventListener("click", replayFinishedScreen);
+  if (els.finishedScreenHide) els.finishedScreenHide.addEventListener("click", hideFinishedScreen);
+  if (els.finishedScreenShow) els.finishedScreenShow.addEventListener("click", () => showFinishedScreen({ replay: true }));
+  if (els.finishedScreenHideBtn) els.finishedScreenHideBtn.addEventListener("click", hideFinishedScreen);
+
+  const rerender = () => {
+    if (uiState.finishedScreenVisible) {
+      renderFinishedScreen({ replay: false });
+      syncFinishedScreenObs({ replay: false, refresh: true });
+    }
+  };
+
+  const bindText = (el, key) => el && el.addEventListener("input", (event) => {
+    state.layout.finishedScreen[key] = event.target.value;
+    rerender();
+  });
+  const bindNumber = (el, key) => el && el.addEventListener("input", (event) => {
+    state.layout.finishedScreen[key] = Number(event.target.value);
+    rerender();
+  });
+  const bindCheck = (el, key) => el && el.addEventListener("change", (event) => {
+    state.layout.finishedScreen[key] = event.target.checked;
+    rerender();
+  });
+  const bindRange = (el, key, out, suffix) => el && el.addEventListener("input", (event) => {
+    state.layout.finishedScreen[key] = Number(event.target.value);
+    if (out) out.textContent = `${event.target.value}${suffix}`;
+    rerender();
+  });
+
+  // General
+  bindText(els.finishedScreenAccent, "accentColor");
+  bindText(els.finishedScreenBackdrop, "backdropColor");
+  bindRange(els.finishedScreenBackdropOpacity, "backdropOpacity", els.finishedScreenBackdropOpacityValue, " %");
+  bindRange(els.finishedScreenRowSpeed, "rowSpeedMs", els.finishedScreenRowSpeedValue, " ms");
+  bindRange(els.finishedScreenRowStagger, "rowStaggerMs", els.finishedScreenRowStaggerValue, " ms");
+  bindCheck(els.finishedScreenIcons, "showIcons");
+  bindCheck(els.finishedScreenGaps, "showGaps");
+  bindCheck(els.finishedScreenUnderline, "showUnderline");
+  bindCheck(els.finishedScreenOnlyBackground, "showOnlyBackground");
+
+  // Top 3 icon uploads (auto-cropped to fill the badge via object-fit: cover).
+  const bindIcon = (input, clearBtn, preview, key) => {
+    if (input) input.addEventListener("change", (event) => {
+      readImageFile(event.target.files?.[0], (dataUrl) => {
+        state.layout.finishedScreen[key] = dataUrl;
+        updateFinishedScreenIconPreview(preview, dataUrl);
+        rerender();
+      });
+    });
+    if (clearBtn) clearBtn.addEventListener("click", () => {
+      state.layout.finishedScreen[key] = "";
+      if (input) input.value = "";
+      updateFinishedScreenIconPreview(preview, "");
+      rerender();
+    });
+  };
+  bindIcon(els.finishedScreenIcon1, els.finishedScreenIcon1Clear, els.finishedScreenIcon1Preview, "topIcon1");
+  bindIcon(els.finishedScreenIcon2, els.finishedScreenIcon2Clear, els.finishedScreenIcon2Preview, "topIcon2");
+  bindIcon(els.finishedScreenIcon3, els.finishedScreenIcon3Clear, els.finishedScreenIcon3Preview, "topIcon3");
+
+  // Header text
+  bindText(els.finishedScreenHeading, "heading");
+  bindText(els.finishedScreenHeadingFont, "headingFontFamily");
+  bindNumber(els.finishedScreenHeadingFontSize, "headingFontSize");
+  bindText(els.finishedScreenHeadingColor, "headingColor");
+  bindCheck(els.finishedScreenHeadingStrokeEnabled, "headingStrokeEnabled");
+  bindText(els.finishedScreenHeadingStrokeColor, "headingStrokeColor");
+  bindNumber(els.finishedScreenHeadingStrokeWidth, "headingStrokeWidth");
+  bindCheck(els.finishedScreenHeadingShadowEnabled, "headingShadowEnabled");
+  bindText(els.finishedScreenHeadingShadowColor, "headingShadowColor");
+  bindNumber(els.finishedScreenHeadingShadowBlur, "headingShadowBlur");
+  bindNumber(els.finishedScreenHeadingShadowX, "headingShadowX");
+  bindNumber(els.finishedScreenHeadingShadowY, "headingShadowY");
+  if (els.finishedScreenHeadingFontBrowser) els.finishedScreenHeadingFontBrowser.addEventListener("change", (event) => {
+    if (!event.target.value) return;
+    state.layout.finishedScreen.headingFontFamily = event.target.value;
+    if (els.finishedScreenHeadingFont) els.finishedScreenHeadingFont.value = event.target.value;
+    rerender();
+  });
+  if (els.finishedScreenHeadingBrowseFonts) els.finishedScreenHeadingBrowseFonts.addEventListener("click", browseInstalledFonts);
+
+  // Runner text
+  bindText(els.finishedScreenRunnerFont, "runnerFontFamily");
+  bindNumber(els.finishedScreenRunnerFontSize, "runnerFontSize");
+  bindText(els.finishedScreenRunnerColor, "runnerColor");
+  bindCheck(els.finishedScreenRunnerStrokeEnabled, "runnerStrokeEnabled");
+  bindText(els.finishedScreenRunnerStrokeColor, "runnerStrokeColor");
+  bindNumber(els.finishedScreenRunnerStrokeWidth, "runnerStrokeWidth");
+  bindCheck(els.finishedScreenRunnerShadowEnabled, "runnerShadowEnabled");
+  bindText(els.finishedScreenRunnerShadowColor, "runnerShadowColor");
+  bindNumber(els.finishedScreenRunnerShadowBlur, "runnerShadowBlur");
+  bindNumber(els.finishedScreenRunnerShadowX, "runnerShadowX");
+  bindNumber(els.finishedScreenRunnerShadowY, "runnerShadowY");
+  if (els.finishedScreenRunnerFontBrowser) els.finishedScreenRunnerFontBrowser.addEventListener("change", (event) => {
+    if (!event.target.value) return;
+    state.layout.finishedScreen.runnerFontFamily = event.target.value;
+    if (els.finishedScreenRunnerFont) els.finishedScreenRunnerFont.value = event.target.value;
+    rerender();
+  });
+  if (els.finishedScreenRunnerBrowseFonts) els.finishedScreenRunnerBrowseFonts.addEventListener("click", browseInstalledFonts);
+
+  window.addEventListener("resize", updateFinishedScreenScale);
+}
+
+function syncFinishedScreenControls() {
+  const cfg = { ...DEFAULT_FINISHED_SCREEN, ...(state.layout.finishedScreen || {}) };
+  const setVal = (el, v) => { if (el) el.value = v; };
+  const setChk = (el, v) => { if (el) el.checked = Boolean(v); };
+  const setOut = (el, v) => { if (el) el.textContent = v; };
+
+  // General
+  setVal(els.finishedScreenAccent, cfg.accentColor);
+  setVal(els.finishedScreenBackdrop, cfg.backdropColor);
+  setVal(els.finishedScreenBackdropOpacity, cfg.backdropOpacity);
+  setOut(els.finishedScreenBackdropOpacityValue, `${cfg.backdropOpacity} %`);
+  setVal(els.finishedScreenRowSpeed, cfg.rowSpeedMs);
+  setOut(els.finishedScreenRowSpeedValue, `${cfg.rowSpeedMs} ms`);
+  setVal(els.finishedScreenRowStagger, cfg.rowStaggerMs);
+  setOut(els.finishedScreenRowStaggerValue, `${cfg.rowStaggerMs} ms`);
+  setChk(els.finishedScreenIcons, cfg.showIcons === true);
+  setChk(els.finishedScreenGaps, cfg.showGaps === true);
+  setChk(els.finishedScreenUnderline, cfg.showUnderline !== false);
+  setChk(els.finishedScreenOnlyBackground, cfg.showOnlyBackground === true);
+  updateFinishedScreenIconPreview(els.finishedScreenIcon1Preview, cfg.topIcon1);
+  updateFinishedScreenIconPreview(els.finishedScreenIcon2Preview, cfg.topIcon2);
+  updateFinishedScreenIconPreview(els.finishedScreenIcon3Preview, cfg.topIcon3);
+
+  // Header text
+  setVal(els.finishedScreenHeading, cfg.heading);
+  setVal(els.finishedScreenHeadingFont, cfg.headingFontFamily);
+  setVal(els.finishedScreenHeadingFontSize, cfg.headingFontSize);
+  setVal(els.finishedScreenHeadingColor, cfg.headingColor);
+  setChk(els.finishedScreenHeadingStrokeEnabled, cfg.headingStrokeEnabled);
+  setVal(els.finishedScreenHeadingStrokeColor, cfg.headingStrokeColor);
+  setVal(els.finishedScreenHeadingStrokeWidth, cfg.headingStrokeWidth);
+  setChk(els.finishedScreenHeadingShadowEnabled, cfg.headingShadowEnabled);
+  setVal(els.finishedScreenHeadingShadowColor, cfg.headingShadowColor);
+  setVal(els.finishedScreenHeadingShadowBlur, cfg.headingShadowBlur);
+  setVal(els.finishedScreenHeadingShadowX, cfg.headingShadowX);
+  setVal(els.finishedScreenHeadingShadowY, cfg.headingShadowY);
+
+  // Runner text
+  setVal(els.finishedScreenRunnerFont, cfg.runnerFontFamily);
+  setVal(els.finishedScreenRunnerFontSize, cfg.runnerFontSize);
+  setVal(els.finishedScreenRunnerColor, cfg.runnerColor);
+  setChk(els.finishedScreenRunnerStrokeEnabled, cfg.runnerStrokeEnabled);
+  setVal(els.finishedScreenRunnerStrokeColor, cfg.runnerStrokeColor);
+  setVal(els.finishedScreenRunnerStrokeWidth, cfg.runnerStrokeWidth);
+  setChk(els.finishedScreenRunnerShadowEnabled, cfg.runnerShadowEnabled);
+  setVal(els.finishedScreenRunnerShadowColor, cfg.runnerShadowColor);
+  setVal(els.finishedScreenRunnerShadowBlur, cfg.runnerShadowBlur);
+  setVal(els.finishedScreenRunnerShadowX, cfg.runnerShadowX);
+  setVal(els.finishedScreenRunnerShadowY, cfg.runnerShadowY);
+}
+
 function renderControlMode() {
   if (!els.controlRunnerList) return;
   els.controlTimerReadout.textContent = formatTimerDisplay(currentTimerElapsedMs());
@@ -2479,10 +3085,14 @@ function renderRunnerControls() {
     setInputValue(node, "cropTop", runner.crop.top);
     setInputValue(node, "cropRight", runner.crop.right);
     setInputValue(node, "cropBottom", runner.crop.bottom);
+    setInputValue(node, "pronounPrimary", runner.pronounPrimary || "");
+    setInputValue(node, "pronounSecondary", runner.pronounSecondary || "");
+    setInputValue(node, "pronounCustom", runner.pronounCustom || "");
     syncCropOutputs(node, runner);
     syncFeedStatus(node, runner);
     syncRunnerFinishButtons(node, runner);
     syncRunnerAudioControls(node, runner);
+    syncCustomPronounField(node, runner);
 
     node.addEventListener("input", (event) => handleRunnerInput(event, runner, node));
     node.addEventListener("change", (event) => handleRunnerInput(event, runner, node));
@@ -2514,6 +3124,14 @@ function syncRunnerFinishButtons(node, runner) {
 function syncRunnerAudioControls(node, runner) {
   const output = node.querySelector("[data-role='audioVolumeValue']");
   if (output) output.textContent = `${Math.round(Number(runner.audioVolume) || 0)}%`;
+}
+
+function syncCustomPronounField(node, runner) {
+  const showCustom = runner.pronounPrimary === "custom" || runner.pronounSecondary === "custom";
+  const customField = node.querySelector("[data-role='customPronounField']");
+  if (customField) {
+    customField.style.display = showCustom ? "block" : "none";
+  }
 }
 
 function renderStagePanels() {
@@ -2553,6 +3171,13 @@ function handleRunnerInput(event, runner, node) {
     beginContinuousHistory(`runner-${runner.slot}-${field}`);
     runner[field] = event.target.value;
     syncFeedStatus(node, runner);
+  } else if (field === "pronounPrimary" || field === "pronounSecondary") {
+    pushHistory(`runner-${runner.slot}-${field}`);
+    runner[field] = event.target.value;
+    syncCustomPronounField(node, runner);
+  } else if (field === "pronounCustom") {
+    beginContinuousHistory(`runner-${runner.slot}-${field}`);
+    runner[field] = event.target.value;
   } else if (field === "feedMode") {
     pushHistory(`runner-${runner.slot}-feed-mode`);
     runner.feedMode = event.target.value;
@@ -2576,7 +3201,8 @@ function handleRunnerInput(event, runner, node) {
   }
 
   update();
-  scheduleObsApply(field === "finalTimeText" ? "finish" : field, field.startsWith("crop") ? 80 : 250);
+  const applyReason = field.startsWith("pronoun") ? "nameplate" : (field === "finalTimeText" ? "finish" : field);
+  scheduleObsApply(applyReason, field.startsWith("crop") ? 80 : 250);
 }
 
 function handleRunnerAction(event, runner, node) {
@@ -2647,6 +3273,35 @@ function resetAllFinishes() {
 function formatRunnerFinalTime(runner) {
   if (runner.finalTimeText) return runner.finalTimeText;
   if (runner.finalTimeMs !== null && runner.finalTimeMs !== undefined) return formatTimerDisplay(runner.finalTimeMs);
+  return "";
+}
+
+function getRunnerPronouns(runner) {
+  const primary = runner.pronounPrimary;
+  const secondary = runner.pronounSecondary;
+  const custom = runner.pronounCustom;
+
+  if (primary === "custom" || secondary === "custom") {
+    return custom ? custom.trim() : "";
+  }
+
+  const presetMap = {
+    he: "Him",
+    she: "Her",
+    they: "Them"
+  };
+
+  const capitalize = (str) => str ? str.charAt(0).toUpperCase() + str.slice(1) : "";
+
+  if (primary && !secondary) {
+    return `${capitalize(primary)}/${presetMap[primary.toLowerCase()] || ""}`;
+  }
+  if (secondary && !primary) {
+    return `${capitalize(secondary)}/${presetMap[secondary.toLowerCase()] || ""}`;
+  }
+  if (primary && secondary) {
+    return `${capitalize(primary)}/${capitalize(secondary)}`;
+  }
   return "";
 }
 
@@ -2722,6 +3377,7 @@ async function createOrRepairObsScene() {
     obsBridge.itemIds.clear();
     obsBridge.lastRects.clear();
     obsBridge.lastVisibility.clear();
+    obsBridge.lastFinishVisibility.clear();
     obsBridge.lastSceneItemEnabled.clear();
 
     await createBrowserInput("Background", obsBridge.sceneName, htmlDataUrl(buildBackgroundHtml()), STAGE.width, STAGE.height, true);
@@ -2731,6 +3387,17 @@ async function createOrRepairObsScene() {
     await createBrowserInput("TimerBorder", obsBridge.sceneName, htmlDataUrl(buildTimerBorderHtml()), timerBorderSize.width, timerBorderSize.height, state.layout.timerBorder.enabled);
     const timerTextSize = timerTextSourceSize();
     await createBrowserInput("TimerText", obsBridge.sceneName, htmlDataUrl(buildTimerTextHtml()), timerTextSize.width, timerTextSize.height, state.layout.elements.builtInTimer);
+    try {
+      const commSize = commentatorsSourceSize();
+      await createBrowserInput("Commentators", obsBridge.sceneName, htmlDataUrl(buildCommentatorsHtml()), commSize.width, commSize.height, state.layout.commentators.enabled);
+    } catch (error) {
+      logObs(`Commentators source skipped: ${error.message}`);
+    }
+    try {
+      await createBrowserInput("FinishedScreen", obsBridge.sceneName, htmlDataUrl(buildFinishedScreenHtml()), STAGE.width, STAGE.height, uiState.finishedScreenVisible);
+    } catch (error) {
+      logObs(`Finished screen source skipped: ${error.message}`);
+    }
 
     const rectBySlot = getCurrentRectBySlot();
     for (const runner of state.runners) {
@@ -2754,6 +3421,7 @@ async function applyLayoutToObs(options = {}) {
 
   try {
     if (!options.scheduled) setObsUiBusy(true);
+    await refreshSceneItemCache();
     const refreshInputs = options.refreshInputs ?? !options.scheduled;
     const animate = (options.forceAnimate || shouldAnimateObsLayout(options.reason)) && obsBridge.animateLayout;
     const rectBySlot = getCurrentRectBySlot();
@@ -2774,6 +3442,26 @@ async function applyLayoutToObs(options = {}) {
     await setSceneItemTransform("TimerBorder", absoluteRect(state.layout.timerBorder));
     await setSceneItemEnabled("TimerText", state.layout.elements.builtInTimer);
     await setSceneItemTransform("TimerText", timerTextTransformRect());
+    try {
+      await setSceneItemEnabled("Commentators", state.layout.commentators.enabled);
+      await setSceneItemTransform("Commentators", absoluteRect(state.layout.commentators.rect));
+    } catch (error) {
+      logObs(`Commentators layer skipped: ${error.message}`);
+    }
+    // The Finished Screen overlay is non-critical: never let a problem with it
+    // (e.g. missing from an older scene) abort the core layout, which would
+    // leave every runner/title/timer item stuck at the default top-left.
+    try {
+      await setSceneItemTransform("FinishedScreen", {
+        positionX: 0,
+        positionY: 0,
+        boundsWidth: STAGE.width,
+        boundsHeight: STAGE.height
+      });
+      await setSceneItemEnabled("FinishedScreen", uiState.finishedScreenVisible);
+    } catch (error) {
+      logObs(`Finished screen layer skipped: ${error.message}`);
+    }
     await ensureManagedRunnerSources();
     await ensureRunnerItemIds();
     await enforceSceneLayerOrder();
@@ -2783,6 +3471,8 @@ async function applyLayoutToObs(options = {}) {
     } else {
       await applyRunnerLayoutImmediate(rectBySlot, { refreshVisibleNameSources: refreshInputs && runnerNameSourceSizeReason(options.reason) });
     }
+
+    await syncAllFinishTimeVisibilities(rectBySlot, obsBridge.animateLayout && ["active-runners", "active", "runner-add", "runner-remove", "finish", "finishGeometry", "geometry", "spotlight", "done"].includes(options.reason));
 
     logObs(options.scheduled ? `Live OBS update: ${options.reason || "change"}.` : "Applied current layout to OBS.");
   } catch (error) {
@@ -2806,6 +3496,12 @@ async function updateInputsForReason(reason = "", rectBySlot = getCurrentRectByS
   if (manual || ["timerText", "timerBorder", "geometry", "border", "border-image"].includes(reason)) {
     await updateTimerTextInput();
   }
+  if (manual || ["finishedScreen", "finish", "done", "active", "active-runners", "runner-add", "runner-remove"].includes(reason)) {
+    await setInputUrl("FinishedScreen", htmlDataUrl(buildFinishedScreenHtml()));
+  }
+  if (manual || ["commentators"].includes(reason)) {
+    await updateCommentatorsInput();
+  }
 
   for (const runner of state.runners) {
     if (manual || ["source", "feedMode", "vdo-clean", "feedWidth", "feedHeight"].includes(reason)) {
@@ -2816,7 +3512,7 @@ async function updateInputsForReason(reason = "", rectBySlot = getCurrentRectByS
     if (manual || ["border", "border-image"].includes(reason)) {
       await setInputUrl(runnerPart(runner.slot, "Border"), htmlDataUrl(buildBorderHtml()));
     }
-    if (manual || ["name", "nameplate", "nameplate-image"].includes(reason) || runnerNameSourceSizeReason(reason)) {
+    if (manual || ["name", "nameplate", "nameplate-image", "pronounsText"].includes(reason) || runnerNameSourceSizeReason(reason)) {
       await updateRunnerNameInput(runner, rectBySlot.get(runner.slot));
     }
     if (manual || ["finish", "finishGeometry", "geometry", "spotlight"].includes(reason)) {
@@ -2824,6 +3520,213 @@ async function updateInputsForReason(reason = "", rectBySlot = getCurrentRectByS
     }
     if (manual || reason === "audio") {
       await updateRunnerAudio(runner);
+    }
+  }
+}
+
+function finishAnimStyleName() {
+  return state.layout.finishAnimationStyle || "scaleFade";
+}
+
+// Whether the given finish-animation style relies on the opacity filter.
+function finishAnimStyleUsesFade(styleName = finishAnimStyleName()) {
+  return ["moveFade", "scaleFade", "fade", "pop", "settle", "slideSide", "drop", "glow"].includes(styleName);
+}
+
+// Compute the transform + opacity for a finish-time source at a given raw
+// progress (0..1). `show` reverses the timeline for exits. Returns a rect
+// (scaled from centre) plus a 0..1 opacity. All styles are expressed here so
+// the OBS animation stays in lock-step with the preview CSS in styles.css.
+function getFinishAnimFrame(targetRect, progress, show, styleName = finishAnimStyleName()) {
+  const hasFade = obsBridge.opacitySupported;
+  const p = clamp01(show ? progress : 1 - progress);
+  const ease = easeOutCubic(p);
+  const targetX = targetRect.positionX ?? targetRect.x ?? 0;
+  const targetY = targetRect.positionY ?? targetRect.y ?? 0;
+  const targetW = targetRect.boundsWidth ?? targetRect.width ?? 0;
+  const targetH = targetRect.boundsHeight ?? targetRect.height ?? 0;
+
+  let dx = 0;
+  let dy = 0;
+  let scale = 1;
+  let opacity = 1;
+
+  switch (styleName) {
+    case "fade":
+      opacity = p;
+      break;
+    case "move":
+      dy = (1 - ease) * 24;
+      break;
+    case "moveFade":
+      dy = (1 - ease) * 24;
+      opacity = p;
+      break;
+    case "pop": {
+      const back = easeOutBack(p);
+      scale = 0.6 + 0.4 * back;
+      opacity = Math.min(1, p * 1.6);
+      break;
+    }
+    case "settle": {
+      const back = easeOutBack(p);
+      dy = 28 * (1 - back);
+      opacity = Math.min(1, p * 1.5);
+      break;
+    }
+    case "slideSide": {
+      dx = (1 - ease) * 72;
+      opacity = p;
+      break;
+    }
+    case "drop": {
+      const back = easeOutBack(p);
+      dy = -32 * (1 - back);
+      opacity = Math.min(1, p * 1.5);
+      break;
+    }
+    case "glow": {
+      const pulse = Math.sin(p * Math.PI);
+      scale = lerp(0.92, 1, ease) + 0.05 * pulse;
+      opacity = p;
+      break;
+    }
+    case "scaleFade":
+    default:
+      scale = lerp(0.7, 1, ease);
+      opacity = p;
+      break;
+  }
+
+  if (!hasFade) opacity = 1;
+
+  const width = targetW * scale;
+  const height = targetH * scale;
+  const rect = { ...targetRect };
+  rect.positionX = targetX + dx - (width - targetW) / 2;
+  rect.x = rect.positionX;
+  rect.positionY = targetY + dy - (height - targetH) / 2;
+  rect.y = rect.positionY;
+  rect.boundsWidth = width;
+  rect.width = width;
+  rect.boundsHeight = height;
+  rect.height = height;
+  return { rect, opacity: clamp01(opacity) };
+}
+
+async function animateFinishTimeLayout(finishPlans, rectBySlot) {
+  const duration = Math.max(80, state.layout.finishAnimationMs || 360);
+  const frameMs = Math.max(16, Math.round(1000 / Math.max(15, state.layout.finishAnimationFps || 60)));
+  const frames = Math.max(2, Math.ceil(duration / frameMs));
+  const styleName = finishAnimStyleName();
+  const usesFade = obsBridge.opacitySupported && finishAnimStyleUsesFade(styleName);
+
+  for (const plan of finishPlans) {
+    const inputName = runnerPart(plan.runner.slot, "Finish");
+    if (plan.willBeVisible) {
+      const cachedId = getCachedSceneItemId(`${MANAGED_PREFIX}${inputName}`);
+      if (!cachedId) continue;
+
+      const targetRect = absoluteRect(viewportRect(rectBySlot.get(plan.runner.slot), finishGeometry(plan.runner, rectBySlot.get(plan.runner.slot))));
+      const frame0 = getFinishAnimFrame(targetRect, 0, true, styleName);
+      await setSceneItemTransform(inputName, frame0.rect);
+      if (usesFade) {
+        await obsCall("SetSourceFilterSettings", {
+          sourceName: `${MANAGED_PREFIX}${inputName}`,
+          filterName: `${MANAGED_PREFIX}Opacity`,
+          filterSettings: { opacity: frame0.opacity },
+          overlay: true
+        });
+      }
+      await setSceneItemEnabled(inputName, true);
+    }
+  }
+
+  for (let frame = 1; frame <= frames; frame += 1) {
+    const progress = frame / frames;
+    const requests = [];
+
+    for (const plan of finishPlans) {
+      const inputName = runnerPart(plan.runner.slot, "Finish");
+      const cachedId = getCachedSceneItemId(`${MANAGED_PREFIX}${inputName}`);
+      if (!cachedId) continue;
+
+      const targetRect = absoluteRect(viewportRect(rectBySlot.get(plan.runner.slot), finishGeometry(plan.runner, rectBySlot.get(plan.runner.slot))));
+      const f = getFinishAnimFrame(targetRect, progress, plan.willBeVisible, styleName);
+
+      requests.push({
+        requestType: "SetSceneItemTransform",
+        requestData: {
+          sceneName: obsBridge.sceneName,
+          sceneItemId: cachedId,
+          sceneItemTransform: buildSceneItemTransform(f.rect)
+        }
+      });
+
+      if (usesFade) {
+        requests.push({
+          requestType: "SetSourceFilterSettings",
+          requestData: {
+            sourceName: `${MANAGED_PREFIX}${inputName}`,
+            filterName: `${MANAGED_PREFIX}Opacity`,
+            filterSettings: { opacity: f.opacity },
+            overlay: true
+          }
+        });
+      }
+    }
+
+    if (requests.length > 0) await obsBatch(requests);
+    await delay(frameMs);
+  }
+
+  for (const plan of finishPlans) {
+    const inputName = runnerPart(plan.runner.slot, "Finish");
+    if (!plan.willBeVisible) {
+      await setSceneItemEnabled(inputName, false);
+    }
+    obsBridge.lastFinishVisibility.set(plan.runner.slot, plan.willBeVisible);
+  }
+}
+
+async function syncAllFinishTimeVisibilities(rectBySlot, animate = false) {
+  if (!obsBridge.lastFinishVisibility) {
+    obsBridge.lastFinishVisibility = new Map();
+  }
+
+  const finishPlans = [];
+  for (const runner of state.runners) {
+    const wasVisible = obsBridge.lastFinishVisibility.get(runner.slot) ?? false;
+    const willBeVisible = rectBySlot.has(runner.slot) && runner.done && state.layout.elements.finishedTime && !uiState.finishedScreenVisible;
+    if (wasVisible !== willBeVisible) {
+      finishPlans.push({
+        runner,
+        wasVisible,
+        willBeVisible
+      });
+    }
+  }
+
+  if (animate && finishPlans.length > 0) {
+    await animateFinishTimeLayout(finishPlans, rectBySlot);
+  } else {
+    for (const runner of state.runners) {
+      const inputName = runnerPart(runner.slot, "Finish");
+      const visible = rectBySlot.has(runner.slot) && runner.done && state.layout.elements.finishedTime && !uiState.finishedScreenVisible;
+      await setSceneItemEnabled(inputName, visible);
+      if (visible) {
+        const targetRect = absoluteRect(viewportRect(rectBySlot.get(runner.slot), finishGeometry(runner, rectBySlot.get(runner.slot))));
+        await setSceneItemTransform(inputName, targetRect);
+        if (obsBridge.opacitySupported) {
+          await obsCall("SetSourceFilterSettings", {
+            sourceName: `${MANAGED_PREFIX}${inputName}`,
+            filterName: `${MANAGED_PREFIX}Opacity`,
+            filterSettings: { opacity: 1 },
+            overlay: true
+          });
+        }
+      }
+      obsBridge.lastFinishVisibility.set(runner.slot, visible);
     }
   }
 }
@@ -3064,6 +3967,7 @@ function shouldRefreshObsInputs(reason) {
     "feedHeight",
     "nameplate",
     "nameplate-image",
+    "pronounsText",
     "active-runners",
     "active",
     "runner-add",
@@ -3071,7 +3975,8 @@ function shouldRefreshObsInputs(reason) {
     "aspectPreset",
     "timerHeight",
     "titleHeight",
-    "margin",
+    "marginLeft",
+    "marginRight",
     "gap",
     "spotlight",
     "spotlight-nameplates",
@@ -3095,7 +4000,8 @@ function shouldAnimateObsLayout(reason) {
     "aspectPreset",
     "timerHeight",
     "titleHeight",
-    "margin",
+    "marginLeft",
+    "marginRight",
     "gap",
     "spotlight",
     "drag-end"
@@ -3112,7 +4018,8 @@ function runnerNameSourceSizeReason(reason) {
     "aspectPreset",
     "timerHeight",
     "titleHeight",
-    "margin",
+    "marginLeft",
+    "marginRight",
     "gap",
     "spotlight",
     "spotlight-nameplates",
@@ -3157,6 +4064,7 @@ async function cleanupObsScene() {
     obsBridge.itemIds.clear();
     obsBridge.lastRects.clear();
     obsBridge.lastVisibility.clear();
+    obsBridge.lastFinishVisibility.clear();
     obsBridge.lastSceneItemEnabled.clear();
     obsBridge.opacitySupported = false;
     logObs("Cleanup complete. Managed scene was left in place.");
@@ -3170,8 +4078,13 @@ async function cleanupObsScene() {
 function setInputValue(root, field, value) {
   const inputs = root.querySelectorAll(`[data-field='${field}']`);
   for (const input of inputs) {
-    if (input.type === "checkbox") input.checked = Boolean(value);
-    else syncRangeInput(input, value);
+    if (input.type === "checkbox") {
+      input.checked = Boolean(value);
+    } else if (input.tagName === "SELECT" || input.tagName === "TEXTAREA" || input.type === "text" || input.type === "color") {
+      input.value = String(value ?? "");
+    } else {
+      syncRangeInput(input, value);
+    }
   }
 }
 
@@ -3258,9 +4171,11 @@ function update() {
   els.layoutSummary.textContent = `${STAGE.width}x${STAGE.height} canvas, ${state.layout.aspectPreset} game frames`;
   syncGeometryControls();
   applyTitleBarPreviewGeometry();
+  applyCommentatorsPreviewGeometry();
   applyTimerBorderPreviewGeometry();
   applyTimerTextPreviewGeometry();
   renderControlMode();
+  renderFinishedScreen();
 
   for (const runner of state.runners) {
     const rect = previewRectBySlot.get(runner.slot) ?? hiddenRect();
@@ -3315,6 +4230,192 @@ function applyTitleBarPreviewGeometry() {
   subtitle.style.color = hexToRgba(config.textColor, 0.68);
   applyNormalizedStyle(els.titleBarPreview, config.rect);
   if (!visible) els.titleBarPreview.style.display = "none";
+}
+
+function applyCommentatorsPreviewGeometry() {
+  if (!els.commentatorsPreview) return;
+  const config = state.layout.commentators;
+  const visible = Boolean(config.enabled);
+  const stageScale = els.stage.clientWidth / STAGE.width;
+  const sourceWidth = Math.max(1, STAGE.width * config.rect.width);
+  const sourceHeight = Math.max(1, STAGE.height * config.rect.height);
+  els.commentatorsPreview.classList.toggle("hidden-element", !visible);
+  els.commentatorsPreview.style.display = visible ? "" : "none";
+
+  els.commentatorsPreview.style.cssText = [
+    `position:absolute`,
+    `z-index:5`,
+    `overflow:visible`,
+    `transition-duration:${state.layout.animationMs}ms`,
+    `font-family:${cssFontStack(config.fontFamily)}`,
+    `color:${config.textColor}`,
+    commentatorsPlateCss(config, sourceWidth, sourceHeight, stageScale)
+  ].join(";");
+  applyNormalizedStyle(els.commentatorsPreview, config.rect);
+  if (!visible) els.commentatorsPreview.style.display = "none";
+
+  let content = els.commentatorsPreview.querySelector(".commentators-content");
+  if (!content) {
+    content = document.createElement("div");
+    content.className = "commentators-content";
+    els.commentatorsPreview.prepend(content);
+  }
+  const fontSize = Math.max(8, Number(config.fontSize) || 34) * stageScale;
+  const textEffects = commentatorsTextEffectCss(config).replace(/(-?\d+(?:\.\d+)?)px/g, (m, n) => `${Number(n) * stageScale}px`);
+  const label = String(config.label || "").trim();
+  const names = getCommentatorNames(config);
+  const labelHtml = label ? `<span class="c-label" style="font-size:${fontSize * 0.5}px;${textEffects}">${escapeHtml(label)}</span>` : "";
+  const namesHtml = names.map((name) => `<strong class="c-name" style="font-size:${fontSize}px;${textEffects}">${escapeHtml(name)}</strong>`)
+    .join(`<i class="c-sep" style="font-size:${fontSize * 0.7}px;${textEffects}">&bull;</i>`);
+  content.style.transform = `translate(${(Number(config.textX) || 0) * stageScale}px, ${(Number(config.textY) || 0) * stageScale}px)`;
+  content.style.gap = `${Math.round(fontSize * 0.12)}px`;
+  content.innerHTML = `${labelHtml}<div class="c-names" style="gap:0 ${fontSize * 0.4}px;">${namesHtml}</div>`;
+}
+
+function bindCommentatorsControls() {
+  const changed = () => { update(); scheduleObsApply("commentators", 120); };
+  const bindText = (el, key) => el && el.addEventListener("input", (event) => { pushHistory("commentators"); state.layout.commentators[key] = event.target.value; changed(); });
+  const bindNum = (el, key) => el && el.addEventListener("input", (event) => { pushHistory("commentators"); state.layout.commentators[key] = Number(event.target.value); changed(); });
+  const bindChk = (el, key) => el && el.addEventListener("change", (event) => { pushHistory("commentators"); state.layout.commentators[key] = event.target.checked; changed(); });
+  const bindSelect = (el, key) => el && el.addEventListener("change", (event) => { pushHistory("commentators"); state.layout.commentators[key] = event.target.value; changed(); });
+  const bindRange = (el, key, out, suffix) => el && el.addEventListener("input", (event) => { state.layout.commentators[key] = Number(event.target.value); if (out) out.textContent = `${event.target.value}${suffix}`; changed(); });
+
+  bindChk(els.commEnabled, "enabled");
+  bindText(els.commLabel, "label");
+  if (els.commNames) els.commNames.addEventListener("input", (event) => { pushHistory("commentators"); state.layout.commentators.names = event.target.value.split(/\r?\n/); changed(); });
+  bindText(els.commFont, "fontFamily");
+  bindNum(els.commFontSize, "fontSize");
+  bindText(els.commColor, "textColor");
+  bindNum(els.commTextX, "textX");
+  bindNum(els.commTextY, "textY");
+  bindChk(els.commStrokeEnabled, "strokeEnabled");
+  bindText(els.commStrokeColor, "strokeColor");
+  bindNum(els.commStrokeWidth, "strokeWidth");
+  bindChk(els.commShadowEnabled, "shadowEnabled");
+  bindText(els.commShadowColor, "shadowColor");
+  bindNum(els.commShadowBlur, "shadowBlur");
+  bindNum(els.commShadowX, "shadowX");
+  bindNum(els.commShadowY, "shadowY");
+  bindChk(els.commShowBox, "showBox");
+  bindText(els.commBgColor, "plateBackgroundColor");
+  bindRange(els.commBgOpacity, "plateBackgroundOpacity", els.commBgOpacityValue, " %");
+  bindText(els.commGradFrom, "plateGradientFrom");
+  bindText(els.commGradTo, "plateGradientTo");
+  bindNum(els.commPadding, "platePaddingX");
+  bindNum(els.commRadius, "plateRadius");
+  bindChk(els.commShowBorder, "showBorder");
+
+  // Plate mode + fill mode drive which sub-sections are visible.
+  if (els.commPlateMode) els.commPlateMode.addEventListener("change", (event) => { pushHistory("commentators"); state.layout.commentators.plateMode = event.target.value; syncCommPlateSections(); changed(); });
+  if (els.commFillMode) els.commFillMode.addEventListener("change", (event) => { pushHistory("commentators"); state.layout.commentators.plateFillMode = event.target.value; syncCommPlateSections(); changed(); });
+  if (els.commGradAnimate) els.commGradAnimate.addEventListener("change", (event) => { pushHistory("commentators"); state.layout.commentators.plateAnimateGradientAngle = event.target.checked; syncCommPlateSections(); changed(); });
+
+  // Gradient angle: slider + number stay in sync.
+  const setGradAngle = (v) => {
+    state.layout.commentators.plateGradientAngle = Number(v);
+    if (els.commGradAngle) els.commGradAngle.value = v;
+    if (els.commGradAngleSlider) els.commGradAngleSlider.value = v;
+    changed();
+  };
+  if (els.commGradAngle) els.commGradAngle.addEventListener("input", (event) => { pushHistory("commentators"); setGradAngle(event.target.value); });
+  if (els.commGradAngleSlider) els.commGradAngleSlider.addEventListener("input", (event) => { pushHistory("commentators"); setGradAngle(event.target.value); });
+  bindRange(els.commGradSpeed, "plateGradientAngleSpeed", els.commGradSpeedValue, " deg/s");
+
+  // Texture controls.
+  bindRange(els.commTextureScale, "plateTextureScale", els.commTextureScaleValue, "%");
+  bindRange(els.commTextureX, "plateTextureX", null, "");
+  bindRange(els.commTextureY, "plateTextureY", null, "");
+  bindRange(els.commTextureScrollX, "plateTextureScrollX", els.commTextureScrollXValue, " px/s");
+  bindRange(els.commTextureScrollY, "plateTextureScrollY", els.commTextureScrollYValue, " px/s");
+
+  // Image uploads.
+  if (els.commPlateImage) els.commPlateImage.addEventListener("change", (event) => {
+    readImageFile(event.target.files?.[0], (dataUrl) => { pushHistory("commentators"); state.layout.commentators.plateImage = dataUrl; changed(); });
+  });
+  if (els.commClearPlateImage) els.commClearPlateImage.addEventListener("click", () => { pushHistory("commentators"); state.layout.commentators.plateImage = ""; if (els.commPlateImage) els.commPlateImage.value = ""; changed(); });
+  if (els.commTextureImage) els.commTextureImage.addEventListener("change", (event) => {
+    readImageFile(event.target.files?.[0], (dataUrl) => { pushHistory("commentators"); state.layout.commentators.plateTextureImage = dataUrl; changed(); });
+  });
+  if (els.commClearTexture) els.commClearTexture.addEventListener("click", () => { pushHistory("commentators"); state.layout.commentators.plateTextureImage = ""; if (els.commTextureImage) els.commTextureImage.value = ""; changed(); });
+  bindText(els.commBorderColor, "plateBorderColor");
+  bindRange(els.commBorderOpacity, "plateBorderOpacity", els.commBorderOpacityValue, " %");
+  bindNum(els.commBorderWidth, "plateBorderWidth");
+
+  if (els.commFontBrowser) els.commFontBrowser.addEventListener("change", (event) => {
+    if (!event.target.value) return;
+    pushHistory("commentators");
+    state.layout.commentators.fontFamily = event.target.value;
+    if (els.commFont) els.commFont.value = event.target.value;
+    changed();
+  });
+  if (els.commBrowseFonts) els.commBrowseFonts.addEventListener("click", browseInstalledFonts);
+}
+
+function syncCommentatorsControls() {
+  const c = state.layout.commentators;
+  const setVal = (el, v) => { if (el) el.value = v; };
+  const setChk = (el, v) => { if (el) el.checked = Boolean(v); };
+  const setOut = (el, v) => { if (el) el.textContent = v; };
+  setChk(els.commEnabled, c.enabled);
+  setVal(els.commLabel, c.label);
+  setVal(els.commNames, Array.isArray(c.names) ? c.names.join("\n") : String(c.names || ""));
+  setVal(els.commFont, c.fontFamily);
+  setVal(els.commFontSize, c.fontSize);
+  setVal(els.commColor, c.textColor);
+  setVal(els.commTextX, c.textX);
+  setVal(els.commTextY, c.textY);
+  setChk(els.commStrokeEnabled, c.strokeEnabled);
+  setVal(els.commStrokeColor, c.strokeColor);
+  setVal(els.commStrokeWidth, c.strokeWidth);
+  setChk(els.commShadowEnabled, c.shadowEnabled);
+  setVal(els.commShadowColor, c.shadowColor);
+  setVal(els.commShadowBlur, c.shadowBlur);
+  setVal(els.commShadowX, c.shadowX);
+  setVal(els.commShadowY, c.shadowY);
+  setChk(els.commShowBox, c.showBox);
+  setVal(els.commPlateMode, c.plateMode);
+  setVal(els.commFillMode, c.plateFillMode);
+  setVal(els.commBgColor, c.plateBackgroundColor);
+  setVal(els.commBgOpacity, c.plateBackgroundOpacity);
+  setOut(els.commBgOpacityValue, `${c.plateBackgroundOpacity} %`);
+  setVal(els.commGradFrom, c.plateGradientFrom);
+  setVal(els.commGradTo, c.plateGradientTo);
+  setVal(els.commGradAngle, c.plateGradientAngle);
+  setVal(els.commGradAngleSlider, c.plateGradientAngle);
+  setChk(els.commGradAnimate, c.plateAnimateGradientAngle);
+  setVal(els.commGradSpeed, c.plateGradientAngleSpeed);
+  setOut(els.commGradSpeedValue, `${c.plateGradientAngleSpeed} deg/s`);
+  setVal(els.commTextureScale, c.plateTextureScale);
+  setOut(els.commTextureScaleValue, `${c.plateTextureScale}%`);
+  setVal(els.commTextureX, c.plateTextureX);
+  setVal(els.commTextureY, c.plateTextureY);
+  setVal(els.commTextureScrollX, c.plateTextureScrollX);
+  setOut(els.commTextureScrollXValue, `${c.plateTextureScrollX} px/s`);
+  setVal(els.commTextureScrollY, c.plateTextureScrollY);
+  setOut(els.commTextureScrollYValue, `${c.plateTextureScrollY} px/s`);
+  if (els.commPlateImage && !c.plateImage) els.commPlateImage.value = "";
+  if (els.commTextureImage && !c.plateTextureImage) els.commTextureImage.value = "";
+  setVal(els.commPadding, c.platePaddingX);
+  setVal(els.commRadius, c.plateRadius);
+  setChk(els.commShowBorder, c.showBorder);
+  setVal(els.commBorderColor, c.plateBorderColor);
+  setVal(els.commBorderWidth, c.plateBorderWidth);
+  setVal(els.commBorderOpacity, c.plateBorderOpacity);
+  setOut(els.commBorderOpacityValue, `${c.plateBorderOpacity} %`);
+  syncCommPlateSections();
+}
+
+function syncCommPlateSections() {
+  const c = state.layout.commentators;
+  for (const section of document.querySelectorAll("[data-comm-plate-section]")) {
+    section.hidden = section.dataset.commPlateSection !== c.plateMode;
+  }
+  for (const section of document.querySelectorAll("[data-comm-plate-fill-section]")) {
+    section.hidden = section.dataset.commPlateFillSection !== c.plateFillMode;
+  }
+  if (els.commGradSpeedRow) {
+    els.commGradSpeedRow.hidden = !(c.plateFillMode === "gradient" && c.plateAnimateGradientAngle);
+  }
 }
 
 function applyTimerTextPreviewGeometry() {
@@ -3449,18 +4550,28 @@ function rowPattern(count) {
   return patterns[count] ?? patterns[20];
 }
 
+// The usable area for runner panels, inset by the four independent margins.
+// The top margin (formerly the reserved title area) always applies, whether or
+// not the title bar is enabled.
+function layoutAvailableArea(layout) {
+  const left = Number(layout.marginLeft) || 0;
+  const right = Number(layout.marginRight) || 0;
+  const top = Number(layout.titleHeight) || 0;
+  const bottom = Number(layout.timerHeight) || 0;
+  return {
+    x: left,
+    y: top,
+    width: STAGE.width - left - right,
+    height: STAGE.height - top - bottom
+  };
+}
+
 function generateLayout(count, layout) {
   if (count <= 0) return [];
 
   const rows = rowPattern(count);
   const aspect = aspectValue(layout.aspectPreset);
-  const titleHeightValue = layout.elements.titleBar ? layout.titleHeight : 0;
-  const available = {
-    x: layout.margin,
-    y: layout.margin + titleHeightValue,
-    width: STAGE.width - layout.margin * 2,
-    height: STAGE.height - layout.timerHeight - titleHeightValue - layout.margin * 2
-  };
+  const available = layoutAvailableArea(layout);
   const maxCols = Math.max(...rows);
   const rowCount = rows.length;
 
@@ -3497,13 +4608,7 @@ function generateSpotlightLayout(activeRunners, layout) {
   const showOthers = Boolean(layout.spotlight.showOthers);
   const side = layout.spotlight.side;
   const spotlightGap = Number(layout.spotlight.gap) || layout.gap;
-  const titleHeightValue = layout.elements.titleBar ? layout.titleHeight : 0;
-  const available = {
-    x: layout.margin,
-    y: layout.margin + titleHeightValue,
-    width: STAGE.width - layout.margin * 2,
-    height: STAGE.height - layout.timerHeight - titleHeightValue - layout.margin * 2
-  };
+  const available = layoutAvailableArea(layout);
   const otherBand = showOthers && others.length > 0
     ? Math.max(0.08, Math.min(0.45, Number(layout.spotlight.otherScale) / 100))
     : 0;
@@ -3647,6 +4752,7 @@ function applyPanelGeometry(runner, rect, visible = runner.active) {
   panel.classList.toggle("setup-preview", visible && !runner.active);
   panel.classList.toggle("runner-done", Boolean(runner.done));
   panel.style.transitionDuration = `${state.layout.animationMs}ms`;
+  panel.style.setProperty("--finish-anim-dur", `${state.layout.finishAnimationMs || 360}ms`);
   panel.style.left = `${(rect.x / STAGE.width) * 100}%`;
   panel.style.top = `${(rect.y / STAGE.height) * 100}%`;
   panel.style.width = `${(rect.width / STAGE.width) * 100}%`;
@@ -3670,7 +4776,10 @@ function applyPanelGeometry(runner, rect, visible = runner.active) {
   viewport.classList.toggle("hidden-element", !state.layout.elements.feed);
   panel.querySelector(".runner-shell").classList.toggle("hide-border", !state.layout.elements.feedBorder);
   nameplate.classList.toggle("hidden-element", !state.layout.elements.name || shouldHideNameplateForSlot(runner.slot));
-  finish.classList.toggle("hidden-element", !state.layout.elements.finishedTime || !displayRunnerFinalTime(runner, true));
+  const finishStyle = state.layout.finishAnimationStyle || "scaleFade";
+  finish.className = `runner-finished-time drag-target ${finishStyle}`;
+  const finishVisible = state.layout.elements.finishedTime && Boolean(displayRunnerFinalTime(runner, true)) && !uiState.finishedScreenVisible;
+  finish.classList.toggle("show-finish", finishVisible);
   applyCrop(feed, runner.crop);
   feed.dataset.source = runner.source;
   applyFeedPreview(feed, runner);
@@ -3906,18 +5015,39 @@ function applyNameplatePreview(nameplate, runner, rect) {
   const plateImage = config.showBox && config.plateMode === "image" && config.plateImage
     ? `<img class="plate-art" src="${escapeAttribute(config.plateImage)}" alt="">`
     : "";
-  const markup = `${plateImage}${nameTextSvgMarkup(runner, sourceSize)}<div class="name-content" title="Drag the text to move it inside the nameplate"><strong class="name-text-drag" data-drag-target="nameText">${escapeHtml(runner.name)}</strong></div>`;
-  if (frame.dataset.markup !== markup) {
+  const pronounsText = getRunnerPronouns(runner);
+  const pronounsContentMarkup = pronounsText && state.layout.pronounsText.enabled
+    ? `<div class="pronouns-content" title="Drag the pronouns to move them inside the nameplate"><strong class="pronouns-text-drag" data-drag-target="pronounsText">${escapeHtml(pronounsText)}</strong></div>`
+    : "";
+  const markup = `${plateImage}${nameTextSvgMarkup(runner, sourceSize)}${pronounsTextSvgMarkup(runner, sourceSize)}<div class="name-content" title="Drag the text to move it inside the nameplate"><strong class="name-text-drag" data-drag-target="nameText">${escapeHtml(runner.name)}</strong></div>${pronounsContentMarkup}`;
+  const markupChanged = frame.dataset.markup !== markup;
+  if (markupChanged) {
     frame.dataset.markup = markup;
     frame.innerHTML = markup;
   }
 
-  frame.style.cssText = `${nameplateFrameCss(config, sourceSize.width, sourceSize.height)}font-family:${cssFontStack(config.fontFamily)};color:${config.textColor};text-rendering:geometricPrecision;-webkit-font-smoothing:antialiased;font-stretch:normal;letter-spacing:0;transform:scale(${previewWidth / sourceSize.width}, ${previewHeight / sourceSize.height});`;
-  const content = frame.querySelector(".name-content");
-  if (content) content.style.cssText = nameplateContentCss(config, sourceSize);
-  const strong = frame.querySelector("strong");
-  const fontLimit = nameTextIsUnframed() ? `${config.fontSize}px` : `${sourceSize.height * NAME_FONT_HEIGHT_RATIO}px`;
-  if (strong) strong.style.cssText = `${nameplateStrongCss(config, fontLimit)}color:transparent;text-shadow:none;-webkit-text-stroke:0 transparent;`;
+  const scaleX = previewWidth / sourceSize.width;
+  const scaleY = previewHeight / sourceSize.height;
+  const styleString = `${sourceSize.width}|${sourceSize.height}|${scaleX}|${scaleY}|${config.fontFamily}|${config.textColor}|${runner.name}|${pronounsText}`;
+  // Re-apply child styling whenever the markup is rebuilt too: replacing innerHTML
+  // recreates the draggable overlay <strong>, which must be re-hidden or its
+  // visible text stacks on top of the SVG as a duplicate at the default size.
+  if (markupChanged || frame.dataset.styleString !== styleString) {
+    frame.dataset.styleString = styleString;
+    frame.style.cssText = `${nameplateFrameCss(config, sourceSize.width, sourceSize.height)}font-family:${cssFontStack(config.fontFamily)};color:${config.textColor};text-rendering:geometricPrecision;-webkit-font-smoothing:antialiased;font-stretch:normal;letter-spacing:0;transform:scale(${scaleX}, ${scaleY});`;
+
+    const content = frame.querySelector(".name-content");
+    if (content) content.style.cssText = nameplateContentCss(config, sourceSize);
+    const strong = frame.querySelector(".name-text-drag");
+    const fontLimit = nameTextIsUnframed() ? `${config.fontSize}px` : `${sourceSize.height * NAME_FONT_HEIGHT_RATIO}px`;
+    if (strong) strong.style.cssText = `${nameplateStrongCss(config, fontLimit)}color:transparent;text-shadow:none;-webkit-text-stroke:0 transparent;`;
+
+    const pronounsContent = frame.querySelector(".pronouns-content");
+    if (pronounsContent) pronounsContent.style.cssText = pronounsplateContentCss(state.layout.pronounsText, sourceSize);
+    const pronounsStrong = frame.querySelector(".pronouns-text-drag");
+    const pronounsFontLimit = nameTextIsUnframed() ? `${state.layout.pronounsText.fontSize}px` : `${sourceSize.height * NAME_FONT_HEIGHT_RATIO}px`;
+    if (pronounsStrong) pronounsStrong.style.cssText = `${pronounsplateStrongCss(state.layout.pronounsText, pronounsFontLimit)}color:transparent;text-shadow:none;-webkit-text-stroke:0 transparent;`;
+  }
 }
 
 function applyFinishedTimePreview(element, runner, rect) {
@@ -3932,7 +5062,14 @@ function applyFinishedTimePreview(element, runner, rect) {
     frame.dataset.markup = markup;
     frame.innerHTML = markup;
   }
-  frame.style.cssText = `position:absolute;left:0;top:0;width:${sourceSize.width}px;height:${sourceSize.height}px;display:block;overflow:hidden;box-sizing:border-box;transform-origin:0 0;transform:scale(${previewWidth / sourceSize.width}, ${previewHeight / sourceSize.height});font-family:${cssFontStack(state.layout.finishedTime.fontFamily)};`;
+
+  const scaleX = previewWidth / sourceSize.width;
+  const scaleY = previewHeight / sourceSize.height;
+  const styleString = `${sourceSize.width}|${sourceSize.height}|${scaleX}|${scaleY}|${state.layout.finishedTime.fontFamily}`;
+  if (frame.dataset.styleString !== styleString) {
+    frame.dataset.styleString = styleString;
+    frame.style.cssText = `position:absolute;left:0;top:0;width:${sourceSize.width}px;height:${sourceSize.height}px;display:block;overflow:hidden;box-sizing:border-box;transform-origin:0 0;transform:scale(${scaleX}, ${scaleY});font-family:${cssFontStack(state.layout.finishedTime.fontFamily)};`;
+  }
 }
 
 function applyCrop(feed, crop) {
@@ -3955,7 +5092,8 @@ function buildObsPayload(rectBySlot) {
       aspectPreset: state.layout.aspectPreset,
       timerHeight: state.layout.timerHeight,
       titleHeight: state.layout.titleHeight,
-      margin: state.layout.margin,
+      marginLeft: state.layout.marginLeft,
+      marginRight: state.layout.marginRight,
       gap: state.layout.gap,
       animationMs: state.layout.animationMs,
       animationFps: state.layout.animationFps,
@@ -4121,24 +5259,47 @@ async function createBrowserInput(partName, sceneName, url, width, height, enabl
     css = runnerFeedBrowserCss();
   }
 
-  const response = await obsCall("CreateInput", {
-    sceneName,
-    inputName,
-    inputKind: "browser_source",
-    inputSettings: {
-      url,
-      width,
-      height,
-      css,
-      reroute_audio: Boolean(options.rerouteAudio),
-      shutdown: false,
-      restart_when_active: false
-    },
-    sceneItemEnabled: enabled
-  });
+  let sceneItemId;
+  try {
+    const response = await obsCall("CreateInput", {
+      sceneName,
+      inputName,
+      inputKind: "browser_source",
+      inputSettings: {
+        url,
+        width,
+        height,
+        css,
+        reroute_audio: Boolean(options.rerouteAudio),
+        shutdown: false,
+        restart_when_active: false
+      },
+      sceneItemEnabled: enabled
+    });
+    sceneItemId = response.sceneItemId;
+  } catch (error) {
+    if (/already exists|ResourceAlreadyExists/i.test(error.message)) {
+      // Input exists globally, add it to the scene
+      const response = await obsCall("CreateSceneItem", {
+        sceneName,
+        sourceName: inputName,
+        sceneItemEnabled: enabled
+      });
+      sceneItemId = response.sceneItemId;
+      
+      // Update settings of the existing source
+      await obsCall("SetInputSettings", {
+        inputName,
+        inputSettings: { url, width, height, css },
+        overlay: true
+      });
+    } else {
+      throw error;
+    }
+  }
 
-  if (response?.sceneItemId !== undefined) {
-    obsBridge.itemIds.set(inputName, response.sceneItemId);
+  if (sceneItemId !== undefined) {
+    obsBridge.itemIds.set(inputName, sceneItemId);
   }
   obsBridge.lastSceneItemEnabled.set(inputName, Boolean(enabled));
   return inputName;
@@ -4148,6 +5309,7 @@ async function ensureOpacityFilters() {
   let allSupported = true;
 
   for (const runner of state.runners) {
+    if (!runner.active) continue; // Only check/create for active runners to prevent non-existent sources from failing the check!
     for (const part of RUNNER_PARTS) {
       const sourceName = `${MANAGED_PREFIX}${runnerPart(runner.slot, part)}`;
       const created = await ensureOpacityFilter(sourceName);
@@ -4156,7 +5318,7 @@ async function ensureOpacityFilters() {
   }
 
   if (!allSupported) {
-    logObs("Opacity filters were not available for every source. Fade presets will fall back to movement/scale.");
+    logObs("Opacity filters were not available for active sources. Fade presets will fall back to movement/scale.");
   }
 
   return allSupported;
@@ -4304,8 +5466,6 @@ async function setRunnerVisible(slot, visible) {
   await setSceneItemEnabled(runnerPart(slot, "Feed"), visible && state.layout.elements.feed);
   await setSceneItemEnabled(runnerPart(slot, "Border"), visible && state.layout.elements.feedBorder);
   await setSceneItemEnabled(runnerPart(slot, "Name"), visible && state.layout.elements.name && !shouldHideNameplateForSlot(slot));
-  const runner = state.runners.find((candidate) => candidate.slot === slot);
-  await setSceneItemEnabled(runnerPart(slot, "Finish"), visible && Boolean(runner?.done) && state.layout.elements.finishedTime);
 }
 
 function isSpotlightHiddenActiveRunner(runner) {
@@ -4321,11 +5481,19 @@ async function setRunnerSpotlightHidden(slot) {
 
 async function ensureRunnerItemIds() {
   for (const part of GLOBAL_PARTS) {
-    await getSceneItemId(`${MANAGED_PREFIX}${part}`);
+    try {
+      await getSceneItemId(`${MANAGED_PREFIX}${part}`);
+    } catch (e) {
+      logObs(`Failed to get ID for global part ${part}: ${e.message}`);
+    }
   }
   for (const runner of state.runners) {
     for (const part of RUNNER_PARTS) {
-      await getSceneItemId(`${MANAGED_PREFIX}${runnerPart(runner.slot, part)}`);
+      try {
+        await getSceneItemId(`${MANAGED_PREFIX}${runnerPart(runner.slot, part)}`);
+      } catch (e) {
+        logObs(`Failed to get ID for runner ${runner.slot} part ${part}: ${e.message}`);
+      }
     }
   }
 }
@@ -4337,7 +5505,9 @@ async function ensureManagedGlobalSources() {
     ["Background", htmlDataUrl(buildBackgroundHtml()), STAGE.width, STAGE.height, true],
     ["TitleBar", htmlDataUrl(buildTitleBarHtml()), titleSize.width, titleSize.height, state.layout.elements.titleBar],
     ["TimerBorder", htmlDataUrl(buildTimerBorderHtml()), timerBorderSourceSize().width, timerBorderSourceSize().height, state.layout.timerBorder.enabled && state.layout.elements.timerBorder],
-    ["TimerText", htmlDataUrl(buildTimerTextHtml()), timerTextSize.width, timerTextSize.height, state.layout.elements.builtInTimer]
+    ["TimerText", htmlDataUrl(buildTimerTextHtml()), timerTextSize.width, timerTextSize.height, state.layout.elements.builtInTimer],
+    ["Commentators", htmlDataUrl(buildCommentatorsHtml()), commentatorsSourceSize().width, commentatorsSourceSize().height, state.layout.commentators.enabled],
+    ["FinishedScreen", htmlDataUrl(buildFinishedScreenHtml()), STAGE.width, STAGE.height, uiState.finishedScreenVisible]
   ];
 
   for (const [part, url, width, height, enabled] of globals) {
@@ -4345,7 +5515,12 @@ async function ensureManagedGlobalSources() {
     try {
       await getSceneItemId(inputName);
     } catch {
-      await createBrowserInput(part, obsBridge.sceneName, url, width, height, enabled);
+      try {
+        await createBrowserInput(part, obsBridge.sceneName, url, width, height, enabled);
+      } catch (error) {
+        // Don't let one problematic global source abort the whole layout apply.
+        logObs(`Could not create ${part}: ${error.message}`);
+      }
     }
   }
 }
@@ -4377,6 +5552,15 @@ async function updateTitleBarInput() {
   });
 }
 
+async function updateCommentatorsInput() {
+  const size = commentatorsSourceSize();
+  await setBrowserInputSettings("Commentators", {
+    url: htmlDataUrl(buildCommentatorsHtml()),
+    width: size.width,
+    height: size.height
+  });
+}
+
 async function ensureManagedRunnerSources() {
   let createdAny = false;
   for (const runner of state.runners) {
@@ -4402,7 +5586,7 @@ async function ensureManagedRunnerSources() {
     }
   }
 
-  if (createdAny) {
+  if (createdAny || obsBridge.opacitySupported === undefined || !obsBridge.opacitySupported) {
     obsBridge.opacitySupported = await ensureOpacityFilters();
   }
 }
@@ -4438,7 +5622,20 @@ async function enforceSceneLayerOrder() {
   let index = 0;
 
   const pushLayer = (partName) => {
-    requests.push(sceneItemIndexRequest(partName, index));
+    const inputName = `${MANAGED_PREFIX}${partName}`;
+    // Only order items that actually exist in the scene. Sending a
+    // SetSceneItemIndex with an unknown (null) id can reject the whole batch,
+    // which previously aborted create/repair before the layout was applied and
+    // left every item stuck at the default top-left position.
+    if (!obsBridge.itemIds.has(inputName)) return;
+    requests.push({
+      requestType: "SetSceneItemIndex",
+      requestData: {
+        sceneName: obsBridge.sceneName,
+        sceneItemId: obsBridge.itemIds.get(inputName),
+        sceneItemIndex: index
+      }
+    });
     index += 1;
   };
 
@@ -4456,8 +5653,73 @@ async function enforceSceneLayerOrder() {
   pushLayer("TitleBar");
   pushLayer("TimerText");
   pushLayer("TimerBorder");
+  pushLayer("Commentators");
+  pushLayer("FinishedScreen");
 
   await obsBatch(requests);
+}
+
+// Direct show/hide/replay of the Finished Screen browser source in OBS,
+// independent of the debounced full-layout apply so the entrance animation
+// fires immediately when the operator toggles the view.
+async function syncFinishedScreenObs({ replay = false, refresh = false } = {}) {
+  if (!obsBridge.connected || !obsBridge.client) return;
+  try {
+    await ensureManagedGlobalSources();
+    await refreshSceneItemCache();
+    const source = `${MANAGED_PREFIX}FinishedScreen`;
+    const show = uiState.finishedScreenVisible;
+    const wasEnabled = obsBridge.lastSceneItemEnabled.get(source) ?? false;
+
+    if (show) {
+      // Reloading the browser source URL replays the CSS entrance animation and
+      // refreshes the standings. A unique nonce guarantees the URL changes so
+      // OBS actually reloads the page (it caches identical URLs otherwise).
+      if (replay || refresh || !wasEnabled) {
+        await setInputUrl("FinishedScreen", htmlDataUrl(buildFinishedScreenHtml(Date.now())));
+      }
+      await setSceneItemTransform("FinishedScreen", {
+        positionX: 0,
+        positionY: 0,
+        boundsWidth: STAGE.width,
+        boundsHeight: STAGE.height
+      });
+      await enforceSceneLayerOrder();
+      await ensureOpacityFilter(source);
+      await setSourceOpacity(source, 1);
+      await setSceneItemEnabled("FinishedScreen", true);
+    } else if (wasEnabled) {
+      await fadeOutFinishedScreenObs();
+    } else {
+      await setSceneItemEnabled("FinishedScreen", false);
+    }
+
+    // Reflect finish-time suppression on the main scene: fades finish times out
+    // while the screen is up, and back in when it is dismissed.
+    await syncAllFinishTimeVisibilities(getCurrentRectBySlot(), true);
+    logObs(show ? "Finished screen shown in OBS." : "Finished screen hidden in OBS.");
+  } catch (error) {
+    logObs(`Finished screen update failed: ${error.message}`);
+  }
+}
+
+// Fade the Finished Screen browser source out via its opacity filter, then
+// disable it. Falls back to an instant hide if opacity filters are unavailable.
+async function fadeOutFinishedScreenObs() {
+  const source = `${MANAGED_PREFIX}FinishedScreen`;
+  const supported = await ensureOpacityFilter(source);
+  if (!supported) {
+    await setSceneItemEnabled("FinishedScreen", false);
+    return;
+  }
+  const frames = 12;
+  const frameMs = Math.max(16, Math.round(260 / frames));
+  for (let i = 1; i <= frames; i += 1) {
+    await setSourceOpacity(source, 1 - i / frames);
+    await delay(frameMs);
+  }
+  await setSceneItemEnabled("FinishedScreen", false);
+  await setSourceOpacity(source, 1);
 }
 
 function sceneItemIndexRequest(partName, sceneItemIndex) {
@@ -4480,6 +5742,21 @@ async function setSceneItemTransform(partName, rect, crop = null, options = {}) 
   });
 }
 
+async function refreshSceneItemCache() {
+  if (!requireObs()) return;
+  try {
+    const response = await obsCall("GetSceneItemList", { sceneName: obsBridge.sceneName });
+    obsBridge.itemIds.clear();
+    if (response && response.sceneItems) {
+      for (const item of response.sceneItems) {
+        obsBridge.itemIds.set(item.sourceName, item.sceneItemId);
+      }
+    }
+  } catch (error) {
+    logObs(`Failed to refresh scene item cache: ${error.message}`);
+  }
+}
+
 async function getSceneItemId(inputName) {
   if (obsBridge.itemIds.has(inputName)) return obsBridge.itemIds.get(inputName);
 
@@ -4493,7 +5770,8 @@ async function getSceneItemId(inputName) {
 
 function getCachedSceneItemId(inputName) {
   if (!obsBridge.itemIds.has(inputName)) {
-    throw new Error(`Scene item ID for ${inputName} is not cached. Run Create / Repair first.`);
+    logObs(`Warning: Scene item ID for ${inputName} is not cached.`);
+    return null;
   }
   return obsBridge.itemIds.get(inputName);
 }
@@ -4738,7 +6016,7 @@ function buildTitleBarHtml() {
   const frameClip = `border-radius:${frameRadius("title")}px;overflow:hidden;`;
   const plateStyle = `position:absolute;inset:0;${raceInfoPlateFrameCss(config, size.width, size.height, 1.0)}`;
 
-  return `<!doctype html><html><body><div class="title-container"><div class="title-plate-bg" style="${plateStyle}"></div><div class="title"><strong>${escapeHtml(config.title)}</strong><span>${escapeHtml(config.subtitle)}</span><div class="title-border" aria-hidden="true"></div></div></div></body><style>${baseHtmlCss()} ${nameplateAnimationCss(config, size.width, size.height, "ormRaceInfoTexture")}${borderAnimationCss(getBorderStyle("title"), size.width, size.height)}body{font-family:${cssFontStack(config.fontFamily)};}.title-container{position:absolute;inset:0;${frameClip}}.title{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:18px;overflow:hidden;white-space:nowrap;color:${config.textColor};}.title-border{${titleBorder}}strong,span{position:relative;z-index:1;${textEffects}}strong{font-size:${Math.max(8, Number(config.fontSize) || 34)}px;font-weight:900;line-height:1;}span{font-size:${Math.max(8, Number(config.fontSize) || 34) * 0.58}px;font-weight:800;line-height:1;color:${hexToRgba(config.textColor, 0.68)};}</style></html>`;
+  return `<!doctype html><html><body><div class="title-container"><div class="title-plate-bg" style="${plateStyle}"></div><div class="title"><strong>${escapeHtml(config.title)}</strong><span>${escapeHtml(config.subtitle)}</span><div class="title-border" aria-hidden="true"></div></div></div></body><style>${baseHtmlCss()} ${nameplateAnimationCss(config, size.width, size.height, "ormRaceInfoTexture")}${borderAnimationCss(getBorderStyle("title"), size.width, size.height)}body{font-family:${cssFontStack(config.fontFamily)};}.title-container{position:absolute;inset:0;${frameClip}}.title{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;overflow:hidden;text-align:center;white-space:pre-wrap;color:${config.textColor};}.title-border{${titleBorder}}strong,span{position:relative;z-index:1;white-space:pre-wrap;${textEffects}}strong{font-size:${Math.max(8, Number(config.fontSize) || 34)}px;font-weight:900;line-height:1.2;}span{font-size:${Math.max(8, Number(config.fontSize) || 34) * 0.58}px;font-weight:800;line-height:1.2;color:${hexToRgba(config.textColor, 0.68)};}</style></html>`;
 }
 
 function titleBorderHtmlCss(width, height) {
@@ -4754,7 +6032,7 @@ function raceInfoPlateFrameCss(config, sourceWidth = 960, sourceHeight = 120, sc
   const padding = Math.max(0, Number(config.platePaddingX) || 0) * scale;
   const radius = frameRadius("title") * scale;
 
-  return `display:flex;align-items:center;justify-content:center;gap:18px;padding:0 ${padding}px;overflow:hidden;white-space:nowrap;${plateBackgroundFrameCss(config, sourceWidth, sourceHeight, "ormRaceInfoTexture")}border:none;border-radius:${radius}px;box-sizing:border-box;background-clip:padding-box;`;
+  return `display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:0 ${padding}px;overflow:hidden;text-align:center;white-space:pre-wrap;${plateBackgroundFrameCss(config, sourceWidth, sourceHeight, "ormRaceInfoTexture")}border:none;border-radius:${radius}px;box-sizing:border-box;background-clip:padding-box;`;
 }
 
 function timerPlateFrameCss(config, sourceWidth = 320, sourceHeight = 80, scale = 1.0) {
@@ -4776,6 +6054,78 @@ function plateBackgroundFrameCss(config, sourceWidth, sourceHeight, textureAnima
   }
 
   return "background:transparent;";
+}
+
+// ---------------------------------------------------------------------------
+// Commentators (movable global plate with commentator names)
+// ---------------------------------------------------------------------------
+
+function commentatorsSourceSize() {
+  const rect = absoluteRect(state.layout.commentators.rect);
+  return {
+    width: Math.max(1, Math.round(rect.width)),
+    height: Math.max(1, Math.round(rect.height))
+  };
+}
+
+function getCommentatorNames(config = state.layout.commentators) {
+  const raw = Array.isArray(config.names) ? config.names : String(config.names || "").split(/\r?\n/);
+  return raw.map((name) => String(name).trim()).filter(Boolean);
+}
+
+// Plate CSS shared by the OBS browser source (scale = 1, px source size) and the
+// in-app preview (scale = stage scale). Reuses the nameplate fill helper so the
+// same fill/gradient options apply.
+function commentatorsPlateCss(config, sourceWidth, sourceHeight, scale = 1) {
+  const padding = Math.max(0, Number(config.platePaddingX) || 0) * scale;
+  const radius = Math.max(0, Number(config.plateRadius) || 0) * scale;
+  const borderWidth = Math.max(0, Number(config.plateBorderWidth) || 0) * scale;
+  const borderColor = hexToRgba(config.plateBorderColor, Number(config.plateBorderOpacity) / 100);
+  const generated = config.plateMode !== "image";
+  const fill = !config.showBox
+    ? "background:transparent;"
+    : (config.plateMode === "image" && config.plateImage
+      ? `background-color:transparent;background-image:url("${escapeCssString(config.plateImage)}");background-size:100% 100%;background-repeat:no-repeat;background-position:center;`
+      : nameplateBackgroundCss(config, sourceWidth, sourceHeight, "ormCommentatorsTexture"));
+  const border = (generated && config.showBorder) ? `${borderWidth}px solid ${borderColor}` : `${borderWidth}px solid transparent`;
+  return `display:flex;flex-direction:column;align-items:center;justify-content:center;gap:${Math.round(3 * scale)}px;padding:0 ${padding}px;overflow:hidden;text-align:center;${fill}border:${border};border-radius:${radius}px;box-sizing:border-box;background-clip:padding-box;`;
+}
+
+function commentatorsTextEffectCss(config) {
+  const shadow = config.shadowEnabled
+    ? `text-shadow:${Number(config.shadowX) || 0}px ${Number(config.shadowY) || 0}px ${Math.max(0, Number(config.shadowBlur) || 0)}px ${config.shadowColor};`
+    : "text-shadow:none;";
+  const stroke = config.strokeEnabled && Number(config.strokeWidth) > 0
+    ? `-webkit-text-stroke:${Number(config.strokeWidth)}px ${config.strokeColor};paint-order:stroke fill;`
+    : "";
+  return `${shadow}${stroke}`;
+}
+
+function buildCommentatorsHtml() {
+  const config = state.layout.commentators;
+  const size = commentatorsSourceSize();
+  const names = getCommentatorNames(config);
+  const label = String(config.label || "").trim();
+  const fontSize = Math.max(8, Number(config.fontSize) || 34);
+  const textEffects = commentatorsTextEffectCss(config);
+  const plateCss = commentatorsPlateCss(config, size.width, size.height, 1);
+  const labelHtml = label ? `<span class="c-label">${escapeHtml(label)}</span>` : "";
+  const namesHtml = names.length
+    ? names.map((name) => `<strong class="c-name">${escapeHtml(name)}</strong>`).join(`<i class="c-sep">&bull;</i>`)
+    : "";
+  const tx = Number(config.textX) || 0;
+  const ty = Number(config.textY) || 0;
+
+  return `<!doctype html><html><body><div class="c-plate" style="position:absolute;inset:0;${plateCss}">`
+    + `<div class="c-content" style="transform:translate(${tx}px, ${ty}px);">${labelHtml}<div class="c-names">${namesHtml}</div></div></div></body>`
+    + `<style>${baseHtmlCss()} ${nameplateAnimationCss(config, size.width, size.height, "ormCommentatorsTexture")}`
+    + `body{font-family:${cssFontStack(config.fontFamily)};color:${config.textColor};}`
+    + `.c-content{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:${Math.round(fontSize * 0.12)}px;}`
+    + `.c-names{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:0 ${Math.round(fontSize * 0.4)}px;}`
+    + `.c-name{font-size:${fontSize}px;font-weight:900;line-height:1.15;${textEffects}}`
+    + `.c-sep{font-style:normal;font-size:${Math.round(fontSize * 0.7)}px;opacity:0.5;${textEffects}}`
+    + `.c-label{font-size:${Math.round(fontSize * 0.5)}px;font-weight:800;letter-spacing:2px;text-transform:uppercase;opacity:0.72;${textEffects}}`
+    + `</style></html>`;
 }
 
 function buildFeedUrl(runner) {
@@ -5050,7 +6400,8 @@ function buildNameHtml(runner, rect = null) {
   const plateImage = config.showBox && config.plateMode === "image" && config.plateImage;
   const plateImageMarkup = plateImage ? `<img class="plate-art" src="${escapeAttribute(config.plateImage)}" alt="">` : "";
   const textSvg = nameTextSvgMarkup(runner, sourceSize);
-  return `<!doctype html><html><body><div class="bar">${plateImageMarkup}${textSvg}</div></body><style>${baseHtmlCss()} ${nameplateAnimationCss(config, sourceSize.width, sourceSize.height)}body{font-family:${cssFontStack(config.fontFamily)};color:${config.textColor};text-rendering:geometricPrecision;-webkit-font-smoothing:antialiased;font-stretch:normal;letter-spacing:0;}.bar{${nameplateFrameCss(config, "100%", "100%", sourceSize.width, sourceSize.height)}}.plate-art{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:block;z-index:0;pointer-events:none;}.svg-text{position:absolute;inset:0;z-index:1;display:block;pointer-events:none;}</style></html>`;
+  const pronounsSvg = pronounsTextSvgMarkup(runner, sourceSize);
+  return `<!doctype html><html><body><div class="bar">${plateImageMarkup}${textSvg}${pronounsSvg}</div></body><style>${baseHtmlCss()} ${nameplateAnimationCss(config, sourceSize.width, sourceSize.height)}body{font-family:${cssFontStack(config.fontFamily)};color:${config.textColor};text-rendering:geometricPrecision;-webkit-font-smoothing:antialiased;font-stretch:normal;letter-spacing:0;}.bar{${nameplateFrameCss(config, "100%", "100%", sourceSize.width, sourceSize.height)}}.plate-art{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:block;z-index:0;pointer-events:none;}.svg-text{position:absolute;inset:0;z-index:1;display:block;pointer-events:none;}</style></html>`;
 }
 
 function nameTextSvgMarkup(runner, sourceSize) {
@@ -5075,11 +6426,261 @@ function nameTextSvgMarkup(runner, sourceSize) {
   });
 }
 
+function pronounsTextSvgMarkup(runner, sourceSize) {
+  const config = state.layout.pronounsText;
+  if (!config || !config.enabled) return "";
+
+  const text = getRunnerPronouns(runner);
+  if (!text) return "";
+
+  const fontSize = nameTextIsUnframed()
+    ? Math.max(1, Number(config.fontSize) || 28)
+    : Math.min(Number(config.fontSize), sourceSize.height * NAME_FONT_HEIGHT_RATIO);
+  const anchor = pronounsTextAnchor(sourceSize);
+
+  return svgTextMarkup({
+    text,
+    width: sourceSize.width,
+    height: sourceSize.height,
+    fontFamily: config.fontFamily,
+    fontSize,
+    fill: config.textColor,
+    config,
+    align: "right",
+    x: anchor.x,
+    y: anchor.y,
+    textClass: "pronouns-visual-text",
+    filterKey: `pronouns-${runner.slot}`
+  });
+}
+
+function pronounsTextAnchor(sourceSize) {
+  const config = state.layout.pronounsText;
+  const padding = Math.max(0, Number(state.layout.nameplate.platePaddingX) || 0);
+  if (!nameTextIsUnframed()) {
+    return {
+      x: sourceSize.width - padding + (Number(config.textX) || 0),
+      y: sourceSize.height / 2 + (Number(config.textY) || 0)
+    };
+  }
+
+  const name = state.layout.panelGeometry.name;
+  return {
+    x: (name.x + name.width) * sourceSize.width - padding + (Number(config.textX) || 0),
+    y: (name.y + name.height / 2) * sourceSize.height + (Number(config.textY) || 0)
+  };
+}
+
 function buildFinishHtml(runner) {
   const text = formatRunnerFinalTime(runner);
   const size = finishSourceSize(runner, getCurrentRectBySlot().get(runner.slot));
   const svg = finishTextSvgMarkup(runner, size, text);
   return `<!doctype html><html><body>${svg}</body><style>${baseHtmlCss()} body{display:block;}</style></html>`;
+}
+
+// ---------------------------------------------------------------------------
+// Finished Screen (results leaderboard)
+// The same markup drives the in-app preview overlay and the managed OBS browser
+// source, so the animated leaderboard looks identical in both. It is authored
+// on a fixed 1920x1080 canvas; the preview simply scales that canvas down.
+// ---------------------------------------------------------------------------
+
+function runnerFinishMs(runner) {
+  if (runner.finalTimeMs !== null && runner.finalTimeMs !== undefined && runner.finalTimeMs !== "") {
+    const numeric = Number(runner.finalTimeMs);
+    if (Number.isFinite(numeric)) return numeric;
+  }
+  const text = String(runner.finalTimeText || "").trim();
+  const match = /^(?:(\d+):)?(\d{1,2}):(\d{2})(?:[.,](\d{1,3}))?$/.exec(text);
+  if (!match) return null;
+  const hours = Number(match[1] || 0);
+  const minutes = Number(match[2] || 0);
+  const seconds = Number(match[3] || 0);
+  const millis = Number((match[4] || "0").padEnd(3, "0"));
+  return ((hours * 60 + minutes) * 60 + seconds) * 1000 + millis;
+}
+
+// Ordered standings: finishers ranked by fastest time, then active runners
+// without a time as DNF.
+function finishedScreenStandings() {
+  const participants = state.runners.filter((runner) => runner.active || hasRealRunnerFinalTime(runner));
+  const finishers = [];
+  const dnf = [];
+  for (const runner of participants) {
+    const timeText = formatRunnerFinalTime(runner);
+    if (hasRealRunnerFinalTime(runner) && timeText) {
+      const ms = runnerFinishMs(runner);
+      finishers.push({ runner, ms: ms === null ? Number.MAX_SAFE_INTEGER : ms, time: timeText });
+    } else {
+      dnf.push({ runner });
+    }
+  }
+  finishers.sort((a, b) => (a.ms - b.ms) || (a.runner.slot - b.runner.slot));
+  const rows = finishers.map((entry, index) => ({
+    place: index + 1,
+    name: entry.runner.name,
+    time: entry.time,
+    dnf: false,
+    ms: entry.ms === Number.MAX_SAFE_INTEGER ? null : entry.ms
+  }));
+  for (const entry of dnf) {
+    rows.push({ place: null, name: entry.runner.name, time: "DNF", dnf: true, ms: null });
+  }
+  return rows;
+}
+
+// Build inline text-effect CSS (color + drop shadow + stroke) from a config
+// block, matching how the rest of the tool renders text.
+function fsTextEffectCss({ color, strokeEnabled, strokeColor, strokeWidth, shadowEnabled, shadowColor, shadowBlur, shadowX, shadowY }) {
+  const parts = [];
+  if (color) parts.push(`color:${color};`);
+  parts.push(shadowEnabled
+    ? `text-shadow:${Number(shadowX) || 0}px ${Number(shadowY) || 0}px ${Math.max(0, Number(shadowBlur) || 0)}px ${shadowColor};`
+    : "text-shadow:none;");
+  if (strokeEnabled && Number(strokeWidth) > 0) {
+    parts.push(`-webkit-text-stroke:${Number(strokeWidth)}px ${strokeColor};paint-order:stroke fill;`);
+  }
+  return parts.join("");
+}
+
+function formatGapMs(ms) {
+  const total = Math.max(0, Math.round(ms));
+  const hours = Math.floor(total / 3600000);
+  const minutes = Math.floor((total % 3600000) / 60000);
+  const seconds = Math.floor((total % 60000) / 1000);
+  const pad = (n) => String(n).padStart(2, "0");
+  return hours > 0 ? `+${hours}:${pad(minutes)}:${pad(seconds)}` : `+${minutes}:${pad(seconds)}`;
+}
+
+// CSS for a full-canvas layer replicating the managed Theme background, so the
+// "Show only background" mode looks identical to the OBS Background source. A
+// solid black underlay guarantees the live scene is fully hidden.
+function finishedScreenBackgroundLayerCss() {
+  const layout = state.layout;
+  if (layout.backgroundImage) {
+    const loop = textureLoop(layout.backgroundScrollX, layout.backgroundScrollY, STAGE.width, STAGE.height, layout.backgroundScale);
+    const animation = loop ? `animation:ormBackgroundScroll ${loop.duration}s linear infinite;` : "";
+    const scrollVars = loop ? `--orm-bg-scroll-x:${loop.dx}px;--orm-bg-scroll-y:${loop.dy}px;` : "";
+    return {
+      keyframes: `@keyframes ormBackgroundScroll{from{background-position:0px 0px;}to{background-position:var(--orm-bg-scroll-x) var(--orm-bg-scroll-y);}}`,
+      css: `.ofs-bg{position:absolute;inset:0;background-color:#000;background-image:url("${escapeCssString(layout.backgroundImage)}");background-repeat:repeat;background-size:${layout.backgroundScale}% auto;background-position:0px 0px;${scrollVars}${animation}}`
+    };
+  }
+  return {
+    keyframes: "",
+    css: `.ofs-bg{position:absolute;inset:0;background:linear-gradient(135deg,rgba(45,198,163,.25),transparent 38%),linear-gradient(315deg,rgba(240,184,74,.2),transparent 38%),#11161a;}`
+  };
+}
+
+function finishedScreenMarkup() {
+  const cfg = { ...DEFAULT_FINISHED_SCREEN, ...(state.layout.finishedScreen || {}) };
+  const rows = finishedScreenStandings();
+  const count = Math.max(rows.length, 1);
+  const accent = cfg.accentColor || DEFAULT_FINISHED_SCREEN.accentColor;
+  const backdropColor = cfg.backdropColor || DEFAULT_FINISHED_SCREEN.backdropColor;
+  const headingFontStack = cssFontStack(cfg.headingFontFamily);
+  const runnerFontStack = cssFontStack(cfg.runnerFontFamily);
+  const dim = clamp01(Number(cfg.backdropOpacity) / 100);
+  const speed = Math.max(120, Number(cfg.rowSpeedMs) || DEFAULT_FINISHED_SCREEN.rowSpeedMs);
+  const stagger = Math.max(0, Number(cfg.rowStaggerMs) || 0);
+  const showIcons = cfg.showIcons === true;
+  const topIcons = [cfg.topIcon1, cfg.topIcon2, cfg.topIcon3];
+  const showGaps = cfg.showGaps === true;
+  const showUnderline = cfg.showUnderline !== false;
+  const showOnlyBackground = cfg.showOnlyBackground === true;
+  const bgLayer = showOnlyBackground ? finishedScreenBackgroundLayerCss() : null;
+
+  const gap = 16;
+  const areaHeight = 720;
+  const maxRowHeight = 96;
+  let rowHeight = Math.floor((areaHeight - gap * (count - 1)) / count);
+  rowHeight = Math.max(46, Math.min(maxRowHeight, rowHeight));
+  const rowScale = rowHeight / maxRowHeight;
+  const runnerBase = Math.max(10, Number(cfg.runnerFontSize) || DEFAULT_FINISHED_SCREEN.runnerFontSize);
+  const nameFont = Math.max(12, Math.round(runnerBase * rowScale));
+  const timeFont = Math.max(12, Math.round(runnerBase * 1.05 * rowScale));
+  const gapFont = Math.max(10, Math.round(runnerBase * 0.5 * rowScale));
+  const placeFont = Math.max(12, Math.round(runnerBase * 0.85 * rowScale));
+  const badgeSize = Math.round(rowHeight * 0.78);
+  const headingFont = Math.max(12, Number(cfg.headingFontSize) || DEFAULT_FINISHED_SCREEN.headingFontSize);
+
+  const nameEffect = fsTextEffectCss({ color: cfg.runnerColor, strokeEnabled: cfg.runnerStrokeEnabled, strokeColor: cfg.runnerStrokeColor, strokeWidth: cfg.runnerStrokeWidth, shadowEnabled: cfg.runnerShadowEnabled, shadowColor: cfg.runnerShadowColor, shadowBlur: cfg.runnerShadowBlur, shadowX: cfg.runnerShadowX, shadowY: cfg.runnerShadowY });
+  const timeEffect = fsTextEffectCss({ color: accent, strokeEnabled: cfg.runnerStrokeEnabled, strokeColor: cfg.runnerStrokeColor, strokeWidth: cfg.runnerStrokeWidth, shadowEnabled: cfg.runnerShadowEnabled, shadowColor: cfg.runnerShadowColor, shadowBlur: cfg.runnerShadowBlur, shadowX: cfg.runnerShadowX, shadowY: cfg.runnerShadowY });
+  const headingEffect = fsTextEffectCss({ color: cfg.headingColor, strokeEnabled: cfg.headingStrokeEnabled, strokeColor: cfg.headingStrokeColor, strokeWidth: cfg.headingStrokeWidth, shadowEnabled: cfg.headingShadowEnabled, shadowColor: cfg.headingShadowColor, shadowBlur: cfg.headingShadowBlur, shadowX: cfg.headingShadowX, shadowY: cfg.headingShadowY });
+
+  const firstFinisher = rows.find((row) => !row.dnf);
+  const leaderMs = firstFinisher && Number.isFinite(firstFinisher.ms) ? firstFinisher.ms : null;
+
+  const rowsHtml = rows.map((row, index) => {
+    const isFirst = row.place === 1;
+    const icon = showIcons && !row.dnf && row.place <= 3 ? topIcons[row.place - 1] : "";
+    const badgeClass = row.dnf
+      ? "ofs-badge-dnf"
+      : (icon ? "ofs-badge-icon" : (row.place <= 3 ? `ofs-badge-${row.place}` : ""));
+    const badgeInner = row.dnf
+      ? "&mdash;"
+      : (icon ? `<img class="ofs-badge-img" src="${escapeAttribute(icon)}" alt="">` : escapeHtml(String(row.place)));
+    const delay = Math.round(index * stagger);
+    let gapHtml = "";
+    if (showGaps) {
+      const gapText = (!row.dnf && !isFirst && Number.isFinite(row.ms) && Number.isFinite(leaderMs))
+        ? formatGapMs(row.ms - leaderMs)
+        : "";
+      gapHtml = `<div class="ofs-gap">${escapeHtml(gapText)}</div>`;
+    }
+    return `<div class="ofs-row${row.dnf ? " ofs-dnf" : ""}${isFirst ? " ofs-first" : ""}" style="height:${rowHeight}px;animation-delay:${delay}ms;">`
+      + `<div class="ofs-badge ${badgeClass}">${badgeInner}</div>`
+      + `<div class="ofs-name">${escapeHtml(row.name || "")}</div>`
+      + `<div class="ofs-time">${escapeHtml(row.time || "")}</div>`
+      + gapHtml
+      + `</div>`;
+  }).join("");
+  const emptyHtml = rows.length ? "" : `<div class="ofs-empty">Awaiting finishers…</div>`;
+
+  const underlineCss = showUnderline
+    ? `.ofs-heading::after{content:"";position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:230px;height:5px;border-radius:3px;background:linear-gradient(90deg, rgba(0,0,0,0), ${accent}, rgba(0,0,0,0));}`
+    : "";
+
+  const style = `
+${bgLayer ? bgLayer.keyframes : ""}
+.ofs-root{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden;font-family:${runnerFontStack};}
+${bgLayer ? bgLayer.css : ""}
+.ofs-backdrop{position:absolute;inset:0;background:radial-gradient(130% 100% at 50% 24%, rgba(0,0,0,0) 0%, rgba(0,0,0,${(dim * 0.28).toFixed(3)}) 100%), ${hexToRgba(backdropColor, dim)};}
+.ofs-panel{position:absolute;left:50%;top:92px;transform:translateX(-50%);width:1180px;}
+.ofs-heading{font-family:${headingFontStack};font-size:${headingFont}px;font-weight:900;letter-spacing:6px;text-align:center;text-transform:uppercase;margin:0 0 44px;padding-bottom:18px;position:relative;opacity:0;animation:ofsHeadIn ${speed}ms cubic-bezier(0.22,1,0.36,1) both;${headingEffect}}
+${underlineCss}
+.ofs-rows{display:flex;flex-direction:column;gap:${gap}px;}
+.ofs-row{position:relative;display:flex;align-items:center;gap:26px;padding:0 30px;border-radius:14px;background:linear-gradient(90deg, ${hexToRgba(accent, 0.16)} 0%, rgba(255,255,255,0.05) 8%, rgba(255,255,255,0.05) 100%);border:1px solid rgba(255,255,255,0.10);box-shadow:0 8px 22px rgba(0,0,0,0.38);opacity:0;animation:ofsRowIn ${speed}ms cubic-bezier(0.34,1.4,0.5,1) both;}
+.ofs-badge{flex:0 0 auto;width:${badgeSize}px;height:${badgeSize}px;display:flex;align-items:center;justify-content:center;border-radius:12px;font-size:${placeFont}px;font-weight:900;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);overflow:hidden;}
+.ofs-badge-icon{background:transparent;border:1px solid rgba(255,255,255,0.18);padding:0;}
+.ofs-badge-img{width:100%;height:100%;object-fit:contain;display:block;}
+.ofs-badge-1{background:linear-gradient(145deg,#f7d774,#e0a52e);color:#3a2a00;border:1px solid rgba(255,255,255,0.55);box-shadow:0 0 18px ${hexToRgba(accent, 0.6)};}
+.ofs-badge-2{background:linear-gradient(145deg,#eef1f6,#a9b4c2);color:#26303a;border:1px solid rgba(255,255,255,0.55);}
+.ofs-badge-3{background:linear-gradient(145deg,#e6a76b,#b06f37);color:#2e1600;border:1px solid rgba(255,255,255,0.45);}
+.ofs-badge-dnf{color:rgba(255,255,255,0.5);}
+.ofs-name{flex:1 1 auto;font-size:${nameFont}px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${nameEffect}}
+.ofs-time{flex:0 0 auto;font-size:${timeFont}px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:1px;${timeEffect}}
+.ofs-gap{flex:0 0 auto;min-width:120px;text-align:right;font-size:${gapFont}px;font-weight:700;font-variant-numeric:tabular-nums;color:${hexToRgba(accent, 0.7)};}
+.ofs-first{background:linear-gradient(90deg, ${hexToRgba(accent, 0.42)} 0%, ${hexToRgba(accent, 0.16)} 58%, ${hexToRgba(accent, 0.07)} 100%);border:2px solid ${hexToRgba(accent, 0.85)};animation:ofsRowIn ${speed}ms cubic-bezier(0.34,1.4,0.5,1) both, ofsFirstGlow 2.6s ease-in-out infinite;}
+.ofs-first .ofs-name{font-size:${Math.round(nameFont * 1.1)}px;font-weight:800;}
+.ofs-first .ofs-time{font-size:${Math.round(timeFont * 1.1)}px;}
+.ofs-dnf{filter:saturate(0.6);}
+.ofs-dnf .ofs-name{opacity:0.6;}
+.ofs-dnf .ofs-time{opacity:0.55;letter-spacing:2px;}
+.ofs-empty{text-align:center;font-size:34px;font-weight:700;color:#ffffff;opacity:0.7;padding:60px 0;}
+@keyframes ofsRowIn{from{opacity:0;transform:translateY(46px) scale(0.96);}to{opacity:1;transform:translateY(0) scale(1);}}
+@keyframes ofsHeadIn{from{opacity:0;transform:translateY(-26px);}to{opacity:1;transform:translateY(0);}}
+@keyframes ofsFirstGlow{0%,100%{box-shadow:0 10px 34px ${hexToRgba(accent, 0.3)}, inset 0 0 24px ${hexToRgba(accent, 0.1)};}50%{box-shadow:0 12px 46px ${hexToRgba(accent, 0.55)}, inset 0 0 34px ${hexToRgba(accent, 0.18)};}}
+`;
+
+  return `<style>${style}</style><div class="ofs-root">${bgLayer ? `<div class="ofs-bg"></div>` : ""}<div class="ofs-backdrop"></div><div class="ofs-panel"><div class="ofs-heading">${escapeHtml(cfg.heading || DEFAULT_FINISHED_SCREEN.heading)}</div><div class="ofs-rows">${rowsHtml}${emptyHtml}</div></div></div>`;
+}
+
+// `nonce` makes the generated data URL unique so OBS reloads the browser source
+// (replaying the CSS entrance animation) even when the standings are unchanged.
+function buildFinishedScreenHtml(nonce = "") {
+  const nonceMeta = nonce ? `<meta name="orm-nonce" content="${escapeAttribute(String(nonce))}">` : "";
+  return `<!doctype html><html><head><meta charset="utf-8">${nonceMeta}<style>${baseHtmlCss()} body{display:block;background:rgba(0,0,0,0);}</style></head><body>${finishedScreenMarkup()}</body></html>`;
 }
 
 function finishTextSvgMarkup(runner, size, text = formatRunnerFinalTime(runner)) {
@@ -5183,6 +6784,22 @@ function nameplateStrongCss(config, heightLimit = `${NAME_FONT_HEIGHT_RATIO * 10
   return `display:block;flex:0 0 auto;min-width:max-content;max-width:none;padding:${pad}px;margin:-${pad}px;font-size:min(${config.fontSize}px,${heightLimit});font-weight:800;line-height:1;white-space:nowrap;overflow:visible;text-overflow:clip;color:${config.textColor};${shadow}`;
 }
 
+function pronounsplateContentCss(config, sourceSize = null) {
+  const padding = Math.max(0, Number(state.layout.nameplate.platePaddingX) || 0);
+  if (sourceSize && nameTextIsUnframed()) {
+    const name = state.layout.panelGeometry.name;
+    const right = (1 - (name.x + name.width)) * sourceSize.width + padding;
+    const top = (name.y + name.height / 2) * sourceSize.height;
+    return `position:absolute;right:${round(right)}px;top:${round(top)}px;z-index:2;display:inline-flex;align-items:center;width:max-content;max-width:none;min-width:max-content;overflow:visible;transform:translate(${Number(config.textX) || 0}px, calc(-50% + ${Number(config.textY) || 0}px));`;
+  }
+  return `position:absolute;right:${padding}px;top:50%;z-index:2;display:inline-flex;align-items:center;width:max-content;max-width:none;min-width:max-content;overflow:visible;transform:translate(${Number(config.textX) || 0}px, calc(-50% + ${Number(config.textY) || 0}px));`;
+}
+
+function pronounsplateStrongCss(config, heightLimit = `${NAME_FONT_HEIGHT_RATIO * 100}vh`) {
+  const pad = textEffectPadding(config);
+  return `display:block;flex:0 0 auto;min-width:max-content;max-width:none;padding:${pad}px;margin:-${pad}px;font-size:min(${config.fontSize}px,${heightLimit});font-weight:800;line-height:1;white-space:nowrap;overflow:visible;text-overflow:clip;`;
+}
+
 function nameplateFinishCss(config, heightLimit = `${NAME_FONT_HEIGHT_RATIO * 100}vh`) {
   const shadow = nameTextShadowCss(config);
   return `flex:0 0 auto;font-style:normal;font-size:min(${Math.round(config.fontSize * 0.72)}px,${heightLimit});font-weight:900;line-height:1;white-space:nowrap;color:${config.badgeColor};${shadow}`;
@@ -5231,7 +6848,7 @@ function finishJustify(align) {
 }
 
 async function browseInstalledFonts() {
-  for (const button of [els.browseFonts, els.timerBrowseFonts, els.finishBrowseFonts, els.raceInfoBrowseFonts]) button.disabled = true;
+  for (const button of [els.browseFonts, els.timerBrowseFonts, els.finishBrowseFonts, els.raceInfoBrowseFonts, els.browsePronounsFonts, els.finishedScreenHeadingBrowseFonts, els.finishedScreenRunnerBrowseFonts, els.commBrowseFonts]) if (button) button.disabled = true;
   setFontStatus("Looking for installed fonts...");
   try {
     if ("queryLocalFonts" in window) {
@@ -5252,7 +6869,7 @@ async function browseInstalledFonts() {
     const detected = detectAvailableFonts(COMMON_FONT_FACES);
     populateFontChoices(detected, `Font permission was not granted. Showing ${detected.length} detected common fonts.`);
   } finally {
-    for (const button of [els.browseFonts, els.timerBrowseFonts, els.finishBrowseFonts, els.raceInfoBrowseFonts]) button.disabled = false;
+    for (const button of [els.browseFonts, els.timerBrowseFonts, els.finishBrowseFonts, els.raceInfoBrowseFonts, els.browsePronounsFonts, els.finishedScreenHeadingBrowseFonts, els.finishedScreenRunnerBrowseFonts, els.commBrowseFonts]) if (button) button.disabled = false;
   }
 }
 
@@ -5278,6 +6895,21 @@ function populateFontChoices(fonts, status = "") {
     option.value = font;
     return option;
   }));
+  els.pronounsFontChoices.replaceChildren(...names.map((font) => {
+    const option = document.createElement("option");
+    option.value = font;
+    return option;
+  }));
+  if (els.finishedScreenFontChoices) els.finishedScreenFontChoices.replaceChildren(...names.map((font) => {
+    const option = document.createElement("option");
+    option.value = font;
+    return option;
+  }));
+  if (els.commFontChoices) els.commFontChoices.replaceChildren(...names.map((font) => {
+    const option = document.createElement("option");
+    option.value = font;
+    return option;
+  }));
   els.nameFontBrowser.replaceChildren(
     selectOption("", "Choose a font..."),
     ...names.map((font) => selectOption(font, font))
@@ -5294,10 +6926,31 @@ function populateFontChoices(fonts, status = "") {
     selectOption("", "Choose a font..."),
     ...names.map((font) => selectOption(font, font))
   );
+  els.pronounsFontBrowser.replaceChildren(
+    selectOption("", "Choose a font..."),
+    ...names.map((font) => selectOption(font, font))
+  );
+  if (els.finishedScreenHeadingFontBrowser) els.finishedScreenHeadingFontBrowser.replaceChildren(
+    selectOption("", "Choose a font..."),
+    ...names.map((font) => selectOption(font, font))
+  );
+  if (els.finishedScreenRunnerFontBrowser) els.finishedScreenRunnerFontBrowser.replaceChildren(
+    selectOption("", "Choose a font..."),
+    ...names.map((font) => selectOption(font, font))
+  );
+  if (els.commFontBrowser) els.commFontBrowser.replaceChildren(
+    selectOption("", "Choose a font..."),
+    ...names.map((font) => selectOption(font, font))
+  );
   els.nameFontBrowser.value = names.includes(state.layout.nameplate.fontFamily) ? state.layout.nameplate.fontFamily : "";
   els.timerFontBrowser.value = names.includes(state.layout.timerText.fontFamily) ? state.layout.timerText.fontFamily : "";
   els.raceInfoFontBrowser.value = names.includes(state.layout.raceInfo.fontFamily) ? state.layout.raceInfo.fontFamily : "";
   els.finishFontBrowser.value = names.includes(state.layout.finishedTime.fontFamily) ? state.layout.finishedTime.fontFamily : "";
+  els.pronounsFontBrowser.value = names.includes(state.layout.pronounsText.fontFamily) ? state.layout.pronounsText.fontFamily : "";
+  const fsCfg = { ...DEFAULT_FINISHED_SCREEN, ...(state.layout.finishedScreen || {}) };
+  if (els.finishedScreenHeadingFontBrowser) els.finishedScreenHeadingFontBrowser.value = names.includes(fsCfg.headingFontFamily) ? fsCfg.headingFontFamily : "";
+  if (els.finishedScreenRunnerFontBrowser) els.finishedScreenRunnerFontBrowser.value = names.includes(fsCfg.runnerFontFamily) ? fsCfg.runnerFontFamily : "";
+  if (els.commFontBrowser) els.commFontBrowser.value = names.includes(state.layout.commentators.fontFamily) ? state.layout.commentators.fontFamily : "";
   if (status) setFontStatus(status);
 }
 
@@ -5311,6 +6964,7 @@ function selectOption(value, label) {
 function setFontStatus(message) {
   els.fontStatus.textContent = message;
   els.timerFontStatus.textContent = message;
+  if (els.pronounsFontStatus) els.pronounsFontStatus.textContent = message;
 }
 
 function detectAvailableFonts(fonts) {
@@ -5684,6 +7338,24 @@ function normalizeLoadedLayout(layout) {
       ...state.layout.finishedTime,
       ...layout.finishedTime
     },
+    finishedScreen: {
+      ...DEFAULT_FINISHED_SCREEN,
+      ...state.layout.finishedScreen,
+      ...layout.finishedScreen
+    },
+    commentators: {
+      ...structuredClone(DEFAULT_COMMENTATORS),
+      ...state.layout.commentators,
+      ...layout.commentators,
+      rect: {
+        ...DEFAULT_COMMENTATORS.rect,
+        ...state.layout.commentators?.rect,
+        ...layout.commentators?.rect
+      },
+      names: Array.isArray(layout.commentators?.names)
+        ? layout.commentators.names
+        : (layout.commentators?.names !== undefined ? layout.commentators.names : structuredClone(DEFAULT_COMMENTATORS.names))
+    },
     raceInfo: {
       ...state.layout.raceInfo,
       ...layout.raceInfo,
@@ -5695,6 +7367,11 @@ function normalizeLoadedLayout(layout) {
     nameplate: {
       ...state.layout.nameplate,
       ...layout.nameplate
+    },
+    pronounsText: {
+      ...DEFAULT_PRONOUNS_TEXT,
+      ...state.layout.pronounsText,
+      ...layout.pronounsText
     },
     borderStyles: {
       feed: {
@@ -5822,6 +7499,9 @@ function normalizeLoadedRunners(runners) {
       audioMuted: Boolean(runner.audioMuted),
       audioVolume: clampNumber(runner.audioVolume, 0, 200, 100),
       collapsed: Boolean(runner.collapsed),
+      pronounPrimary: String(runner.pronounPrimary || ""),
+      pronounSecondary: String(runner.pronounSecondary || ""),
+      pronounCustom: String(runner.pronounCustom || ""),
       crop: {
         left: Number(runner.crop?.left ?? 0),
         top: Number(runner.crop?.top ?? 0),
@@ -5971,11 +7651,10 @@ function syncGlobalControlsFromState() {
   els.timerHeightValue.textContent = `${state.layout.timerHeight} px`;
   syncRangeInput(els.titleHeight, state.layout.titleHeight);
   els.titleHeightValue.textContent = `${state.layout.titleHeight} px`;
-  const titleActive = state.layout.elements.titleBar;
-  els.titleHeight.disabled = !titleActive;
-  document.getElementById("titleHeightRow").classList.toggle("disabled-control", !titleActive);
-  syncRangeInput(els.marginSize, state.layout.margin);
-  els.marginValue.textContent = `${state.layout.margin} px`;
+  syncRangeInput(els.marginLeft, state.layout.marginLeft);
+  els.marginLeftValue.textContent = `${state.layout.marginLeft} px`;
+  syncRangeInput(els.marginRight, state.layout.marginRight);
+  els.marginRightValue.textContent = `${state.layout.marginRight} px`;
   syncRangeInput(els.gapSize, state.layout.gap);
   els.gapValue.textContent = `${state.layout.gap} px`;
   syncRangeInput(els.animationMs, state.layout.animationMs);
@@ -5983,6 +7662,13 @@ function syncGlobalControlsFromState() {
   syncRangeInput(els.animationFps, state.layout.animationFps);
   els.animationFpsValue.textContent = `${state.layout.animationFps} fps`;
   els.animationStyle.value = state.layout.animationStyle;
+  syncRangeInput(els.finishAnimationMs, state.layout.finishAnimationMs);
+  els.finishAnimationValue.textContent = `${state.layout.finishAnimationMs} ms`;
+  syncRangeInput(els.finishAnimationFps, state.layout.finishAnimationFps);
+  els.finishAnimationFpsValue.textContent = `${state.layout.finishAnimationFps} fps`;
+  els.finishAnimationStyle.value = state.layout.finishAnimationStyle;
+  syncFinishedScreenControls();
+  syncCommentatorsControls();
   els.animateObsLayout.checked = obsBridge.animateLayout;
   els.layerLockEnabled.checked = state.layout.layerLock;
   els.snapEnabled.checked = state.layout.snapEnabled;
@@ -6040,6 +7726,7 @@ function syncGlobalControlsFromState() {
   if (state.layout.timerText.state === "running") startTimerPreviewTicker();
   else stopTimerPreviewTicker();
   syncNameplateControlsFromState();
+  syncPronounsTextControlsFromState();
   syncFinishedTimeControlsFromState();
   syncBorderStyleControlsFromState();
   syncGeometryControls();
@@ -6265,6 +7952,29 @@ function syncNameplateFillSections() {
     section.hidden = section.dataset.nameplateFillSection !== state.layout.nameplate.plateFillMode;
   }
   els.namePlateGradientSpeedRow.hidden = !(state.layout.nameplate.plateFillMode === "gradient" && state.layout.nameplate.plateAnimateGradientAngle);
+}
+
+function syncPronounsTextControlsFromState() {
+  const config = state.layout.pronounsText;
+  if (!config) return;
+  els.pronounsEnabled.checked = config.enabled;
+  els.pronounsFont.value = config.fontFamily;
+  els.pronounsFontBrowser.value = Array.from(els.pronounsFontBrowser.options).some((option) => option.value === config.fontFamily)
+    ? config.fontFamily
+    : "";
+  els.pronounsFontSize.value = config.fontSize;
+  els.pronounsFontSizeValue.textContent = `${config.fontSize} px`;
+  els.pronounsTextColor.value = config.textColor;
+  els.pronounsTextX.value = config.textX;
+  els.pronounsTextY.value = config.textY;
+  els.pronounsStrokeEnabled.checked = config.strokeEnabled;
+  els.pronounsStrokeColor.value = config.strokeColor;
+  els.pronounsStrokeWidth.value = config.strokeWidth;
+  els.pronounsShadowEnabled.checked = config.shadowEnabled;
+  els.pronounsShadowColor.value = config.shadowColor;
+  els.pronounsShadowBlur.value = config.shadowBlur;
+  els.pronounsShadowX.value = config.shadowX;
+  els.pronounsShadowY.value = config.shadowY;
 }
 
 function syncFinishedTimeControlsFromState() {

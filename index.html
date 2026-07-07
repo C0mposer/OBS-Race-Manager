@@ -33,6 +33,8 @@
             <button id="viewEditMode" type="button">Edit Mode</button>
             <button id="viewControlMode" type="button">Control Mode</button>
             <button type="button" disabled>Crop Preview Mode</button>
+            <hr class="menu-divider">
+            <button id="viewFinishedScreen" type="button">Finished Screen</button>
           </div>
         </details>
       </nav>
@@ -94,6 +96,21 @@
               <span class="resize-handle" data-resize-handle="timer" aria-hidden="true"></span>
             </div>
             <div id="timerTextPreview" class="timer-text-preview" aria-hidden="true">00:00:00</div>
+            <div id="commentatorsPreview" class="commentators-preview drag-target hidden-element" data-drag-target="commentators" title="Drag to move commentators">
+              <div class="commentators-content"></div>
+              <span class="resize-handle" data-resize-handle="commentators" aria-hidden="true"></span>
+            </div>
+            <div id="finishedScreenLayer" class="finished-screen-layer" aria-hidden="true">
+              <div id="finishedScreenScale" class="finished-screen-scale"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="finishedScreenBar" class="finished-screen-bar hidden" role="status">
+          <span>Finished Screen is showing</span>
+          <div class="finished-screen-bar-actions">
+            <button id="finishedScreenReplay" type="button">Replay</button>
+            <button id="finishedScreenHide" type="button">Hide</button>
           </div>
         </div>
 
@@ -151,12 +168,14 @@
             <button type="button" data-settings-target="positions">Item Positions</button>
             <button type="button" data-settings-target="nameText">Name Text</button>
             <button type="button" data-settings-target="nameplates">Nameplates</button>
+            <button type="button" data-settings-target="commentators">Commentators</button>
             <button type="button" data-settings-target="borders">Borders</button>
             <button type="button" data-settings-target="theme">Theme</button>
             <button type="button" data-settings-target="animations">Animations</button>
             <button type="button" data-settings-target="timer">Timer</button>
             <button type="button" data-settings-target="finishedTime">Finished Time</button>
             <button type="button" data-settings-target="spotlight">Spotlight</button>
+            <button type="button" data-settings-target="finishedScreen">Finished Screen</button>
           </nav>
         </section>
 
@@ -189,19 +208,24 @@
             </select>
           </label>
           <label>
-            Reserved timer area
-            <input id="timerHeight" type="range" min="80" max="220" value="130">
-            <output id="timerHeightValue">130 px</output>
-          </label>
-          <label id="titleHeightRow">
-            Reserved title area
-            <input id="titleHeight" type="range" min="40" max="220" value="100">
+            Top margin
+            <input id="titleHeight" type="range" min="0" max="400" value="100">
             <output id="titleHeightValue">100 px</output>
           </label>
           <label>
-            Outer margin
-            <input id="marginSize" type="range" min="16" max="80" value="36">
-            <output id="marginValue">36 px</output>
+            Bottom margin
+            <input id="timerHeight" type="range" min="0" max="400" value="130">
+            <output id="timerHeightValue">130 px</output>
+          </label>
+          <label>
+            Left margin
+            <input id="marginLeft" type="range" min="0" max="400" value="36">
+            <output id="marginLeftValue">36 px</output>
+          </label>
+          <label>
+            Right margin
+            <input id="marginRight" type="range" min="0" max="400" value="36">
+            <output id="marginRightValue">36 px</output>
           </label>
           <label>
             Panel gap
@@ -243,11 +267,11 @@
           </label>
           <label>
             Title
-            <input id="raceTitle" type="text" value="Race Title">
+            <textarea id="raceTitle" rows="2">Race Title</textarea>
           </label>
           <label>
             Subtitle
-            <input id="raceSubtitle" type="text" value="Game - Category">
+            <textarea id="raceSubtitle" rows="2">Game - Category</textarea>
           </label>
           <label>
             Font
@@ -655,6 +679,217 @@
           </label>
         </details>
 
+        <details class="settings-group" data-settings-panel="finishedScreen">
+          <summary>Finished Screen</summary>
+          <div class="note compact-note">A full-screen results leaderboard, ranked by fastest finish time. Toggle it from the View menu — it appears in the preview and (when connected) in OBS.</div>
+          <div class="obs-actions">
+            <button id="finishedScreenShow" type="button">Show / Replay</button>
+            <button id="finishedScreenHideBtn" type="button">Hide</button>
+          </div>
+
+          <div class="section-subhead">General</div>
+          <div class="obs-grid">
+            <label>
+              Accent color
+              <input id="finishedScreenAccent" type="color" value="#f0b84a">
+            </label>
+            <label>
+              Backdrop color
+              <input id="finishedScreenBackdrop" type="color" value="#080b10">
+            </label>
+          </div>
+          <label>
+            Backdrop dim
+            <input id="finishedScreenBackdropOpacity" type="range" min="0" max="100" step="1" value="82">
+            <output id="finishedScreenBackdropOpacityValue">82 %</output>
+          </label>
+          <label>
+            Row animation speed
+            <input id="finishedScreenRowSpeed" type="range" min="200" max="1200" step="20" value="520">
+            <output id="finishedScreenRowSpeedValue">520 ms</output>
+          </label>
+          <label>
+            Row stagger
+            <input id="finishedScreenRowStagger" type="range" min="0" max="400" step="10" value="120">
+            <output id="finishedScreenRowStaggerValue">120 ms</output>
+          </label>
+          <label class="toggle-row obs-toggle">
+            <input id="finishedScreenGaps" type="checkbox">
+            <span>Show time behind leader</span>
+          </label>
+          <label class="toggle-row obs-toggle">
+            <input id="finishedScreenUnderline" type="checkbox" checked>
+            <span>Accent underline under heading</span>
+          </label>
+          <label class="toggle-row obs-toggle">
+            <input id="finishedScreenOnlyBackground" type="checkbox">
+            <span>Show only Theme background behind results</span>
+          </label>
+
+          <datalist id="finishedScreenFontChoices"></datalist>
+
+          <details class="nested-settings" style="margin-top: 10px;">
+            <summary>Header Text</summary>
+            <div style="margin-top: 10px; display: grid; gap: 10px;">
+              <label>
+                Heading
+                <input id="finishedScreenHeading" type="text" value="FINAL RESULTS" placeholder="FINAL RESULTS">
+              </label>
+              <label>
+                Font
+                <input id="finishedScreenHeadingFont" list="finishedScreenFontChoices" type="text" value="Segoe UI" placeholder="Installed font face">
+              </label>
+              <div class="font-picker">
+                <button id="finishedScreenHeadingBrowseFonts" type="button">Browse Installed Fonts</button>
+                <select id="finishedScreenHeadingFontBrowser" aria-label="Installed heading font browser">
+                  <option value="">Choose a font...</option>
+                </select>
+              </div>
+              <label>
+                Font size
+                <input id="finishedScreenHeadingFontSize" type="number" min="1" step="1" value="64">
+              </label>
+              <label>
+                Color
+                <input id="finishedScreenHeadingColor" type="color" value="#ffffff">
+              </label>
+              <label class="toggle-row obs-toggle">
+                <input id="finishedScreenHeadingStrokeEnabled" type="checkbox">
+                <span>Text stroke</span>
+              </label>
+              <div class="obs-grid">
+                <label>
+                  Stroke color
+                  <input id="finishedScreenHeadingStrokeColor" type="color" value="#000000">
+                </label>
+                <label>
+                  Stroke width
+                  <input id="finishedScreenHeadingStrokeWidth" type="number" min="0" max="20" step="1" value="2">
+                </label>
+              </div>
+              <label class="toggle-row obs-toggle">
+                <input id="finishedScreenHeadingShadowEnabled" type="checkbox" checked>
+                <span>Drop shadow</span>
+              </label>
+              <div class="obs-grid">
+                <label>
+                  Shadow color
+                  <input id="finishedScreenHeadingShadowColor" type="color" value="#000000">
+                </label>
+                <label>
+                  Blur
+                  <input id="finishedScreenHeadingShadowBlur" type="number" min="0" max="60" step="1" value="24">
+                </label>
+                <label>
+                  X
+                  <input id="finishedScreenHeadingShadowX" type="number" min="-40" max="40" step="1" value="0">
+                </label>
+                <label>
+                  Y
+                  <input id="finishedScreenHeadingShadowY" type="number" min="-40" max="40" step="1" value="4">
+                </label>
+              </div>
+            </div>
+          </details>
+
+          <details class="nested-settings" style="margin-top: 10px;">
+            <summary>Runner Text</summary>
+            <div style="margin-top: 10px; display: grid; gap: 10px;">
+              <label>
+                Font
+                <input id="finishedScreenRunnerFont" list="finishedScreenFontChoices" type="text" value="Segoe UI" placeholder="Installed font face">
+              </label>
+              <div class="font-picker">
+                <button id="finishedScreenRunnerBrowseFonts" type="button">Browse Installed Fonts</button>
+                <select id="finishedScreenRunnerFontBrowser" aria-label="Installed runner font browser">
+                  <option value="">Choose a font...</option>
+                </select>
+              </div>
+              <label>
+                Font size
+                <input id="finishedScreenRunnerFontSize" type="number" min="1" step="1" value="40">
+              </label>
+              <label>
+                Name color
+                <input id="finishedScreenRunnerColor" type="color" value="#ffffff">
+              </label>
+              <div class="note compact-note">Finish times use the accent color; names use the color above.</div>
+              <label class="toggle-row obs-toggle">
+                <input id="finishedScreenRunnerStrokeEnabled" type="checkbox">
+                <span>Text stroke</span>
+              </label>
+              <div class="obs-grid">
+                <label>
+                  Stroke color
+                  <input id="finishedScreenRunnerStrokeColor" type="color" value="#000000">
+                </label>
+                <label>
+                  Stroke width
+                  <input id="finishedScreenRunnerStrokeWidth" type="number" min="0" max="20" step="1" value="2">
+                </label>
+              </div>
+              <label class="toggle-row obs-toggle">
+                <input id="finishedScreenRunnerShadowEnabled" type="checkbox" checked>
+                <span>Drop shadow</span>
+              </label>
+              <div class="obs-grid">
+                <label>
+                  Shadow color
+                  <input id="finishedScreenRunnerShadowColor" type="color" value="#000000">
+                </label>
+                <label>
+                  Blur
+                  <input id="finishedScreenRunnerShadowBlur" type="number" min="0" max="60" step="1" value="8">
+                </label>
+                <label>
+                  X
+                  <input id="finishedScreenRunnerShadowX" type="number" min="-40" max="40" step="1" value="0">
+                </label>
+                <label>
+                  Y
+                  <input id="finishedScreenRunnerShadowY" type="number" min="-40" max="40" step="1" value="2">
+                </label>
+              </div>
+            </div>
+          </details>
+
+          <details class="nested-settings" style="margin-top: 10px;">
+            <summary>Top 3 Icons</summary>
+            <div style="margin-top: 10px; display: grid; gap: 10px;">
+              <label class="toggle-row obs-toggle">
+                <input id="finishedScreenIcons" type="checkbox">
+                <span>Show icons for top 3</span>
+              </label>
+              <div class="note compact-note">Upload an icon for each podium place. Each icon is scaled to fit fully inside the badge, so the whole image is always shown.</div>
+              <div class="note compact-note">Recommended resolution: 200&times;200 px (square), transparent PNG.</div>
+              <label>
+                1st place icon
+                <input id="finishedScreenIcon1" type="file" accept="image/*">
+              </label>
+              <div class="font-picker">
+                <img id="finishedScreenIcon1Preview" class="fs-icon-preview" alt="1st place icon preview" hidden>
+                <button id="finishedScreenIcon1Clear" type="button">Clear</button>
+              </div>
+              <label>
+                2nd place icon
+                <input id="finishedScreenIcon2" type="file" accept="image/*">
+              </label>
+              <div class="font-picker">
+                <img id="finishedScreenIcon2Preview" class="fs-icon-preview" alt="2nd place icon preview" hidden>
+                <button id="finishedScreenIcon2Clear" type="button">Clear</button>
+              </div>
+              <label>
+                3rd place icon
+                <input id="finishedScreenIcon3" type="file" accept="image/*">
+              </label>
+              <div class="font-picker">
+                <img id="finishedScreenIcon3Preview" class="fs-icon-preview" alt="3rd place icon preview" hidden>
+                <button id="finishedScreenIcon3Clear" type="button">Clear</button>
+              </div>
+            </div>
+          </details>
+        </details>
+
         <details class="settings-group" data-settings-panel="positions">
           <summary>Item Positions</summary>
           <div class="note">
@@ -777,28 +1012,64 @@
             <input id="animateObsLayout" type="checkbox" checked>
             <span>Animations On</span>
           </label>
-          <label>
-            Duration
-            <input id="animationMs" type="range" min="120" max="900" step="10" value="360">
-            <output id="animationValue">360 ms</output>
-          </label>
-          <label>
-            OBS animation style
-            <select id="animationStyle">
-              <option value="moveFade">Move + fade</option>
-              <option value="move">Move only</option>
-              <option value="scaleFade">Scale + fade</option>
-              <option value="fade">Fade only</option>
-              <option value="pop">Pop in/out</option>
-              <option value="settle">Settle bounce</option>
-              <option value="spotlightPulse">Spotlight pulse</option>
-            </select>
-          </label>
-          <label>
-            OBS animation FPS
-          <input id="animationFps" type="range" min="15" max="60" step="5" value="60">
-          <output id="animationFpsValue">60 fps</output>
-          </label>
+
+          <details class="nested-settings" style="margin-top: 10px; margin-bottom: 10px;">
+            <summary>Player Feeds</summary>
+            <div style="margin-top: 10px; display: grid; gap: 10px;">
+              <label>
+                Duration
+                <input id="animationMs" type="range" min="120" max="900" step="10" value="360">
+                <output id="animationValue">360 ms</output>
+              </label>
+              <label>
+                OBS animation style
+                <select id="animationStyle">
+                  <option value="moveFade">Move + fade</option>
+                  <option value="move">Move only</option>
+                  <option value="scaleFade">Scale + fade</option>
+                  <option value="fade">Fade only</option>
+                  <option value="pop">Pop in/out</option>
+                  <option value="settle">Settle bounce</option>
+                  <option value="spotlightPulse">Spotlight pulse</option>
+                </select>
+              </label>
+              <label>
+                OBS animation FPS
+                <input id="animationFps" type="range" min="15" max="60" step="5" value="60">
+                <output id="animationFpsValue">60 fps</output>
+              </label>
+            </div>
+          </details>
+
+          <details class="nested-settings" style="margin-top: 10px; margin-bottom: 10px;">
+            <summary>Finish Times</summary>
+            <div style="margin-top: 10px; display: grid; gap: 10px;">
+              <label>
+                Duration
+                <input id="finishAnimationMs" type="range" min="120" max="900" step="10" value="360">
+                <output id="finishAnimationValue">360 ms</output>
+              </label>
+              <label>
+                Animation style
+                <select id="finishAnimationStyle">
+                  <option value="scaleFade" selected>Scale + fade</option>
+                  <option value="moveFade">Move + fade</option>
+                  <option value="move">Move only</option>
+                  <option value="fade">Fade only</option>
+                  <option value="pop">Pop in/out</option>
+                  <option value="settle">Settle bounce</option>
+                  <option value="slideSide">Slide from side</option>
+                  <option value="drop">Drop in</option>
+                  <option value="glow">Glow pulse</option>
+                </select>
+              </label>
+              <label>
+                Animation FPS
+                <input id="finishAnimationFps" type="range" min="15" max="60" step="5" value="60">
+                <output id="finishAnimationFpsValue">60 fps</output>
+              </label>
+            </div>
+          </details>
         </details>
 
         <details class="settings-group" data-settings-panel="nameText">
@@ -881,6 +1152,81 @@
               <input id="nameShadowY" type="number" min="-20" max="20" step="1" value="2">
             </label>
           </div>
+
+          <details class="nested-settings" id="pronounsTextDetails">
+            <summary>Pronouns Text</summary>
+            <label class="toggle-row obs-toggle">
+              <input id="pronounsEnabled" type="checkbox" checked>
+              <span>Enable Pronouns Text</span>
+            </label>
+            <label>
+              Font
+              <input id="pronounsFont" list="pronounsFontChoices" type="text" value="Segoe UI" placeholder="Installed font face">
+              <datalist id="pronounsFontChoices"></datalist>
+            </label>
+            <div class="font-picker">
+              <button id="browsePronounsFonts" type="button">Browse Installed Fonts</button>
+              <select id="pronounsFontBrowser" aria-label="Installed pronouns font browser">
+                <option value="">Choose a font...</option>
+              </select>
+            </div>
+            <div id="pronounsFontStatus" class="note compact-note">Use Browse to request local font access, or type an installed font face.</div>
+            <label>
+              Max font size
+              <input id="pronounsFontSize" type="number" min="1" step="1" value="28">
+              <output id="pronounsFontSizeValue">28 px</output>
+            </label>
+            <label>
+              Text color
+              <input id="pronounsTextColor" type="color" value="#9aa7ae">
+            </label>
+            <div class="obs-grid">
+              <label>
+                Text X
+                <input id="pronounsTextX" type="number" min="-500" max="500" step="1" value="0">
+              </label>
+              <label>
+                Text Y
+                <input id="pronounsTextY" type="number" min="-200" max="200" step="1" value="0">
+              </label>
+            </div>
+            <label class="toggle-row obs-toggle">
+              <input id="pronounsStrokeEnabled" type="checkbox">
+              <span>Text stroke</span>
+            </label>
+            <div class="obs-grid">
+              <label>
+                Stroke color
+                <input id="pronounsStrokeColor" type="color" value="#000000">
+              </label>
+              <label>
+                Stroke width
+                <input id="pronounsStrokeWidth" type="number" min="0" max="8" step="1" value="2">
+              </label>
+            </div>
+            <label class="toggle-row obs-toggle">
+              <input id="pronounsShadowEnabled" type="checkbox" checked>
+              <span>Drop shadow</span>
+            </label>
+            <div class="obs-grid">
+              <label>
+                Shadow color
+                <input id="pronounsShadowColor" type="color" value="#000000">
+              </label>
+              <label>
+                Blur
+                <input id="pronounsShadowBlur" type="number" min="0" max="30" step="1" value="8">
+              </label>
+              <label>
+                X
+                <input id="pronounsShadowX" type="number" min="-20" max="20" step="1" value="0">
+              </label>
+              <label>
+                Y
+                <input id="pronounsShadowY" type="number" min="-20" max="20" step="1" value="2">
+              </label>
+            </div>
+          </details>
         </details>
 
         <details class="settings-group" data-settings-panel="nameplates">
@@ -1088,6 +1434,222 @@
           </div>
         </details>
 
+        <details class="settings-group" data-settings-panel="commentators">
+          <summary>Commentators</summary>
+          <label class="toggle-row obs-toggle">
+            <input id="commEnabled" type="checkbox">
+            <span>Enable Commentator Names</span>
+          </label>
+          <div class="note compact-note">A movable name plate for commentators. Drag it anywhere on the preview to position it.</div>
+          <label>
+            Label (optional)
+            <input id="commLabel" type="text" value="COMMENTARY" placeholder="COMMENTARY">
+          </label>
+          <label>
+            Commentator names (one per line)
+            <textarea id="commNames" rows="3" placeholder="Alice&#10;Bob"></textarea>
+          </label>
+
+          <div class="section-subhead">Text</div>
+          <label>
+            Font
+            <input id="commFont" list="commFontChoices" type="text" value="Segoe UI" placeholder="Installed font face">
+            <datalist id="commFontChoices"></datalist>
+          </label>
+          <div class="font-picker">
+            <button id="commBrowseFonts" type="button">Browse Installed Fonts</button>
+            <select id="commFontBrowser" aria-label="Installed commentators font browser">
+              <option value="">Choose a font...</option>
+            </select>
+          </div>
+          <label>
+            Max font size
+            <input id="commFontSize" type="number" min="1" step="1" value="34">
+          </label>
+          <div class="obs-grid">
+            <label>
+              Color
+              <input id="commColor" type="color" value="#ffffff">
+            </label>
+            <label>
+              Text nudge Y
+              <input id="commTextY" type="number" step="1" value="0">
+            </label>
+          </div>
+          <label>
+            Text nudge X
+            <input id="commTextX" type="number" step="1" value="0">
+          </label>
+          <label class="toggle-row obs-toggle">
+            <input id="commStrokeEnabled" type="checkbox">
+            <span>Text stroke</span>
+          </label>
+          <div class="obs-grid">
+            <label>
+              Stroke color
+              <input id="commStrokeColor" type="color" value="#000000">
+            </label>
+            <label>
+              Stroke width
+              <input id="commStrokeWidth" type="number" min="0" max="20" step="1" value="2">
+            </label>
+          </div>
+          <label class="toggle-row obs-toggle">
+            <input id="commShadowEnabled" type="checkbox" checked>
+            <span>Drop shadow</span>
+          </label>
+          <div class="obs-grid">
+            <label>
+              Shadow color
+              <input id="commShadowColor" type="color" value="#000000">
+            </label>
+            <label>
+              Blur
+              <input id="commShadowBlur" type="number" min="0" max="60" step="1" value="8">
+            </label>
+            <label>
+              X
+              <input id="commShadowX" type="number" min="-40" max="40" step="1" value="0">
+            </label>
+            <label>
+              Y
+              <input id="commShadowY" type="number" min="-40" max="40" step="1" value="2">
+            </label>
+          </div>
+
+          <div class="section-subhead">Plate</div>
+          <label>
+            Customize
+            <select id="commPlateMode">
+              <option value="generated">Create Plate</option>
+              <option value="image">Upload plate image</option>
+            </select>
+          </label>
+          <label class="toggle-row obs-toggle">
+            <input id="commShowBox" type="checkbox" checked>
+            <span>Show plate</span>
+          </label>
+          <section data-comm-plate-section="generated">
+            <label>
+              Plate type
+              <select id="commFillMode">
+                <option value="solid">Solid color</option>
+                <option value="gradient">Gradient</option>
+                <option value="texture">Texture image</option>
+              </select>
+            </label>
+            <section class="nameplate-editor-section" data-comm-plate-fill-section="solid">
+              <label>
+                Plate color
+                <input id="commBgColor" type="color" value="#070a0c">
+              </label>
+            </section>
+            <section class="nameplate-editor-section" data-comm-plate-fill-section="gradient">
+              <div class="obs-grid">
+                <label>
+                  From color
+                  <input id="commGradFrom" type="color" value="#070a0c">
+                </label>
+                <label>
+                  To color
+                  <input id="commGradTo" type="color" value="#1f2d34">
+                </label>
+                <label>
+                  Gradient angle
+                  <input id="commGradAngleSlider" type="range" min="0" max="360" step="1" value="135">
+                  <input id="commGradAngle" type="number" min="0" max="360" step="1" value="135">
+                </label>
+                <label class="toggle-row obs-toggle wide-control">
+                  <input id="commGradAnimate" type="checkbox">
+                  <span>Animate Gradient Angle</span>
+                </label>
+                <label id="commGradSpeedRow" class="wide-control">
+                  Speed
+                  <input id="commGradSpeed" type="range" min="-360" max="360" step="1" value="45">
+                  <output id="commGradSpeedValue">45 deg/s</output>
+                </label>
+              </div>
+            </section>
+            <section class="nameplate-editor-section" data-comm-plate-fill-section="texture">
+              <label>
+                Texture image
+                <input id="commTextureImage" type="file" accept="image/*">
+              </label>
+              <button id="commClearTexture" class="secondary-button" type="button">Clear Texture Image</button>
+              <div class="obs-grid">
+                <label>
+                  Scale
+                  <input id="commTextureScale" type="range" min="25" max="400" step="1" value="100">
+                  <output id="commTextureScaleValue">100%</output>
+                </label>
+                <label>
+                  X position
+                  <input id="commTextureX" type="range" min="0" max="100" step="1" value="50">
+                </label>
+                <label>
+                  Y position
+                  <input id="commTextureY" type="range" min="0" max="100" step="1" value="50">
+                </label>
+                <label>
+                  Scroll X
+                  <input id="commTextureScrollX" type="range" min="-200" max="200" step="1" value="0">
+                  <output id="commTextureScrollXValue">0 px/s</output>
+                </label>
+                <label>
+                  Scroll Y
+                  <input id="commTextureScrollY" type="range" min="-200" max="200" step="1" value="0">
+                  <output id="commTextureScrollYValue">0 px/s</output>
+                </label>
+              </div>
+            </section>
+            <div class="obs-grid">
+              <label>
+                Plate opacity
+                <input id="commBgOpacity" type="range" min="0" max="100" step="1" value="82">
+                <output id="commBgOpacityValue">82 %</output>
+              </label>
+              <label>
+                Side padding
+                <input id="commPadding" type="number" min="0" step="1" value="16">
+              </label>
+            </div>
+            <label>
+              Corner radius
+              <input id="commRadius" type="number" min="0" step="1" value="10">
+            </label>
+          </section>
+          <section data-comm-plate-section="image">
+            <div class="section-subhead">Image Plate</div>
+            <label>
+              Plate image
+              <input id="commPlateImage" type="file" accept="image/*">
+            </label>
+            <button id="commClearPlateImage" class="secondary-button" type="button">Clear Plate Image</button>
+            <div class="note compact-note">Transparent PNGs render with transparency in both preview and OBS.</div>
+          </section>
+
+          <div class="section-subhead">Border</div>
+          <label class="toggle-row obs-toggle">
+            <input id="commShowBorder" type="checkbox" checked>
+            <span>Show border</span>
+          </label>
+          <div class="obs-grid">
+            <label>
+              Border color
+              <input id="commBorderColor" type="color" value="#ffffff">
+            </label>
+            <label>
+              Border width
+              <input id="commBorderWidth" type="number" min="0" max="20" step="1" value="2">
+            </label>
+          </div>
+          <label>
+            Border opacity
+            <input id="commBorderOpacity" type="range" min="0" max="100" step="1" value="18">
+            <output id="commBorderOpacityValue">18 %</output>
+          </label>
+        </details>
+
         <details class="settings-group" data-settings-panel="borders">
           <summary>Borders</summary>
           <label>
@@ -1272,17 +1834,82 @@
           Display name
           <input data-field="name" type="text">
         </label>
-
-          <label>
-            Feed URL or label
+        <label>
+          Feed URL or label
           <input data-field="source" type="text" placeholder="https://vdo.ninja/?view=runner1">
         </label>
+
+        <details class="nested-settings" style="margin-top: 10px; margin-bottom: 10px;">
+          <summary>Pronouns</summary>
+          <div class="obs-grid" style="margin-top: 10px;">
+            <label>
+              Primary Pronoun
+              <select data-field="pronounPrimary">
+                <option value="">None</option>
+                <option value="he">He</option>
+                <option value="she">She</option>
+                <option value="they">They</option>
+                <option value="custom">Custom</option>
+              </select>
+            </label>
+            <label>
+              Secondary Pronoun
+              <select data-field="pronounSecondary">
+                <option value="">None</option>
+                <option value="he">He</option>
+                <option value="she">She</option>
+                <option value="they">They</option>
+                <option value="custom">Custom</option>
+              </select>
+            </label>
+          </div>
+          <label data-role="customPronounField" style="display: none; margin-top: 10px;">
+            Custom Pronoun
+            <input data-field="pronounCustom" type="text" placeholder="e.g. xe/xem">
+          </label>
+        </details>
 
         <div class="feed-tools">
           <span data-role="feedStatus" class="feed-status">Test pattern</span>
           <button data-action="vdoClean" type="button">VDO Clean</button>
         </div>
-        <label>
+        <div class="feed-tools">
+          <button data-action="markDone" type="button">Mark as Finished</button>
+          <button data-action="resetDone" type="button">Reset Finish</button>
+        </div>
+        <label data-role="finishEdit" class="finish-edit">
+          Finished time
+          <input data-field="finalTimeText" type="text" placeholder="00:00:00">
+        </label>
+
+        <details class="nested-settings" style="margin-top: 10px; margin-bottom: 10px;">
+          <summary>Crop</summary>
+          <div class="crop-grid" style="margin-top: 10px;">
+            <label>
+              Left crop
+              <input data-field="cropLeft" type="range" min="0" max="78" step="0.1" value="0">
+              <input data-field="cropLeft" class="crop-number" type="number" min="0" max="78" step="0.1" value="0" aria-label="Left crop percent">
+            </label>
+            <label>
+              Top crop
+              <input data-field="cropTop" type="range" min="0" max="78" step="0.1" value="0">
+              <input data-field="cropTop" class="crop-number" type="number" min="0" max="78" step="0.1" value="0" aria-label="Top crop percent">
+            </label>
+            <label>
+              Right crop
+              <input data-field="cropRight" type="range" min="0" max="78" step="0.1" value="0">
+              <input data-field="cropRight" class="crop-number" type="number" min="0" max="78" step="0.1" value="0" aria-label="Right crop percent">
+            </label>
+            <label>
+              Bottom crop
+              <input data-field="cropBottom" type="range" min="0" max="78" step="0.1" value="0">
+              <input data-field="cropBottom" class="crop-number" type="number" min="0" max="78" step="0.1" value="0" aria-label="Bottom crop percent">
+            </label>
+          </div>
+          <button data-action="previewSlot" type="button" style="margin-top: 10px; width: 100%;">Preview Crop</button>
+        </details>
+
+        <label style="margin-top: 10px; margin-bottom: 10px;">
           Temporary feed replace
           <select data-field="feedMode">
             <option value="live">Live feed</option>
@@ -1292,38 +1919,6 @@
             <option value="standby">Standby card</option>
           </select>
         </label>
-        <div class="feed-tools">
-          <button data-action="previewSlot" type="button">Preview Crop</button>
-          <button data-action="markDone" type="button">Mark as Finished</button>
-          <button data-action="resetDone" type="button">Reset Finish</button>
-        </div>
-        <label data-role="finishEdit" class="finish-edit">
-          Finished time
-          <input data-field="finalTimeText" type="text" placeholder="00:00:00">
-        </label>
-
-        <div class="crop-grid">
-        <label>
-          Left crop
-          <input data-field="cropLeft" type="range" min="0" max="78" step="0.1" value="0">
-          <input data-field="cropLeft" class="crop-number" type="number" min="0" max="78" step="0.1" value="0" aria-label="Left crop percent">
-        </label>
-        <label>
-          Top crop
-          <input data-field="cropTop" type="range" min="0" max="78" step="0.1" value="0">
-          <input data-field="cropTop" class="crop-number" type="number" min="0" max="78" step="0.1" value="0" aria-label="Top crop percent">
-        </label>
-        <label>
-          Right crop
-          <input data-field="cropRight" type="range" min="0" max="78" step="0.1" value="0">
-          <input data-field="cropRight" class="crop-number" type="number" min="0" max="78" step="0.1" value="0" aria-label="Right crop percent">
-        </label>
-        <label>
-          Bottom crop
-          <input data-field="cropBottom" type="range" min="0" max="78" step="0.1" value="0">
-          <input data-field="cropBottom" class="crop-number" type="number" min="0" max="78" step="0.1" value="0" aria-label="Bottom crop percent">
-        </label>
-        </div>
 
         <div class="section-subhead">Audio</div>
         <label class="toggle-row obs-toggle">
