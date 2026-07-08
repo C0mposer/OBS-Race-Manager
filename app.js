@@ -3,6 +3,7 @@ const MANAGED_PREFIX = "ORM__";
 const MAX_RUNNERS = 20;
 const RUNNER_PARTS = ["Feed", "Border", "Name", "Finish"];
 const GLOBAL_PARTS = ["Background", "TitleBar", "TimerBorder", "TimerText", "Commentators", "FinishedScreen"];
+const BASE_LAYER_ORDER = ["background", "runners", "title", "timerText", "timerFrame", "commentators", "finished"];
 const NAME_FONT_HEIGHT_RATIO = 0.48;
 const COMMON_FONT_FACES = [
   "Segoe UI",
@@ -292,6 +293,8 @@ const state = {
     gap: 20,
     viewMode: "edit",
     layerLock: false,
+    sceneView: true,
+    lockedElements: [],
     snapEnabled: true,
     animationMs: 360,
     animationFps: 60,
@@ -420,7 +423,9 @@ const state = {
     backgroundImage: "",
     backgroundScale: 100,
     backgroundScrollX: 0,
-    backgroundScrollY: 0
+    backgroundScrollY: 0,
+    mediaLayers: [],
+    layerOrder: [...BASE_LAYER_ORDER]
   },
   runners: createDefaultRunners()
 };
@@ -434,7 +439,9 @@ const history = {
 };
 const selection = {
   kind: "",
-  activePanel: "layout"
+  activePanel: "layout",
+  globalPanel: "layout",
+  elementId: "scene"
 };
 // Transient UI state (not persisted with the project).
 const uiState = {
@@ -451,6 +458,8 @@ const obsBridge = {
   applyTimer: 0,
   applying: false,
   pendingApply: false,
+  operationQueue: Promise.resolve(),
+  operationDepth: 0,
   opacitySupported: false,
   lastRects: new Map(),
   lastVisibility: new Map(),
@@ -471,6 +480,7 @@ document.addEventListener("DOMContentLoaded", () => {
   bindGlobalControls();
   syncGlobalControlsFromState();
   bindStageSizing();
+  applySceneView();
   update();
   makeOutputsEditable();
 });
@@ -501,8 +511,70 @@ function createRunner(slot, name, source, active, crop) {
     collapsed: false,
     pronounPrimary: "",
     pronounSecondary: "",
-    pronounCustom: ""
+    pronounCustom: "",
+    unique: false,
+    style: null
   };
+}
+
+// Per-runner style override. When a runner is "unique", it renders with its own
+// nameplate, finish-time, and game-feed border configs instead of the shared
+// ones. Implemented as a render-time swap so no per-runner threading is needed.
+function makeRunnerUnique(runner) {
+  if (!runner.style) runner.style = {};
+  if (!runner.style.nameplate) runner.style.nameplate = structuredClone(state.layout.nameplate);
+  if (!runner.style.finishedTime) runner.style.finishedTime = structuredClone(state.layout.finishedTime);
+  if (!runner.style.borderStyle) runner.style.borderStyle = structuredClone(getBorderStyle("feed"));
+  if (runner.style.borderImage === undefined) runner.style.borderImage = getBorderImage("feed");
+  runner.unique = true;
+}
+
+// Run `fn` with the shared configs temporarily swapped to the runner's overrides
+// (if unique). Synchronous only — callers must build strings inside.
+function withRunnerStyle(runner, fn) {
+  if (!runner || !runner.unique || !runner.style) return fn();
+  const s = runner.style;
+  const saved = {
+    np: state.layout.nameplate,
+    ft: state.layout.finishedTime,
+    bs: state.layout.borderStyles.feed,
+    bi: state.layout.borderImages.feed
+  };
+  if (s.nameplate) state.layout.nameplate = s.nameplate;
+  if (s.finishedTime) state.layout.finishedTime = s.finishedTime;
+  if (s.borderStyle) state.layout.borderStyles.feed = s.borderStyle;
+  if (s.borderImage !== undefined) state.layout.borderImages.feed = s.borderImage;
+  try {
+    return fn();
+  } finally {
+    state.layout.nameplate = saved.np;
+    state.layout.finishedTime = saved.ft;
+    state.layout.borderStyles.feed = saved.bs;
+    state.layout.borderImages.feed = saved.bi;
+  }
+}
+
+// The runner currently being edited (a selected, unique runner), or null.
+function editingUniqueRunner() {
+  const id = selection.elementId;
+  if (state.layout.sceneView && typeof id === "string" && id.startsWith("runner:")) {
+    const slot = Number(id.split(":")[1]);
+    const runner = state.runners.find((r) => r.slot === slot);
+    if (runner && runner.unique && runner.style) return runner;
+  }
+  return null;
+}
+
+// The configs the Properties controls should read/write: the selected unique
+// runner's override when editing one, else the shared config.
+function activeNameplate() {
+  const runner = editingUniqueRunner();
+  return runner && runner.style.nameplate ? runner.style.nameplate : state.layout.nameplate;
+}
+
+function activeFinishedTime() {
+  const runner = editingUniqueRunner();
+  return runner && runner.style.finishedTime ? runner.style.finishedTime : state.layout.finishedTime;
 }
 
 function zeroCrop() {
@@ -616,7 +688,14 @@ function hideObsoletePlateRadiusControls() {
 }
 
 function bindElements() {
+  els.leftEditTabs = document.querySelector(".left-edit-tabs");
   els.runnerControls = document.getElementById("runnerControls");
+  els.mediaLayer = document.getElementById("mediaLayer");
+  els.addMediaLayer = document.getElementById("addMediaLayer");
+  els.addMediaMenu = document.getElementById("addMediaMenu");
+  els.addImageLayer = document.getElementById("addImageLayer");
+  els.addVideoLayer = document.getElementById("addVideoLayer");
+  els.mediaLayerFile = document.getElementById("mediaLayerFile");
   els.runnerLayer = document.getElementById("runnerLayer");
   els.stage = document.getElementById("stage");
   els.stageWrap = document.querySelector(".stage-wrap");
@@ -972,6 +1051,14 @@ function bindElements() {
   els.viewEditMode = document.getElementById("viewEditMode");
   els.viewControlMode = document.getElementById("viewControlMode");
   els.viewFinishedScreen = document.getElementById("viewFinishedScreen");
+  els.sceneTree = document.getElementById("sceneTree");
+  els.sceneTreePanel = document.getElementById("sceneTreePanel");
+  els.sceneViewToggle = document.getElementById("sceneViewToggle");
+  els.inspectorHeader = document.getElementById("inspectorHeader");
+  els.inspectorTitle = document.getElementById("inspectorTitle");
+  els.globalTabs = document.getElementById("globalTabs");
+  els.runnerUniqueRow = document.getElementById("runnerUniqueRow");
+  els.runnerUnique = document.getElementById("runnerUnique");
   els.finishedScreenLayer = document.getElementById("finishedScreenLayer");
   els.finishedScreenScale = document.getElementById("finishedScreenScale");
   els.finishedScreenBar = document.getElementById("finishedScreenBar");
@@ -1051,6 +1138,41 @@ function bindGlobalControls() {
   els.viewEditMode.addEventListener("click", () => setViewMode("edit"));
   els.viewControlMode.addEventListener("click", () => setViewMode("control"));
   els.viewFinishedScreen.addEventListener("click", toggleFinishedScreen);
+  if (els.leftEditTabs) els.leftEditTabs.addEventListener("click", handleLeftTabClick);
+  if (els.addMediaLayer) els.addMediaLayer.addEventListener("click", toggleAddMediaMenu);
+  if (els.addImageLayer) els.addImageLayer.addEventListener("click", () => openMediaLayerPicker("image"));
+  if (els.addVideoLayer) els.addVideoLayer.addEventListener("click", () => openMediaLayerPicker("video"));
+  if (els.mediaLayerFile) els.mediaLayerFile.addEventListener("change", handleMediaLayerFile);
+  if (els.sceneViewToggle) els.sceneViewToggle.addEventListener("click", toggleSceneView);
+  if (els.sceneTree) els.sceneTree.addEventListener("click", handleSceneTreeClick);
+  if (els.sceneTree) els.sceneTree.addEventListener("dragstart", handleSceneTreeDragStart);
+  if (els.sceneTree) els.sceneTree.addEventListener("dragover", handleSceneTreeDragOver);
+  if (els.sceneTree) els.sceneTree.addEventListener("dragleave", handleSceneTreeDragLeave);
+  if (els.sceneTree) els.sceneTree.addEventListener("drop", handleSceneTreeDrop);
+  if (els.sceneTree) els.sceneTree.addEventListener("dragend", handleSceneTreeDragEnd);
+  if (els.sceneTree) els.sceneTree.addEventListener("contextmenu", handleSceneTreeContextMenu);
+  if (els.globalTabs) els.globalTabs.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-global]");
+    if (button) focusGlobalPanel(button.dataset.global);
+  });
+  if (els.runnerUnique) els.runnerUnique.addEventListener("change", (event) => {
+    const id = selection.elementId;
+    if (typeof id !== "string" || !id.startsWith("runner:")) return;
+    const slot = Number(id.split(":")[1]);
+    const runner = state.runners.find((r) => r.slot === slot);
+    if (!runner) return;
+    pushHistory("runner unique");
+    if (event.target.checked) makeRunnerUnique(runner);
+    else runner.unique = false;
+    syncNameplateControlsFromState();
+    update();
+    scheduleObsApply("nameplate", 80);
+  });
+  if (els.runnerControls) els.runnerControls.addEventListener("click", (event) => {
+    if (event.target.closest("input, button, select, textarea, label, a")) return;
+    const card = event.target.closest(".runner-card[data-slot]");
+    if (card) setSelectedElement(`runner:${card.dataset.slot}`);
+  });
   bindFinishedScreenControls();
   bindCommentatorsControls();
   els.resetAllFinishes.addEventListener("click", resetAllFinishes);
@@ -1106,7 +1228,7 @@ function bindGlobalControls() {
     state.layout.snapEnabled = event.target.checked;
     update();
   });
-  for (const input of [els.titleBarVisible, els.raceInfoEnabled]) {
+  for (const input of [els.titleBarVisible, els.raceInfoEnabled].filter(Boolean)) {
     input.addEventListener("change", (event) => {
       pushHistory("title visibility");
       state.layout.elements.titleBar = event.target.checked;
@@ -1522,20 +1644,22 @@ function bindGeometryInputs() {
     });
   }
 
-  els.timerBorderEnabled.addEventListener("change", (event) => {
-    pushHistory("timer border enabled");
-    state.layout.timerBorder.enabled = event.target.checked;
-    state.layout.elements.timerBorder = event.target.checked;
-    update();
-    scheduleObsApply("timerBorder", 120);
-  });
+  if (els.timerBorderEnabled) {
+    els.timerBorderEnabled.addEventListener("change", (event) => {
+      pushHistory("timer border enabled");
+      state.layout.timerBorder.enabled = event.target.checked;
+      state.layout.elements.timerBorder = event.target.checked;
+      update();
+      scheduleObsApply("timerBorder", 120);
+    });
+  }
 
   for (const [input, key, reason] of [
     [els.feedVisible, "feed", "feed-visible"],
     [els.feedBorderVisible, "feedBorder", "feed-border-visible"],
     [els.nameVisible, "name", "name-visible"],
     [els.finishedTimeVisible, "finishedTime", "finish-visible"]
-  ]) {
+  ].filter(([input]) => Boolean(input))) {
     input.addEventListener("change", () => {
       pushHistory(reason);
       state.layout.elements[key] = input.checked;
@@ -1807,19 +1931,19 @@ function bindNameplateControls() {
 
   els.nameFont.addEventListener("change", (event) => {
     pushHistory("name font");
-    state.layout.nameplate.fontFamily = event.target.value;
+    activeNameplate().fontFamily = event.target.value;
     update();
     scheduleObsApply("nameplate", 120);
   });
   els.nameFont.addEventListener("input", (event) => {
-    state.layout.nameplate.fontFamily = event.target.value;
+    activeNameplate().fontFamily = event.target.value;
     update();
     scheduleObsApply("nameplate", 240);
   });
   els.nameFontBrowser.addEventListener("change", (event) => {
     if (!event.target.value) return;
     pushHistory("name font");
-    state.layout.nameplate.fontFamily = event.target.value;
+    activeNameplate().fontFamily = event.target.value;
     syncNameplateControlsFromState();
     update();
     scheduleObsApply("nameplate", 120);
@@ -1828,7 +1952,7 @@ function bindNameplateControls() {
 
   els.nameplateMode.addEventListener("change", (event) => {
     pushHistory("nameplate mode");
-    state.layout.nameplate.plateMode = event.target.value;
+    activeNameplate().plateMode = event.target.value;
     syncNameplateModeSections();
     update();
     scheduleObsApply("nameplate", 120);
@@ -1836,7 +1960,7 @@ function bindNameplateControls() {
 
   els.namePlateFillMode.addEventListener("change", (event) => {
     pushHistory("nameplate fill mode");
-    state.layout.nameplate.plateFillMode = event.target.value;
+    activeNameplate().plateFillMode = event.target.value;
     syncNameplateControlsFromState();
     update();
     scheduleObsApply("nameplate", 120);
@@ -1844,7 +1968,7 @@ function bindNameplateControls() {
 
   els.namePlateAnimateGradientAngle.addEventListener("change", () => {
     pushHistory("nameplate gradient animation");
-    state.layout.nameplate.plateAnimateGradientAngle = els.namePlateAnimateGradientAngle.checked;
+    activeNameplate().plateAnimateGradientAngle = els.namePlateAnimateGradientAngle.checked;
     syncNameplateControlsFromState();
     update();
     scheduleObsApply("nameplate", 120);
@@ -1853,8 +1977,8 @@ function bindNameplateControls() {
   els.namePlateTextureImage.addEventListener("change", (event) => {
     readImageFile(event.target.files?.[0], (dataUrl) => {
       pushHistory("nameplate texture image");
-      state.layout.nameplate.plateTextureImage = dataUrl;
-      state.layout.nameplate.plateFillMode = "texture";
+      activeNameplate().plateTextureImage = dataUrl;
+      activeNameplate().plateFillMode = "texture";
       syncNameplateControlsFromState();
       update();
       scheduleObsApply("nameplate", 250);
@@ -1863,9 +1987,9 @@ function bindNameplateControls() {
   });
 
   els.clearNamePlateTextureImage.addEventListener("click", () => {
-    if (!state.layout.nameplate.plateTextureImage) return;
+    if (!activeNameplate().plateTextureImage) return;
     pushHistory("clear nameplate texture image");
-    state.layout.nameplate.plateTextureImage = "";
+    activeNameplate().plateTextureImage = "";
     syncNameplateControlsFromState();
     update();
     scheduleObsApply("nameplate", 120);
@@ -1874,8 +1998,8 @@ function bindNameplateControls() {
   els.nameplateImage.addEventListener("change", (event) => {
     readImageFile(event.target.files?.[0], (dataUrl) => {
       pushHistory("nameplate image");
-      state.layout.nameplate.plateImage = dataUrl;
-      state.layout.nameplate.plateMode = "image";
+      activeNameplate().plateImage = dataUrl;
+      activeNameplate().plateMode = "image";
       syncNameplateControlsFromState();
       update();
       scheduleObsApply("nameplate-image", 250);
@@ -1884,9 +2008,9 @@ function bindNameplateControls() {
   });
 
   els.clearNameplateImage.addEventListener("click", () => {
-    if (!state.layout.nameplate.plateImage) return;
+    if (!activeNameplate().plateImage) return;
     pushHistory("clear nameplate image");
-    state.layout.nameplate.plateImage = "";
+    activeNameplate().plateImage = "";
     syncNameplateControlsFromState();
     update();
     scheduleObsApply("nameplate-image", 120);
@@ -1896,8 +2020,8 @@ function bindNameplateControls() {
     input.addEventListener("focus", () => beginContinuousHistory(`nameplate-${key}`));
     input.addEventListener("change", endContinuousHistory);
     input.addEventListener("input", () => {
-      state.layout.nameplate[key] = Number(input.value);
-      if (output) output.textContent = `${state.layout.nameplate[key]}${suffix}`;
+      activeNameplate()[key] = Number(input.value);
+      if (output) output.textContent = `${activeNameplate()[key]}${suffix}`;
       update();
       scheduleObsApply("nameplate", 160);
     });
@@ -1914,7 +2038,7 @@ function bindNameplateControls() {
   ]) {
     input.addEventListener("pointerdown", () => beginContinuousHistory(`nameplate-${key}`));
     input.addEventListener("input", () => {
-      state.layout.nameplate[key] = input.value;
+      activeNameplate()[key] = input.value;
       update();
       scheduleObsApply("nameplate", 80);
     });
@@ -1929,7 +2053,7 @@ function bindNameplateControls() {
   ]) {
     input.addEventListener("change", () => {
       pushHistory(`nameplate-${key}`);
-      state.layout.nameplate[key] = input.checked;
+      activeNameplate()[key] = input.checked;
       update();
       scheduleObsApply("nameplate", 120);
     });
@@ -2010,19 +2134,19 @@ function bindPronounsTextControls() {
 function bindFinishedTimeControls() {
   els.finishFont.addEventListener("change", (event) => {
     pushHistory("finish font");
-    state.layout.finishedTime.fontFamily = event.target.value;
+    activeFinishedTime().fontFamily = event.target.value;
     update();
     scheduleObsApply("finish", 120);
   });
   els.finishFont.addEventListener("input", (event) => {
-    state.layout.finishedTime.fontFamily = event.target.value;
+    activeFinishedTime().fontFamily = event.target.value;
     update();
     scheduleObsApply("finish", 240);
   });
   els.finishFontBrowser.addEventListener("change", (event) => {
     if (!event.target.value) return;
     pushHistory("finish font");
-    state.layout.finishedTime.fontFamily = event.target.value;
+    activeFinishedTime().fontFamily = event.target.value;
     syncFinishedTimeControlsFromState();
     update();
     scheduleObsApply("finish", 120);
@@ -2039,8 +2163,8 @@ function bindFinishedTimeControls() {
     input.addEventListener("focus", () => beginContinuousHistory(`finish-${key}`));
     input.addEventListener("change", endContinuousHistory);
     input.addEventListener("input", () => {
-      state.layout.finishedTime[key] = Number(input.value);
-      if (output) output.textContent = `${state.layout.finishedTime[key]}${suffix}`;
+      activeFinishedTime()[key] = Number(input.value);
+      if (output) output.textContent = `${activeFinishedTime()[key]}${suffix}`;
       update();
       scheduleObsApply("finish", 120);
     });
@@ -2053,7 +2177,7 @@ function bindFinishedTimeControls() {
   ]) {
     input.addEventListener("pointerdown", () => beginContinuousHistory(`finish-${key}`));
     input.addEventListener("input", () => {
-      state.layout.finishedTime[key] = input.value;
+      activeFinishedTime()[key] = input.value;
       update();
       scheduleObsApply("finish", 80);
     });
@@ -2067,7 +2191,7 @@ function bindFinishedTimeControls() {
   ]) {
     input.addEventListener("change", () => {
       pushHistory(`finish-${key}`);
-      state.layout.finishedTime[key] = input.checked;
+      activeFinishedTime()[key] = input.checked;
       update();
       scheduleObsApply("finish", 120);
     });
@@ -2075,7 +2199,7 @@ function bindFinishedTimeControls() {
 
   els.finishAlign.addEventListener("change", () => {
     pushHistory("finish align");
-    state.layout.finishedTime.align = els.finishAlign.value;
+    activeFinishedTime().align = els.finishAlign.value;
     update();
     scheduleObsApply("finish", 120);
   });
@@ -2207,7 +2331,13 @@ function bindPreviewDragging() {
     if (!target) return;
 
     const kind = handle?.dataset.resizeHandle || target.dataset.dragTarget;
+    const elementId = dragKindToElementId(kind, target);
+    if (isDragKindLocked(kind) || isElementLocked(elementId)) {
+      setSelectedElement(elementId);
+      return;
+    }
     setSelectedDragTarget(kind);
+    setSelectedElement(elementId);
     const textDrag = kind === "nameText" || kind === "pronounsText";
     const rect = textDrag ? getTextDragRect(kind) : getDragRect(kind, target);
     const container = getDragContainer(kind, target);
@@ -2216,6 +2346,7 @@ function bindPreviewDragging() {
 
     drag = {
       kind,
+      mediaId: target.dataset.mediaId || "",
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
@@ -2263,6 +2394,9 @@ function bindPreviewDragging() {
         y: drag.original.y + dy
       };
     }
+    if (drag.kind === "media" && drag.mode === "resize" && !event.shiftKey) {
+      applyMediaAspectResize(drag, dx, dy);
+    }
     normalizeGeometryRect(drag.current);
     applySnapToDragRect(drag, event);
     if (drag.kind === "finish" && state.layout.finishedTime.lockToNameplate) {
@@ -2297,6 +2431,9 @@ function bindPreviewDragging() {
       syncPronounsTextControlsFromState();
     } else if (drag.kind === "finish") {
       Object.assign(state.layout.panelGeometry.finish, storedFinishGeometry(drag.current));
+    } else if (drag.kind === "media") {
+      const layer = getMediaLayer(drag.mediaId);
+      if (layer) Object.assign(layer.rect, drag.current);
     } else {
       Object.assign(getDragRect(drag.kind), drag.current);
     }
@@ -2312,6 +2449,8 @@ function bindPreviewDragging() {
               ? "raceInfo"
             : drag.kind === "commentators"
               ? "commentators"
+              : drag.kind === "media"
+                ? "media"
             : drag.kind === "name"
               ? "geometry"
               : "drag-end";
@@ -2333,7 +2472,7 @@ function focusRunnerName(slot) {
 }
 
 function getDragContainer(kind, target) {
-  if (kind === "timer" || kind === "title" || kind === "commentators") return els.stage.getBoundingClientRect();
+  if (kind === "timer" || kind === "title" || kind === "commentators" || kind === "media") return els.stage.getBoundingClientRect();
   if (kind === "nameText" || kind === "pronounsText") return target.closest(".runner-nameplate").getBoundingClientRect();
   return target.closest(".runner-panel").getBoundingClientRect();
 }
@@ -2397,6 +2536,7 @@ function getDragRect(kind, target = null) {
   if (kind === "name") return state.layout.panelGeometry.name;
   if (kind === "title") return state.layout.raceInfo.rect;
   if (kind === "commentators") return state.layout.commentators.rect;
+  if (kind === "media") return getMediaLayer(target?.dataset.mediaId || "")?.rect || { x: 0, y: 0, width: 0.1, height: 0.1 };
   if (kind === "finish") {
     const slot = Number(target?.closest(".runner-panel")?.dataset.slot);
     const runner = state.runners.find((candidate) => candidate.slot === slot);
@@ -2408,7 +2548,7 @@ function getDragRect(kind, target = null) {
 function setSelectedDragTarget(kind) {
   selection.kind = kind;
   for (const element of els.stage.querySelectorAll("[data-drag-target]")) {
-    element.classList.toggle("selected", element.dataset.dragTarget === kind);
+    element.classList.toggle("selected", kind !== "media" && element.dataset.dragTarget === kind);
   }
 }
 
@@ -2417,6 +2557,27 @@ function normalizeGeometryRect(rect) {
   rect.height = Math.max(0.02, Math.min(1, Number(rect.height)));
   rect.x = Math.max(0, Math.min(1 - rect.width, Number(rect.x)));
   rect.y = Math.max(0, Math.min(1 - rect.height, Number(rect.y)));
+}
+
+function applyMediaAspectResize(drag, dx, dy) {
+  const layer = getMediaLayer(drag.mediaId);
+  const aspect = Number(layer?.aspectRatio) || (drag.original.width * STAGE.width) / Math.max(1, drag.original.height * STAGE.height) || 16 / 9;
+  const stageRatio = STAGE.width / STAGE.height;
+  if (Math.abs(dy) > Math.abs(dx)) {
+    drag.current.width = drag.current.height * aspect / stageRatio;
+  } else {
+    drag.current.height = drag.current.width * stageRatio / aspect;
+  }
+  const maxWidth = Math.max(0.02, 1 - drag.current.x);
+  const maxHeight = Math.max(0.02, 1 - drag.current.y);
+  if (drag.current.width > maxWidth) {
+    drag.current.width = maxWidth;
+    drag.current.height = drag.current.width * stageRatio / aspect;
+  }
+  if (drag.current.height > maxHeight) {
+    drag.current.height = maxHeight;
+    drag.current.width = drag.current.height * aspect / stageRatio;
+  }
 }
 
 function applySnapToDragRect(drag, event) {
@@ -2582,6 +2743,12 @@ function paintDragPreview(kind, rect) {
     return;
   }
 
+  if (kind === "media") {
+    const target = els.stage.querySelector(".media-preview.dragging");
+    if (target) applyNormalizedStyle(target, rect);
+    return;
+  }
+
   const selector = kind === "feed" ? ".game-viewport" : kind === "finish" ? ".runner-finished-time" : ".runner-nameplate";
   for (const element of els.runnerLayer.querySelectorAll(selector)) {
     applyNormalizedStyle(element, rect);
@@ -2710,6 +2877,26 @@ function handleSettingsTabClick(event) {
   setActiveSettingsPanel(button.dataset.settingsTarget);
 }
 
+function handleLeftTabClick(event) {
+  const button = event.target.closest("[data-left-tab]");
+  if (!button) return;
+  setActiveLeftTab(button.dataset.leftTab);
+}
+
+function setActiveLeftTab(target) {
+  if (!els.leftEditTabs) return;
+  for (const button of els.leftEditTabs.querySelectorAll("[data-left-tab]")) {
+    const active = button.dataset.leftTab === target;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", active ? "true" : "false");
+  }
+  for (const panel of els.leftEditTabs.querySelectorAll("[data-left-panel]")) {
+    const active = panel.dataset.leftPanel === target;
+    panel.classList.toggle("active", active);
+    panel.hidden = !active;
+  }
+}
+
 function setViewMode(mode) {
   const nextMode = mode === "control" ? "control" : "edit";
   if (state.layout.viewMode === nextMode) return;
@@ -2719,6 +2906,885 @@ function setViewMode(mode) {
   else state.layout.layerLock = false;
   syncGlobalControlsFromState();
   update();
+}
+
+function toggleAddMediaMenu(event) {
+  event?.stopPropagation();
+  if (!els.addMediaMenu) return;
+  const open = els.addMediaMenu.hidden;
+  els.addMediaMenu.hidden = !open;
+  els.addMediaLayer?.setAttribute("aria-expanded", open ? "true" : "false");
+  if (open) {
+    document.addEventListener("click", closeAddMediaMenu, { once: true });
+  }
+}
+
+function closeAddMediaMenu() {
+  if (!els.addMediaMenu) return;
+  els.addMediaMenu.hidden = true;
+  els.addMediaLayer?.setAttribute("aria-expanded", "false");
+}
+
+function openMediaLayerPicker(kind) {
+  closeAddMediaMenu();
+  if (!els.mediaLayerFile) return;
+  els.mediaLayerFile.accept = kind === "video" ? "video/*" : "image/*";
+  els.mediaLayerFile.dataset.mediaKind = kind;
+  els.mediaLayerFile.click();
+}
+
+function mediaNodeId(id) {
+  return `media:${id}`;
+}
+
+function mediaPartName(layer) {
+  return `Media_${layer.id}`;
+}
+
+function getMediaLayer(id) {
+  return state.layout.mediaLayers.find((layer) => layer.id === id) || null;
+}
+
+function mediaLayerIds() {
+  return state.layout.mediaLayers.map((layer) => mediaNodeId(layer.id));
+}
+
+function normalizedLayerOrder() {
+  return normalizedLayerOrderFor(state.layout);
+}
+
+async function addMediaLayerFromFile(file, dataUrl) {
+  const id = `media${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+  const isVideo = String(file.type || "").startsWith("video/");
+  const dimensions = await readMediaDimensions(dataUrl, isVideo ? "video" : "image");
+  const aspectRatio = dimensions.width > 0 && dimensions.height > 0 ? dimensions.width / dimensions.height : 16 / 9;
+  const defaultWidth = 0.5;
+  const defaultHeight = Math.min(0.7, defaultWidth * (STAGE.width / STAGE.height) / aspectRatio);
+  const layer = {
+    id,
+    name: file.name ? file.name.replace(/\.[^.]+$/, "") : (isVideo ? "Video" : "Image"),
+    type: isVideo ? "video" : "image",
+    mimeType: file.type || "",
+    dataUrl,
+    aspectRatio,
+    visible: true,
+    rect: { x: 0.25, y: 0.22, width: defaultWidth, height: defaultHeight }
+  };
+  pushHistory("add media layer");
+  state.layout.mediaLayers.push(layer);
+  normalizedLayerOrder();
+  const nodeId = mediaNodeId(layer.id);
+  const order = state.layout.layerOrder;
+  const current = order.indexOf(nodeId);
+  const finished = order.indexOf("finished");
+  if (current >= 0 && finished >= 0 && current > finished) {
+    order.splice(current, 1);
+    order.splice(finished, 0, nodeId);
+  }
+  setSelectedElement(nodeId);
+  update();
+  scheduleObsApply("media", 120);
+}
+
+function handleMediaLayerFile(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const requestedKind = event.target.dataset.mediaKind;
+  if (requestedKind === "image" && !String(file.type || "").startsWith("image/")) {
+    logObs("Choose an image file for Add Image.");
+    event.target.value = "";
+    return;
+  }
+  if (requestedKind === "video" && !String(file.type || "").startsWith("video/")) {
+    logObs("Choose a video file for Add Video.");
+    event.target.value = "";
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => void addMediaLayerFromFile(file, String(reader.result));
+  reader.readAsDataURL(file);
+  event.target.value = "";
+}
+
+function readMediaDimensions(dataUrl, type) {
+  return new Promise((resolve) => {
+    if (type === "video") {
+      const video = document.createElement("video");
+      const done = () => resolve({ width: video.videoWidth || 16, height: video.videoHeight || 9 });
+      video.addEventListener("loadedmetadata", done, { once: true });
+      video.addEventListener("error", () => resolve({ width: 16, height: 9 }), { once: true });
+      video.preload = "metadata";
+      video.src = dataUrl;
+      video.load();
+      return;
+    }
+    const image = new Image();
+    image.onload = () => resolve({ width: image.naturalWidth || 16, height: image.naturalHeight || 9 });
+    image.onerror = () => resolve({ width: 16, height: 9 });
+    image.src = dataUrl;
+  });
+}
+
+function removeMediaLayer(id) {
+  const layer = getMediaLayer(id);
+  if (!layer) return;
+  pushHistory("remove media layer");
+  state.layout.mediaLayers = state.layout.mediaLayers.filter((candidate) => candidate.id !== id);
+  state.layout.layerOrder = normalizedLayerOrder().filter((entry) => entry !== mediaNodeId(id));
+  if (selection.elementId === mediaNodeId(id)) setSelectedElement("scene");
+  void removeManagedMediaInput(layer);
+  update();
+  scheduleObsApply("media", 80);
+}
+
+async function removeManagedMediaInput(layer) {
+  if (!obsBridge.connected || !obsBridge.client) return;
+  try {
+    await obsCall("RemoveInput", { inputName: `${MANAGED_PREFIX}${mediaPartName(layer)}` });
+    obsBridge.itemIds.delete(`${MANAGED_PREFIX}${mediaPartName(layer)}`);
+  } catch (error) {
+    if (!/not found|ResourceNotFound|does not exist/i.test(error.message)) {
+      logObs(`Could not remove ${layer.name || "media layer"}: ${error.message}`);
+    }
+  }
+}
+
+let sceneTreeDragId = "";
+
+function moveLayerOrderItem(draggedId, targetId, placeAfter = false) {
+  if (!draggedId || !targetId || draggedId === targetId || draggedId === "background") return;
+  const order = normalizedLayerOrder();
+  const fromIndex = order.indexOf(draggedId);
+  let targetIndex = order.indexOf(targetId);
+  if (fromIndex < 0 || targetIndex < 0) return;
+  pushHistory("scene layer order");
+  order.splice(fromIndex, 1);
+  if (fromIndex < targetIndex) targetIndex -= 1;
+  const insertAt = targetIndex + (placeAfter ? 1 : 0);
+  order.splice(Math.max(1, insertAt), 0, draggedId);
+  state.layout.layerOrder = order;
+  renderSceneTree();
+  applySceneLayerZIndexes();
+  scheduleObsApply("layer-order", 80);
+}
+
+// --- Scene tree (Phase 1: tree + eyes + locks + selection) -----------------
+
+function elementFlagVis(key, reason) {
+  return {
+    get: () => Boolean(state.layout.elements[key]),
+    toggle: () => {
+      pushHistory("visibility");
+      state.layout.elements[key] = !state.layout.elements[key];
+      syncGlobalControlsFromState();
+      update();
+      scheduleObsApply(reason, 100);
+    }
+  };
+}
+
+function buildOrderedSceneTree() {
+  const nodes = [{ id: "scene", label: "Scene", kind: "scene", indent: 0 }];
+  const activeRunners = state.runners.filter((runner) => runner.active);
+  const appendRunners = () => {
+    nodes.push({ id: "runners", label: `Runners - ${activeRunners.length}`, kind: "group", indent: 0, lockable: true, selectable: true });
+    for (const runner of activeRunners) {
+      nodes.push({
+        id: `runner:${runner.slot}`, label: `P${runner.placement} - ${runner.name || "Runner"}`, indent: 1, kind: "runner", slot: runner.slot, lockable: true,
+        vis: {
+          get: () => Boolean(runner.active),
+          toggle: () => {
+            pushHistory("runner active");
+            runner.active = !runner.active;
+            renderRunnerControls();
+            update();
+            scheduleObsApply("active", 80);
+          }
+        }
+      });
+    }
+    nodes.push({ id: "layers", label: "Shared layers", kind: "group", indent: 1 });
+    nodes.push({ id: "layer:feed", label: "Game feeds", indent: 2, vis: elementFlagVis("feed", "feed-visible") });
+    nodes.push({ id: "layer:feedBorder", label: "Feed borders", indent: 2, vis: elementFlagVis("feedBorder", "feed-border-visible") });
+    nodes.push({ id: "layer:name", label: "Nameplates", indent: 2, vis: elementFlagVis("name", "name-visible") });
+    nodes.push({ id: "layer:finishedTime", label: "Finish times", indent: 2, vis: elementFlagVis("finishedTime", "finish-visible") });
+  };
+
+  for (const id of [...normalizedLayerOrder()].reverse()) {
+    if (id === "background") nodes.push({ id: "background", label: "Background", indent: 0 });
+    else if (id === "title") nodes.push({ id: "title", label: "Title bar", indent: 0, orderId: id, drag: "title", lockable: true, vis: elementFlagVis("titleBar", "raceInfo") });
+    else if (id === "timerText") nodes.push({ id: "timerText", label: "Timer text", indent: 0, orderId: id, drag: "timer", vis: elementFlagVis("builtInTimer", "timerText") });
+    else if (id === "timerFrame") {
+      nodes.push({
+        id: "timerFrame", label: "Timer frame", indent: 0, orderId: id, drag: "timer", lockable: true,
+        vis: {
+          get: () => Boolean(state.layout.timerBorder.enabled && state.layout.elements.timerBorder),
+          toggle: () => {
+            pushHistory("timer border");
+            const next = !(state.layout.timerBorder.enabled && state.layout.elements.timerBorder);
+            state.layout.timerBorder.enabled = next;
+            state.layout.elements.timerBorder = next;
+            syncGlobalControlsFromState();
+            update();
+            scheduleObsApply("timerBorder", 120);
+          }
+        }
+      });
+    } else if (id === "commentators") {
+      nodes.push({
+        id: "commentators", label: "Commentators", indent: 0, orderId: id, drag: "commentators", lockable: true,
+        vis: {
+          get: () => Boolean(state.layout.commentators.enabled),
+          toggle: () => {
+            pushHistory("commentators");
+            state.layout.commentators.enabled = !state.layout.commentators.enabled;
+            syncCommentatorsControls();
+            update();
+            scheduleObsApply("commentators", 120);
+          }
+        }
+      });
+    } else if (id === "runners") {
+      const before = nodes.length;
+      appendRunners();
+      nodes[before].orderId = id;
+    }
+    else if (id === "finished") {
+      nodes.push({
+        id: "finished", label: "Finished screen", indent: 0, orderId: id,
+        vis: { get: () => uiState.finishedScreenVisible, toggle: () => toggleFinishedScreen() }
+      });
+    } else if (id.startsWith("media:")) {
+      const layer = getMediaLayer(id.slice("media:".length));
+      if (layer) {
+        nodes.push({
+          id,
+          label: layer.name || "Media layer",
+          kind: "media",
+          indent: 0,
+          orderId: id,
+          drag: "media",
+          lockable: true,
+          removable: true,
+          vis: {
+            get: () => layer.visible !== false,
+            toggle: () => {
+              pushHistory("media visibility");
+              layer.visible = layer.visible === false;
+              update();
+              scheduleObsApply("media", 80);
+            }
+          }
+        });
+      }
+    }
+  }
+  return nodes;
+}
+
+function buildSceneTree() {
+  return buildOrderedSceneTree();
+  const nodes = [];
+  nodes.push({ id: "scene", label: "Scene", kind: "scene", indent: 0 });
+  nodes.push({ id: "title", label: "Title bar", indent: 0, drag: "title", lockable: true, vis: elementFlagVis("titleBar", "raceInfo") });
+  nodes.push({ id: "timer", label: "Timer", kind: "group", indent: 0 });
+  nodes.push({ id: "timerText", label: "Timer text", indent: 1, drag: "timer", vis: elementFlagVis("builtInTimer", "timerText") });
+  nodes.push({
+    id: "timerFrame", label: "Timer frame", indent: 1, drag: "timer", lockable: true,
+    vis: {
+      get: () => Boolean(state.layout.timerBorder.enabled && state.layout.elements.timerBorder),
+      toggle: () => {
+        pushHistory("timer border");
+        const next = !(state.layout.timerBorder.enabled && state.layout.elements.timerBorder);
+        state.layout.timerBorder.enabled = next;
+        state.layout.elements.timerBorder = next;
+        syncGlobalControlsFromState();
+        update();
+        scheduleObsApply("timerBorder", 120);
+      }
+    }
+  });
+  nodes.push({
+    id: "commentators", label: "Commentators", indent: 0, drag: "commentators", lockable: true,
+    vis: {
+      get: () => Boolean(state.layout.commentators.enabled),
+      toggle: () => {
+        pushHistory("commentators");
+        state.layout.commentators.enabled = !state.layout.commentators.enabled;
+        syncCommentatorsControls();
+        update();
+        scheduleObsApply("commentators", 120);
+      }
+    }
+  });
+  const activeRunners = state.runners.filter((runner) => runner.active);
+  nodes.push({ id: "runners", label: `Runners · ${activeRunners.length}`, kind: "group", indent: 0, lockable: true, selectable: true });
+  for (const runner of activeRunners) {
+    nodes.push({
+      id: `runner:${runner.slot}`, label: `P${runner.placement} · ${runner.name || "Runner"}`, indent: 1, kind: "runner", slot: runner.slot, lockable: true,
+      vis: {
+        get: () => Boolean(runner.active),
+        toggle: () => {
+          pushHistory("runner active");
+          runner.active = !runner.active;
+          renderRunnerControls();
+          update();
+          scheduleObsApply("active", 80);
+        }
+      }
+    });
+  }
+  nodes.push({ id: "layers", label: "Shared layers", kind: "group", indent: 1 });
+  nodes.push({ id: "layer:feed", label: "Game feeds", indent: 2, vis: elementFlagVis("feed", "feed-visible") });
+  nodes.push({ id: "layer:feedBorder", label: "Feed borders", indent: 2, vis: elementFlagVis("feedBorder", "feed-border-visible") });
+  nodes.push({ id: "layer:name", label: "Nameplates", indent: 2, vis: elementFlagVis("name", "name-visible") });
+  nodes.push({ id: "layer:finishedTime", label: "Finish times", indent: 2, vis: elementFlagVis("finishedTime", "finish-visible") });
+  nodes.push({
+    id: "finished", label: "Finished screen", indent: 0,
+    vis: { get: () => uiState.finishedScreenVisible, toggle: () => toggleFinishedScreen() }
+  });
+  nodes.push({ id: "background", label: "Background", indent: 0 });
+  return nodes;
+}
+
+function isElementLocked(id) {
+  return Array.isArray(state.layout.lockedElements) && state.layout.lockedElements.includes(id);
+}
+
+function toggleElementLock(id) {
+  if (!Array.isArray(state.layout.lockedElements)) state.layout.lockedElements = [];
+  const idx = state.layout.lockedElements.indexOf(id);
+  if (idx >= 0) state.layout.lockedElements.splice(idx, 1);
+  else state.layout.lockedElements.push(id);
+  renderSceneTree();
+}
+
+function isDragKindLocked(kind) {
+  if (state.layout.layerLock) return true;
+  const map = { title: "title", timer: "timerFrame", commentators: "commentators" };
+  if (map[kind]) return isElementLocked(map[kind]);
+  if (["feed", "name", "finish"].includes(kind)) return isElementLocked("runners");
+  if (kind === "media") return false;
+  return false;
+}
+
+function dragKindToElementId(kind, target) {
+  if (kind === "title") return "title";
+  if (kind === "timer") return "timerFrame";
+  if (kind === "commentators") return "commentators";
+  if (kind === "media") return mediaNodeId(target?.dataset.mediaId || "");
+  if (["feed", "name", "finish"].includes(kind)) {
+    const slot = target?.closest?.(".runner-panel")?.dataset.slot;
+    return slot ? `runner:${slot}` : "runners";
+  }
+  return "scene";
+}
+
+const INSPECTOR_PANELS = {
+  scene: ["layout", "spotlight", "finishedScreen"],
+  background: ["theme"],
+  title: ["raceInfo", "borders", "animations"],
+  timerText: ["timer", "animations"],
+  timerFrame: ["borders", "timer", "animations"],
+  commentators: ["commentators", "borders", "animations"],
+  runners: ["borders", "nameText", "nameplates", "nameplateBorders", "finishedTime", "positions", "animations"],
+  "layer:feed": ["positions", "animations"],
+  "layer:feedBorder": ["borders"],
+  "layer:name": ["nameText", "nameplates", "nameplateBorders"],
+  "layer:finishedTime": ["finishedTime"],
+  finished: ["finishedScreen"]
+};
+const BORDER_TARGET_FOR = { title: "title", timerFrame: "timer", commentators: "commentators", runners: "feed", "layer:feedBorder": "feed" };
+
+function inspectorPanelsFor(id) {
+  if (typeof id === "string" && id.startsWith("runner:")) return INSPECTOR_PANELS.runners;
+  if (typeof id === "string" && id.startsWith("media:")) return [];
+  return INSPECTOR_PANELS[id] || INSPECTOR_PANELS.scene;
+}
+
+function inspectorTitleFor(id) {
+  if (typeof id === "string" && id.startsWith("media:")) {
+    const layer = getMediaLayer(id.slice("media:".length));
+    return layer ? layer.name || "Media layer" : "Media layer";
+  }
+  if (typeof id === "string" && id.startsWith("runner:")) {
+    const slot = id.split(":")[1];
+    const runner = state.runners.find((r) => String(r.slot) === slot);
+    return runner ? `P${runner.placement} · ${runner.name || "Runner"}` : "Runner";
+  }
+  const labels = {
+    scene: "Scene", background: "Background", title: "Title bar", timerText: "Timer text",
+    timerFrame: "Timer frame", commentators: "Commentators", runners: "Runners (shared style)",
+    "layer:feed": "Game feeds", "layer:feedBorder": "Feed borders", "layer:name": "Nameplates",
+    "layer:finishedTime": "Finish times", finished: "Finished screen"
+  };
+  return labels[id] || "Scene";
+}
+
+function visibleInspectorPanelsFor(id) {
+  if (id === "scene") {
+    const panel = INSPECTOR_PANELS.scene.includes(selection.globalPanel) ? selection.globalPanel : "layout";
+    selection.globalPanel = panel;
+    return [panel];
+  }
+  return inspectorPanelsFor(id);
+}
+
+function showInspectorPanels(ids) {
+  const panels = [...document.querySelectorAll("[data-settings-panel]")];
+  const openSinglePanel = ids.length === 1;
+  for (const panel of panels) {
+    const show = ids.includes(panel.dataset.settingsPanel);
+    panel.classList.toggle("active", show);
+    panel.open = show && openSinglePanel;
+  }
+  // Panels display in DOM order, so reorder the active ones to match `ids`.
+  const parent = panels[0] && panels[0].parentElement;
+  if (parent) {
+    for (const id of ids) {
+      const panel = panels.find((p) => p.dataset.settingsPanel === id);
+      if (panel) parent.appendChild(panel);
+    }
+  }
+}
+
+function focusGlobalPanel(name) {
+  if (INSPECTOR_PANELS.scene.includes(name)) selection.globalPanel = name;
+  setSelectedElement("scene");
+  const panel = document.querySelector(`[data-settings-panel="${name}"]`);
+  if (panel) {
+    panel.open = true;
+    try { panel.scrollIntoView({ block: "nearest" }); } catch (e) { /* ignore */ }
+  }
+  if (els.globalTabs) {
+    for (const button of els.globalTabs.querySelectorAll("button")) {
+      button.classList.toggle("active", button.dataset.global === name);
+    }
+  }
+}
+
+function updateInspector() {
+  if (!state.layout.sceneView) return;
+  const id = selection.elementId || "scene";
+  if (els.globalTabs) {
+    for (const button of els.globalTabs.querySelectorAll("button")) {
+      button.classList.toggle("active", id === "scene" && button.dataset.global === selection.globalPanel);
+    }
+  }
+  const target = BORDER_TARGET_FOR[id] || (String(id).startsWith("runner:") ? "feed" : null);
+  if (target && state.layout.borderTarget !== target) {
+    state.layout.borderTarget = target;
+    if (els.borderTarget) els.borderTarget.value = target;
+    syncBorderStyleControlsFromState();
+  }
+  // Give the (single) Borders panel a context-appropriate title.
+  const bordersSummary = document.querySelector('[data-settings-panel="borders"] > summary');
+  if (bordersSummary) {
+    const titles = { feed: "Game Feed Borders", timer: "Timer Border", title: "Title Bar Border", commentators: "Commentators Border" };
+    bordersSummary.textContent = titles[target || state.layout.borderTarget] || "Borders";
+  }
+  if (els.inspectorTitle) els.inspectorTitle.textContent = inspectorTitleFor(id);
+
+  const isRunner = typeof id === "string" && id.startsWith("runner:");
+  if (els.runnerUniqueRow) els.runnerUniqueRow.style.display = isRunner ? "" : "none";
+  if (isRunner && els.runnerUnique) {
+    const slot = Number(id.split(":")[1]);
+    const runner = state.runners.find((r) => r.slot === slot);
+    els.runnerUnique.checked = Boolean(runner && runner.unique);
+  }
+
+  showInspectorPanels(visibleInspectorPanelsFor(id));
+  // Load the active config (shared, or the selected unique runner's) into the controls.
+  syncNameplateControlsFromState();
+  syncFinishedTimeControlsFromState();
+  syncBorderStyleControlsFromState();
+}
+
+function setSelectedElement(id) {
+  selection.elementId = id;
+  highlightSelectedElement(id);
+  updateInspector();
+  renderSceneTree();
+}
+
+function highlightSelectedElement(id) {
+  for (const el of document.querySelectorAll(".scene-selected")) el.classList.remove("scene-selected");
+  const globals = {
+    title: els.titleBarPreview,
+    timerFrame: els.timerBorder,
+    timerText: els.timerTextPreview,
+    commentators: els.commentatorsPreview
+  };
+  if (globals[id]) globals[id].classList.add("scene-selected");
+  if (typeof id === "string" && id.startsWith("media:")) {
+    const media = els.mediaLayer?.querySelector(`[data-media-id='${id.slice("media:".length)}']`);
+    if (media) media.classList.add("scene-selected");
+  }
+  if (typeof id === "string" && id.startsWith("runner:")) {
+    const slot = id.split(":")[1];
+    const panel = els.runnerLayer?.querySelector(`[data-slot='${slot}']`);
+    if (panel) panel.classList.add("scene-selected");
+    const card = els.runnerControls?.querySelector(`.runner-card[data-slot='${slot}']`);
+    if (card) card.classList.add("scene-selected");
+  }
+}
+
+const SCENE_ICONS = {
+  scene: '<rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/>',
+  background: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="9" r="1.6"/><path d="M4 18l5-5 4 4 3-3 4 4"/>',
+  title: '<rect x="3" y="5" width="18" height="14" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/>',
+  timer: '<circle cx="12" cy="13" r="7.5"/><line x1="12" y1="13" x2="12" y2="9"/><line x1="9.5" y1="2.5" x2="14.5" y2="2.5"/>',
+  commentators: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="21"/>',
+  runners: '<circle cx="9" cy="8" r="3"/><path d="M3.5 20v-1a5 5 0 0 1 10 0v1"/><path d="M16 5.5a3 3 0 0 1 0 5.8"/><path d="M20.5 20v-1a4 4 0 0 0-3-3.7"/>',
+  runner: '<rect x="3" y="4" width="18" height="12" rx="2"/><line x1="8" y1="20" x2="16" y2="20"/><line x1="12" y1="16" x2="12" y2="20"/>',
+  layers: '<path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/>',
+  media: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8" cy="10" r="1.5"/><path d="M4 17l5-5 4 4 2-2 5 5"/>',
+  finished: '<path d="M5 21V4"/><path d="M5 4h12l-2 3.5L17 11H5"/>'
+};
+
+function sceneNodeIconHtml(node) {
+  let key = node.id;
+  if (node.kind === "runner") key = "runner";
+  else if (node.kind === "media") key = "media";
+  else if (String(node.id).startsWith("layer:")) key = "layers";
+  else if (node.id === "timerText" || node.id === "timerFrame") key = "timer";
+  const path = SCENE_ICONS[key] || SCENE_ICONS.layers;
+  return `<svg class="sn-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`;
+}
+
+function renderSceneTree() {
+  if (!els.sceneTree || !state.layout.sceneView) return;
+  const nodes = buildSceneTree();
+  const frag = document.createDocumentFragment();
+  for (const node of nodes) {
+    const row = document.createElement("div");
+    row.className = `scene-node indent-${node.indent}${node.kind === "group" || node.kind === "scene" ? " group" : ""}${selection.elementId === node.id ? " selected" : ""}`;
+    row.dataset.id = node.id;
+    if (node.orderId && node.id !== "background") {
+      row.dataset.orderId = node.orderId;
+      row.draggable = true;
+      row.classList.add("orderable");
+    }
+    row.setAttribute("role", "treeitem");
+
+    row.insertAdjacentHTML("beforeend", sceneNodeIconHtml(node));
+
+    const label = document.createElement("span");
+    label.className = "sn-label";
+    label.textContent = node.label;
+    row.appendChild(label);
+
+    if (node.vis) {
+      const eye = document.createElement("button");
+      eye.type = "button";
+      eye.className = `sn-btn sn-eye${node.vis.get() ? "" : " off"}`;
+      eye.dataset.act = "vis";
+      eye.title = node.vis.get() ? "Hide" : "Show";
+      eye.setAttribute("aria-label", node.vis.get() ? "Hide" : "Show");
+      eye.textContent = "\u{1F441}";
+      row.appendChild(eye);
+    }
+    if (node.lockable) {
+      const lock = document.createElement("button");
+      lock.type = "button";
+      const locked = isElementLocked(node.id);
+      lock.className = `sn-btn sn-lock${locked ? " locked" : ""}`;
+      lock.dataset.act = "lock";
+      lock.title = locked ? "Unlock" : "Lock position";
+      lock.setAttribute("aria-label", locked ? "Unlock" : "Lock position");
+      lock.textContent = locked ? "\u{1F512}" : "\u{1F513}";
+      row.appendChild(lock);
+    }
+    if (node.removable) {
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "sn-btn danger";
+      remove.dataset.act = "remove";
+      remove.title = "Remove";
+      remove.setAttribute("aria-label", "Remove");
+      remove.textContent = "x";
+      row.appendChild(remove);
+    }
+    frag.appendChild(row);
+  }
+  els.sceneTree.replaceChildren(frag);
+}
+
+function handleSceneTreeClick(event) {
+  const btn = event.target.closest(".sn-btn");
+  const row = event.target.closest(".scene-node");
+  if (!row) return;
+  const id = row.dataset.id;
+  const nodes = buildSceneTree();
+  const node = nodes.find((n) => n.id === id);
+  if (!node) return;
+
+  if (btn && btn.dataset.act === "vis" && node.vis) {
+    node.vis.toggle();
+    renderSceneTree();
+    return;
+  }
+  if (btn && node.kind === "media" && btn.dataset.act === "remove") {
+    removeMediaLayer(id.slice("media:".length));
+    return;
+  }
+  if (btn && btn.dataset.act === "lock" && node.lockable) {
+    toggleElementLock(id);
+    return;
+  }
+  const selectable = node.kind !== "group" || node.selectable;
+  if (!selectable) return;
+  setSelectedElement(id);
+}
+
+function clearSceneTreeDropMarkers() {
+  for (const row of els.sceneTree?.querySelectorAll(".drop-above, .drop-below, .dragging") || []) {
+    row.classList.remove("drop-above", "drop-below", "dragging");
+  }
+}
+
+function handleSceneTreeDragStart(event) {
+  const row = event.target.closest(".scene-node[data-order-id]");
+  if (!row || event.target.closest(".sn-btn")) {
+    event.preventDefault();
+    return;
+  }
+  sceneTreeDragId = row.dataset.orderId;
+  row.classList.add("dragging");
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", sceneTreeDragId);
+}
+
+function handleSceneTreeDragOver(event) {
+  const row = event.target.closest(".scene-node[data-order-id]");
+  if (!row || !sceneTreeDragId || row.dataset.orderId === sceneTreeDragId) return;
+  event.preventDefault();
+  const bounds = row.getBoundingClientRect();
+  const after = event.clientY > bounds.top + bounds.height / 2;
+  for (const other of els.sceneTree.querySelectorAll(".drop-above, .drop-below")) {
+    if (other !== row) other.classList.remove("drop-above", "drop-below");
+  }
+  row.classList.toggle("drop-above", !after);
+  row.classList.toggle("drop-below", after);
+  event.dataTransfer.dropEffect = "move";
+}
+
+function handleSceneTreeDragLeave(event) {
+  const row = event.target.closest(".scene-node[data-order-id]");
+  if (!row || row.contains(event.relatedTarget)) return;
+  row.classList.remove("drop-above", "drop-below");
+}
+
+function handleSceneTreeDrop(event) {
+  const row = event.target.closest(".scene-node[data-order-id]");
+  if (!row || !sceneTreeDragId) return;
+  event.preventDefault();
+  const bounds = row.getBoundingClientRect();
+  const after = event.clientY > bounds.top + bounds.height / 2;
+  moveLayerOrderItem(sceneTreeDragId, row.dataset.orderId, !after);
+  sceneTreeDragId = "";
+  clearSceneTreeDropMarkers();
+}
+
+function handleSceneTreeDragEnd() {
+  sceneTreeDragId = "";
+  clearSceneTreeDropMarkers();
+}
+
+function applySceneView() {
+  const on = state.layout.sceneView !== false;
+  document.body.classList.toggle("scene-view", on);
+  if (els.sceneViewToggle) els.sceneViewToggle.textContent = on ? "Hide Scene Tree" : "Show Scene Tree";
+  if (on) {
+    if (!selection.elementId) selection.elementId = "scene";
+    renderSceneTree();
+    updateInspector();
+  } else {
+    // Restore the classic single-tab view.
+    const bordersSummary = document.querySelector('[data-settings-panel="borders"] > summary');
+    if (bordersSummary) bordersSummary.textContent = "Borders";
+    setActiveSettingsPanel(selection.activePanel || "layout");
+  }
+}
+
+function toggleSceneView() {
+  state.layout.sceneView = !state.layout.sceneView;
+  applySceneView();
+}
+
+// --- Style clipboard + per-runner actions -----------------------------------
+
+let styleClipboard = null;
+
+// Snapshot of a runner's full look (its override if unique, else the shared style).
+function runnerEffectiveStyle(runner) {
+  if (runner.unique && runner.style) {
+    return {
+      nameplate: structuredClone(runner.style.nameplate),
+      finishedTime: structuredClone(runner.style.finishedTime),
+      borderStyle: structuredClone(runner.style.borderStyle),
+      borderImage: runner.style.borderImage
+    };
+  }
+  return {
+    nameplate: structuredClone(state.layout.nameplate),
+    finishedTime: structuredClone(state.layout.finishedTime),
+    borderStyle: structuredClone(getBorderStyle("feed")),
+    borderImage: getBorderImage("feed")
+  };
+}
+
+function copyRunnerStyle(runner) {
+  styleClipboard = runnerEffectiveStyle(runner);
+  logObs(`Copied ${runner.name || "runner"}'s style. Paste it onto another runner.`);
+}
+
+function refreshAfterStyleChange() {
+  syncNameplateControlsFromState();
+  syncFinishedTimeControlsFromState();
+  syncBorderStyleControlsFromState();
+  update();
+  scheduleObsApply("manual-layout", 120);
+}
+
+function pasteRunnerStyle(runner) {
+  if (!styleClipboard) return;
+  pushHistory("paste runner style");
+  makeRunnerUnique(runner);
+  runner.style.nameplate = structuredClone(styleClipboard.nameplate);
+  runner.style.finishedTime = structuredClone(styleClipboard.finishedTime);
+  runner.style.borderStyle = structuredClone(styleClipboard.borderStyle);
+  runner.style.borderImage = styleClipboard.borderImage;
+  refreshAfterStyleChange();
+  logObs(`Pasted style onto ${runner.name || "runner"}.`);
+}
+
+function pasteStyleToShared() {
+  if (!styleClipboard) return;
+  pushHistory("paste shared style");
+  state.layout.nameplate = structuredClone(styleClipboard.nameplate);
+  state.layout.finishedTime = structuredClone(styleClipboard.finishedTime);
+  state.layout.borderStyles.feed = structuredClone(styleClipboard.borderStyle);
+  state.layout.borderImages.feed = styleClipboard.borderImage;
+  refreshAfterStyleChange();
+  logObs("Applied style to all shared runners.");
+}
+
+function resetRunnerToShared(runner) {
+  pushHistory("reset runner to shared");
+  runner.unique = false;
+  refreshAfterStyleChange();
+  logObs(`${runner.name || "Runner"} reverted to the shared style.`);
+}
+
+function duplicateRunner(runner) {
+  const target = state.runners.find((r) => !r.active && r.slot !== runner.slot);
+  if (!target) {
+    logObs("No free runner slot available to duplicate into.");
+    return;
+  }
+  pushHistory("duplicate runner");
+  target.name = `${runner.name || "Runner"} copy`;
+  target.source = runner.source;
+  target.feedMode = runner.feedMode;
+  target.crop = { ...runner.crop };
+  target.pronounPrimary = runner.pronounPrimary;
+  target.pronounSecondary = runner.pronounSecondary;
+  target.pronounCustom = runner.pronounCustom;
+  target.audioMuted = runner.audioMuted;
+  target.audioVolume = runner.audioVolume;
+  target.unique = runner.unique;
+  target.style = runner.style ? structuredClone(runner.style) : null;
+  target.active = true;
+  renderRunnerControls();
+  update();
+  scheduleObsApply("runner-add", 120);
+  setSelectedElement(`runner:${target.slot}`);
+  logObs(`Duplicated ${runner.name || "runner"} into slot ${target.slot}.`);
+}
+
+function sceneContextActions(node) {
+  const actions = [];
+  if (node.kind === "runner") {
+    const runner = state.runners.find((r) => r.slot === node.slot);
+    if (!runner) return actions;
+    actions.push({ label: "Rename", run: () => focusRunnerName(node.slot) });
+    actions.push({ label: "Duplicate runner", run: () => duplicateRunner(runner) });
+    actions.push({ separator: true });
+    actions.push({ label: "Copy style", run: () => copyRunnerStyle(runner) });
+    actions.push({ label: "Paste style", disabled: !styleClipboard, run: () => pasteRunnerStyle(runner) });
+    actions.push({ separator: true });
+    if (runner.unique) actions.push({ label: "Reset to shared style", run: () => resetRunnerToShared(runner) });
+    else actions.push({ label: "Make unique", run: () => { pushHistory("runner unique"); makeRunnerUnique(runner); refreshAfterStyleChange(); } });
+    actions.push({ label: isElementLocked(node.id) ? "Unlock position" : "Lock position", run: () => toggleElementLock(node.id) });
+    return actions;
+  }
+  if (node.id === "runners") {
+    actions.push({ label: "Paste style to all runners", disabled: !styleClipboard, run: () => pasteStyleToShared() });
+    return actions;
+  }
+  if (node.lockable) {
+    actions.push({ label: isElementLocked(node.id) ? "Unlock position" : "Lock position", run: () => toggleElementLock(node.id) });
+  }
+  return actions;
+}
+
+function handleSceneTreeContextMenu(event) {
+  const row = event.target.closest(".scene-node");
+  if (!row) return;
+  const node = buildSceneTree().find((n) => n.id === row.dataset.id);
+  if (!node) return;
+  const actions = sceneContextActions(node);
+  if (!actions.length) return;
+  event.preventDefault();
+  if (node.kind !== "group" || node.selectable) setSelectedElement(node.id);
+  showSceneContextMenu(event.clientX, event.clientY, actions);
+}
+
+function showSceneContextMenu(x, y, actions) {
+  hideSceneContextMenu();
+  const menu = document.createElement("div");
+  menu.className = "scene-context-menu";
+  for (const action of actions) {
+    if (action.separator) {
+      const hr = document.createElement("div");
+      hr.className = "scm-sep";
+      menu.appendChild(hr);
+      continue;
+    }
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = action.label;
+    if (action.disabled) btn.disabled = true;
+    else btn.addEventListener("click", () => { hideSceneContextMenu(); action.run(); });
+    menu.appendChild(btn);
+  }
+  document.body.appendChild(menu);
+  els._sceneContextMenu = menu;
+  const rect = menu.getBoundingClientRect();
+  menu.style.left = `${Math.max(4, Math.min(x, window.innerWidth - rect.width - 8))}px`;
+  menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - rect.height - 8))}px`;
+  document.addEventListener("pointerdown", sceneContextMenuOutside);
+  document.addEventListener("keydown", sceneContextMenuKey);
+  window.addEventListener("blur", hideSceneContextMenu);
+}
+
+function hideSceneContextMenu() {
+  if (els._sceneContextMenu) {
+    els._sceneContextMenu.remove();
+    els._sceneContextMenu = null;
+  }
+  document.removeEventListener("pointerdown", sceneContextMenuOutside);
+  document.removeEventListener("keydown", sceneContextMenuKey);
+  window.removeEventListener("blur", hideSceneContextMenu);
+}
+
+function sceneContextMenuOutside(event) {
+  if (els._sceneContextMenu && !els._sceneContextMenu.contains(event.target)) hideSceneContextMenu();
+}
+
+function sceneContextMenuKey(event) {
+  if (event.key === "Escape") hideSceneContextMenu();
 }
 
 // --- Finished Screen (results leaderboard) UI ------------------------------
@@ -3364,66 +4430,84 @@ async function connectObs() {
 async function createOrRepairObsScene() {
   if (!requireObs()) return;
 
-  try {
-    setObsUiBusy(true);
-    obsBridge.sceneName = els.obsSceneName.value.trim() || "ORM__Default";
-    logObs(`Creating or repairing ${obsBridge.sceneName}...`);
-    await ensureScene(obsBridge.sceneName);
-    await cleanupManagedInputs({ keepScene: true });
-    obsBridge.itemIds.clear();
-    obsBridge.lastRects.clear();
-    obsBridge.lastVisibility.clear();
-    obsBridge.lastFinishVisibility.clear();
-    obsBridge.lastSceneItemEnabled.clear();
-
-    await createBrowserInput("Background", obsBridge.sceneName, htmlDataUrl(buildBackgroundHtml()), STAGE.width, STAGE.height, true);
-    const titleSize = titleBarSourceSize();
-    await createBrowserInput("TitleBar", obsBridge.sceneName, htmlDataUrl(buildTitleBarHtml()), titleSize.width, titleSize.height, state.layout.elements.titleBar);
-    const timerBorderSize = timerBorderSourceSize();
-    await createBrowserInput("TimerBorder", obsBridge.sceneName, htmlDataUrl(buildTimerBorderHtml()), timerBorderSize.width, timerBorderSize.height, state.layout.timerBorder.enabled);
-    const timerTextSize = timerTextSourceSize();
-    await createBrowserInput("TimerText", obsBridge.sceneName, htmlDataUrl(buildTimerTextHtml()), timerTextSize.width, timerTextSize.height, state.layout.elements.builtInTimer);
+  return runExclusiveObsOperation(async () => {
     try {
-      const commSize = commentatorsSourceSize();
-      await createBrowserInput("Commentators", obsBridge.sceneName, htmlDataUrl(buildCommentatorsHtml()), commSize.width, commSize.height, state.layout.commentators.enabled);
-    } catch (error) {
-      logObs(`Commentators source skipped: ${error.message}`);
-    }
-    try {
-      await createBrowserInput("FinishedScreen", obsBridge.sceneName, htmlDataUrl(buildFinishedScreenHtml()), STAGE.width, STAGE.height, uiState.finishedScreenVisible);
-    } catch (error) {
-      logObs(`Finished screen source skipped: ${error.message}`);
-    }
+      window.clearTimeout(obsBridge.applyTimer);
+      obsBridge.pendingApply = false;
+      setObsUiBusy(true);
+      setObsLogBusy(true);
+      obsBridge.sceneName = els.obsSceneName.value.trim() || "ORM__Default";
+      logObs(`Setting up scene... creating or repairing ${obsBridge.sceneName}.`);
+      await ensureScene(obsBridge.sceneName);
+      logObs("Setting up scene... cleaning old managed sources.");
+      await cleanupManagedInputs({ keepScene: true });
+      obsBridge.itemIds.clear();
+      obsBridge.lastRects.clear();
+      obsBridge.lastVisibility.clear();
+      obsBridge.lastFinishVisibility.clear();
+      obsBridge.lastSceneItemEnabled.clear();
 
-    const rectBySlot = getCurrentRectBySlot();
-    for (const runner of state.runners) {
-      await createRunnerObsInputs(runner, rectBySlot.get(runner.slot));
-    }
+      logObs("Setting up scene... creating browser sources.");
+      await createBrowserInput("Background", obsBridge.sceneName, htmlDataUrl(buildBackgroundHtml()), STAGE.width, STAGE.height, true);
+      const titleSize = titleBarSourceSize();
+      await createBrowserInput("TitleBar", obsBridge.sceneName, htmlDataUrl(buildTitleBarHtml()), titleSize.width, titleSize.height, state.layout.elements.titleBar);
+      const timerBorderSize = timerBorderSourceSize();
+      await createBrowserInput("TimerBorder", obsBridge.sceneName, htmlDataUrl(buildTimerBorderHtml()), timerBorderSize.width, timerBorderSize.height, state.layout.timerBorder.enabled);
+      const timerTextSize = timerTextSourceSize();
+      await createBrowserInput("TimerText", obsBridge.sceneName, htmlDataUrl(buildTimerTextHtml()), timerTextSize.width, timerTextSize.height, state.layout.elements.builtInTimer);
+      try {
+        const commSize = commentatorsSourceSize();
+        await createBrowserInput("Commentators", obsBridge.sceneName, htmlDataUrl(buildCommentatorsHtml()), commSize.width, commSize.height, state.layout.commentators.enabled);
+      } catch (error) {
+        logObs(`Commentators source skipped: ${error.message}`);
+      }
+      try {
+        await createBrowserInput("FinishedScreen", obsBridge.sceneName, htmlDataUrl(buildFinishedScreenHtml()), STAGE.width, STAGE.height, uiState.finishedScreenVisible);
+      } catch (error) {
+        logObs(`Finished screen source skipped: ${error.message}`);
+      }
+      for (const layer of state.layout.mediaLayers) {
+        try {
+          const size = mediaLayerSourceSize(layer);
+          await createBrowserInput(mediaPartName(layer), obsBridge.sceneName, htmlDataUrl(buildMediaLayerHtml(layer)), size.width, size.height, layer.visible !== false);
+        } catch (error) {
+          logObs(`Media layer ${layer.name || layer.id} skipped: ${error.message}`);
+        }
+      }
 
-    obsBridge.opacitySupported = await ensureOpacityFilters();
-    await enforceSceneLayerOrder();
-    await obsCall("SetCurrentProgramScene", { sceneName: obsBridge.sceneName });
-    await applyLayoutToObs();
-    logObs("Managed OBS scene is ready.");
-  } catch (error) {
-    logObs(`Create / repair failed: ${error.message}`);
-  } finally {
-    setObsUiBusy(false);
-  }
+      const rectBySlot = getCurrentRectBySlot();
+      for (const runner of state.runners) {
+        await createRunnerObsInputs(runner, rectBySlot.get(runner.slot));
+      }
+
+      logObs("Setting up scene... applying layout.");
+      obsBridge.opacitySupported = await ensureOpacityFilters();
+      await enforceSceneLayerOrder();
+      await obsCall("SetCurrentProgramScene", { sceneName: obsBridge.sceneName });
+      await applyLayoutToObs();
+      logObs("Managed OBS scene is ready.");
+    } catch (error) {
+      logObs(`Create / repair failed: ${error.message}`);
+    } finally {
+      setObsLogBusy(false);
+      setObsUiBusy(false);
+    }
+  });
 }
 
 async function applyLayoutToObs(options = {}) {
   if (!requireObs()) return;
 
-  try {
-    if (!options.scheduled) setObsUiBusy(true);
-    await refreshSceneItemCache();
-    const refreshInputs = options.refreshInputs ?? !options.scheduled;
-    const animate = (options.forceAnimate || shouldAnimateObsLayout(options.reason)) && obsBridge.animateLayout;
-    const rectBySlot = getCurrentRectBySlot();
-    if (refreshInputs) {
-      await updateInputsForReason(options.reason, rectBySlot);
-    }
+  return runExclusiveObsOperation(async () => {
+    try {
+      if (!options.scheduled) setObsUiBusy(true);
+      await refreshSceneItemCache();
+      const refreshInputs = options.refreshInputs ?? !options.scheduled;
+      const animate = (options.forceAnimate || shouldAnimateObsLayout(options.reason)) && obsBridge.animateLayout;
+      const rectBySlot = getCurrentRectBySlot();
+      if (refreshInputs) {
+        await updateInputsForReason(options.reason, rectBySlot);
+      }
 
     await ensureManagedGlobalSources();
     await setSceneItemTransform("Background", {
@@ -3458,6 +4542,15 @@ async function applyLayoutToObs(options = {}) {
     } catch (error) {
       logObs(`Finished screen layer skipped: ${error.message}`);
     }
+    await ensureManagedMediaSources();
+    for (const layer of state.layout.mediaLayers) {
+      try {
+        await setSceneItemEnabled(mediaPartName(layer), layer.visible !== false);
+        await setSceneItemTransform(mediaPartName(layer), absoluteRect(layer.rect));
+      } catch (error) {
+        logObs(`Media layer ${layer.name || layer.id} skipped: ${error.message}`);
+      }
+    }
     await ensureManagedRunnerSources();
     await ensureRunnerItemIds();
     await enforceSceneLayerOrder();
@@ -3476,6 +4569,7 @@ async function applyLayoutToObs(options = {}) {
   } finally {
     if (!options.scheduled) setObsUiBusy(false);
   }
+  });
 }
 
 async function updateInputsForReason(reason = "", rectBySlot = getCurrentRectBySlot()) {
@@ -3498,6 +4592,11 @@ async function updateInputsForReason(reason = "", rectBySlot = getCurrentRectByS
   if (manual || ["commentators", "border", "border-image"].includes(reason)) {
     await updateCommentatorsInput();
   }
+  if (manual || ["media"].includes(reason)) {
+    for (const layer of state.layout.mediaLayers) {
+      await updateMediaLayerInput(layer);
+    }
+  }
 
   for (const runner of state.runners) {
     if (manual || ["source", "feedMode", "vdo-clean", "feedWidth", "feedHeight"].includes(reason)) {
@@ -3506,7 +4605,8 @@ async function updateInputsForReason(reason = "", rectBySlot = getCurrentRectByS
       await updateRunnerFeedClipCss(runner);
     }
     if (manual || ["border", "border-image"].includes(reason)) {
-      await setInputUrl(runnerPart(runner.slot, "Border"), htmlDataUrl(buildBorderHtml()));
+      const borderUrl = withRunnerStyle(runner, () => htmlDataUrl(buildBorderHtml()));
+      await setInputUrl(runnerPart(runner.slot, "Border"), borderUrl);
     }
     if (manual || ["name", "nameplate", "nameplate-image", "pronounsText"].includes(reason) || runnerNameSourceSizeReason(reason)) {
       await updateRunnerNameInput(runner, rectBySlot.get(runner.slot));
@@ -3957,6 +5057,7 @@ function shouldRefreshObsInputs(reason) {
     "finishGeometry",
     "audio",
     "background",
+    "media",
     "raceInfo",
     "border-image",
     "feedWidth",
@@ -4050,25 +5151,43 @@ function delay(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+function runExclusiveObsOperation(operation) {
+  if (obsBridge.operationDepth > 0) return operation();
+  const run = obsBridge.operationQueue.catch(() => {}).then(async () => {
+    obsBridge.operationDepth += 1;
+    try {
+      return await operation();
+    } finally {
+      obsBridge.operationDepth -= 1;
+    }
+  });
+  obsBridge.operationQueue = run.catch(() => {});
+  return run;
+}
+
 async function cleanupObsScene() {
   if (!requireObs()) return;
 
-  try {
-    setObsUiBusy(true);
-    logObs("Cleaning up managed ORM__ sources...");
-    await cleanupManagedInputs({ keepScene: true });
-    obsBridge.itemIds.clear();
-    obsBridge.lastRects.clear();
-    obsBridge.lastVisibility.clear();
-    obsBridge.lastFinishVisibility.clear();
-    obsBridge.lastSceneItemEnabled.clear();
-    obsBridge.opacitySupported = false;
-    logObs("Cleanup complete. Managed scene was left in place.");
-  } catch (error) {
-    logObs(`Cleanup failed: ${error.message}`);
-  } finally {
-    setObsUiBusy(false);
-  }
+  return runExclusiveObsOperation(async () => {
+    try {
+      window.clearTimeout(obsBridge.applyTimer);
+      obsBridge.pendingApply = false;
+      setObsUiBusy(true);
+      logObs("Cleaning up managed ORM__ sources...");
+      await cleanupManagedInputs({ keepScene: true });
+      obsBridge.itemIds.clear();
+      obsBridge.lastRects.clear();
+      obsBridge.lastVisibility.clear();
+      obsBridge.lastFinishVisibility.clear();
+      obsBridge.lastSceneItemEnabled.clear();
+      obsBridge.opacitySupported = false;
+      logObs("Cleanup complete. Managed scene was left in place.");
+    } catch (error) {
+      logObs(`Cleanup failed: ${error.message}`);
+    } finally {
+      setObsUiBusy(false);
+    }
+  });
 }
 
 function setInputValue(root, field, value) {
@@ -4170,17 +5289,88 @@ function update() {
   applyCommentatorsPreviewGeometry();
   applyTimerBorderPreviewGeometry();
   applyTimerTextPreviewGeometry();
+  renderMediaLayers();
+  applySceneLayerZIndexes();
   renderControlMode();
   renderFinishedScreen();
+  renderSceneTree();
+  highlightSelectedElement(selection.elementId);
 
   for (const runner of state.runners) {
     const rect = previewRectBySlot.get(runner.slot) ?? hiddenRect();
-    applyPanelGeometry(runner, rect, previewRectBySlot.has(runner.slot));
+    withRunnerStyle(runner, () => applyPanelGeometry(runner, rect, previewRectBySlot.has(runner.slot)));
   }
 
   schedulePreviewRefresh(previewRectBySlot);
   schedulePreviewRefresh(previewRectBySlot, state.layout.animationMs + 80);
   startPreviewLiveRefresh(previewRectBySlot, state.layout.animationMs + 120);
+}
+
+function renderMediaLayers() {
+  if (!els.mediaLayer) return;
+  const seen = new Set();
+  for (const layer of state.layout.mediaLayers) {
+    seen.add(layer.id);
+    let node = els.mediaLayer.querySelector(`[data-media-id='${layer.id}']`);
+    if (!node) {
+      node = document.createElement("div");
+      node.className = "media-preview drag-target";
+      node.dataset.dragTarget = "media";
+      node.dataset.mediaId = layer.id;
+      node.innerHTML = '<span class="resize-handle" data-resize-handle="media" aria-hidden="true"></span>';
+      els.mediaLayer.appendChild(node);
+    }
+    node.classList.toggle("hidden-element", layer.visible === false);
+    node.style.transitionDuration = `${state.layout.animationMs}ms`;
+    applyNormalizedStyle(node, layer.rect);
+
+    if (node.dataset.src !== layer.dataUrl || node.dataset.type !== layer.type) {
+      const media = document.createElement(layer.type === "video" ? "video" : "img");
+      media.src = layer.dataUrl;
+      media.alt = layer.name || "Media layer";
+      if (layer.type === "video") {
+        media.autoplay = true;
+        media.loop = true;
+        media.muted = true;
+        media.playsInline = true;
+      }
+      node.replaceChildren(media, node.querySelector(".resize-handle") || createResizeHandle("media"));
+      node.dataset.src = layer.dataUrl;
+      node.dataset.type = layer.type;
+    }
+  }
+  for (const node of [...els.mediaLayer.querySelectorAll("[data-media-id]")]) {
+    if (!seen.has(node.dataset.mediaId)) node.remove();
+  }
+}
+
+function createResizeHandle(kind) {
+  const handle = document.createElement("span");
+  handle.className = "resize-handle";
+  handle.dataset.resizeHandle = kind;
+  handle.setAttribute("aria-hidden", "true");
+  return handle;
+}
+
+function applySceneLayerZIndexes() {
+  const order = normalizedLayerOrder();
+  const zFor = (id) => Math.max(1, order.indexOf(id) + 1) * 10;
+  if (els.mediaLayer) els.mediaLayer.style.zIndex = "auto";
+  const map = {
+    title: els.titleBarPreview,
+    timerText: els.timerTextPreview,
+    timerFrame: els.timerBorder,
+    commentators: els.commentatorsPreview,
+    runners: els.runnerLayer,
+    finished: els.finishedScreenLayer
+  };
+  for (const [id, element] of Object.entries(map)) {
+    if (element) element.style.zIndex = zFor(id);
+  }
+  for (const layer of state.layout.mediaLayers) {
+    const node = els.mediaLayer?.querySelector(`[data-media-id='${layer.id}']`);
+    if (node) node.style.zIndex = zFor(mediaNodeId(layer.id));
+  }
 }
 
 function applyTimerBorderPreviewGeometry() {
@@ -4466,13 +5656,13 @@ function syncGeometryControls() {
   for (const [input, value] of values) {
     if (document.activeElement !== input) input.value = round(value);
   }
-  els.timerBorderEnabled.checked = state.layout.timerBorder.enabled && state.layout.elements.timerBorder;
-  els.feedVisible.checked = state.layout.elements.feed;
-  els.feedBorderVisible.checked = state.layout.elements.feedBorder;
-  els.nameVisible.checked = state.layout.elements.name;
-  els.finishedTimeVisible.checked = state.layout.elements.finishedTime;
-  els.titleBarVisible.checked = state.layout.elements.titleBar;
-  els.raceInfoEnabled.checked = state.layout.elements.titleBar;
+  if (els.timerBorderEnabled) els.timerBorderEnabled.checked = state.layout.timerBorder.enabled && state.layout.elements.timerBorder;
+  if (els.feedVisible) els.feedVisible.checked = state.layout.elements.feed;
+  if (els.feedBorderVisible) els.feedBorderVisible.checked = state.layout.elements.feedBorder;
+  if (els.nameVisible) els.nameVisible.checked = state.layout.elements.name;
+  if (els.finishedTimeVisible) els.finishedTimeVisible.checked = state.layout.elements.finishedTime;
+  if (els.titleBarVisible) els.titleBarVisible.checked = state.layout.elements.titleBar;
+  if (els.raceInfoEnabled) els.raceInfoEnabled.checked = state.layout.elements.titleBar;
   els.layerLockEnabled.checked = state.layout.layerLock;
   els.snapEnabled.checked = state.layout.snapEnabled;
 }
@@ -4920,9 +6110,11 @@ function refreshMeasuredPreviews(rectBySlot) {
     const panel = els.runnerLayer.querySelector(`[data-slot='${runner.slot}']`);
     if (!panel) continue;
     const rect = rectBySlot.get(runner.slot) ?? hiddenRect();
-    applyBorderPreview(panel.querySelector(".runner-shell"), "feed");
-    applyNameplatePreview(panel.querySelector(".runner-nameplate"), runner, rect);
-    applyFinishedTimePreview(panel.querySelector(".runner-finished-time"), runner, rect);
+    withRunnerStyle(runner, () => {
+      applyBorderPreview(panel.querySelector(".runner-shell"), "feed");
+      applyNameplatePreview(panel.querySelector(".runner-nameplate"), runner, rect);
+      applyFinishedTimePreview(panel.querySelector(".runner-finished-time"), runner, rect);
+    });
   }
 }
 
@@ -5017,7 +6209,7 @@ function applyNameplatePreview(nameplate, runner, rect) {
 
   const scaleX = previewWidth / sourceSize.width;
   const scaleY = previewHeight / sourceSize.height;
-  const styleString = `${sourceSize.width}|${sourceSize.height}|${scaleX}|${scaleY}|${config.fontFamily}|${config.textColor}|${runner.name}|${pronounsText}`;
+  const styleString = `${sourceSize.width}|${sourceSize.height}|${scaleX}|${scaleY}|${runner.name}|${pronounsText}|${JSON.stringify(config)}|${JSON.stringify(state.layout.pronounsText)}`;
   // Re-apply child styling whenever the markup is rebuilt too: replacing innerHTML
   // recreates the draggable overlay <strong>, which must be re-hidden or its
   // visible text stacks on top of the SVG as a duplicate at the default size.
@@ -5154,6 +6346,11 @@ function setObsUiBusy(busy) {
   }
 }
 
+function setObsLogBusy(busy) {
+  els.obsLog.classList.toggle("busy", busy);
+  els.obsLog.setAttribute("aria-busy", busy ? "true" : "false");
+}
+
 function logObs(message) {
   const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   els.obsLog.textContent = `[${time}] ${message}`;
@@ -5197,15 +6394,38 @@ async function ensureScene(sceneName) {
 
 async function cleanupManagedInputs() {
   const names = await discoverManagedInputNames();
+  const nameSet = new Set(names);
+  try {
+    const response = await obsCall("GetSceneItemList", { sceneName: obsBridge.sceneName });
+    const disableRequests = (response.sceneItems || [])
+      .filter((item) => nameSet.has(item.sourceName))
+      .map((item) => ({
+        requestType: "SetSceneItemEnabled",
+        requestData: {
+          sceneName: obsBridge.sceneName,
+          sceneItemId: item.sceneItemId,
+          sceneItemEnabled: false
+        }
+      }));
+    if (disableRequests.length > 0) {
+      await obsBatch(disableRequests);
+      await delay(350);
+    }
+  } catch (error) {
+    logObs(`Could not pre-disable managed scene items: ${error.message}`);
+  }
+
   for (const inputName of names) {
     try {
       await obsCall("RemoveInput", { inputName });
+      await delay(35);
     } catch (error) {
       if (!/not found|ResourceNotFound|does not exist/i.test(error.message)) {
         logObs(`Could not remove ${inputName}: ${error.message}`);
       }
     }
   }
+  if (names.length > 0) await delay(250);
 }
 
 async function discoverManagedInputNames() {
@@ -5222,6 +6442,9 @@ async function discoverManagedInputNames() {
 
 function managedInputNames() {
   const names = GLOBAL_PARTS.map((part) => `${MANAGED_PREFIX}${part}`);
+  for (const layer of state.layout.mediaLayers) {
+    names.push(`${MANAGED_PREFIX}${mediaPartName(layer)}`);
+  }
   for (const runner of state.runners) {
     for (const part of RUNNER_PARTS) {
       names.push(runnerPart(runner.slot, part));
@@ -5231,12 +6454,17 @@ function managedInputNames() {
 }
 
 async function createRunnerObsInputs(runner, rect = null) {
-  const nameSize = nameSourceSize(rect);
-  const finishSize = finishSourceSize(runner, rect);
+  const built = withRunnerStyle(runner, () => ({
+    nameSize: nameSourceSize(rect),
+    nameUrl: htmlDataUrl(buildNameHtml(runner, rect)),
+    borderUrl: htmlDataUrl(buildBorderHtml()),
+    finishSize: finishSourceSize(runner, rect),
+    finishUrl: htmlDataUrl(buildFinishHtml(runner))
+  }));
   await createBrowserInput(runnerPart(runner.slot, "Feed"), obsBridge.sceneName, buildFeedUrl(runner), state.layout.feedWidth, state.layout.feedHeight, runner.active, { rerouteAudio: true });
-  await createBrowserInput(runnerPart(runner.slot, "Border"), obsBridge.sceneName, htmlDataUrl(buildBorderHtml()), state.layout.feedWidth, state.layout.feedHeight, runner.active);
-  await createBrowserInput(runnerPart(runner.slot, "Name"), obsBridge.sceneName, htmlDataUrl(buildNameHtml(runner, rect)), nameSize.width, nameSize.height, runner.active);
-  await createBrowserInput(runnerPart(runner.slot, "Finish"), obsBridge.sceneName, htmlDataUrl(buildFinishHtml(runner)), finishSize.width, finishSize.height, runner.active && runner.done);
+  await createBrowserInput(runnerPart(runner.slot, "Border"), obsBridge.sceneName, built.borderUrl, state.layout.feedWidth, state.layout.feedHeight, runner.active);
+  await createBrowserInput(runnerPart(runner.slot, "Name"), obsBridge.sceneName, built.nameUrl, built.nameSize.width, built.nameSize.height, runner.active);
+  await createBrowserInput(runnerPart(runner.slot, "Finish"), obsBridge.sceneName, built.finishUrl, built.finishSize.width, built.finishSize.height, runner.active && runner.done);
   await updateRunnerAudio(runner);
 }
 
@@ -5351,7 +6579,7 @@ async function setSourceOpacity(sourceName, opacity) {
 
 async function updateRunnerInputs(runner, rect = null) {
   await updateRunnerFeedInput(runner);
-  await setInputUrl(runnerPart(runner.slot, "Border"), htmlDataUrl(buildBorderHtml()));
+  await setInputUrl(runnerPart(runner.slot, "Border"), withRunnerStyle(runner, () => htmlDataUrl(buildBorderHtml())));
   await updateRunnerNameInput(runner, rect);
   await updateRunnerFinishInput(runner, rect);
   await updateRunnerAudio(runner);
@@ -5383,20 +6611,26 @@ function runnerFeedClipRadius() {
 }
 
 async function updateRunnerNameInput(runner, rect = null) {
-  const nameSize = nameSourceSize(rect);
+  const built = withRunnerStyle(runner, () => ({
+    size: nameSourceSize(rect),
+    url: htmlDataUrl(buildNameHtml(runner, rect))
+  }));
   await setBrowserInputSettings(runnerPart(runner.slot, "Name"), {
-    url: htmlDataUrl(buildNameHtml(runner, rect)),
-    width: nameSize.width,
-    height: nameSize.height
+    url: built.url,
+    width: built.size.width,
+    height: built.size.height
   });
 }
 
 async function updateRunnerFinishInput(runner, rect = null) {
-  const finishSize = finishSourceSize(runner, rect);
+  const built = withRunnerStyle(runner, () => ({
+    size: finishSourceSize(runner, rect),
+    url: htmlDataUrl(buildFinishHtml(runner))
+  }));
   await setBrowserInputSettings(runnerPart(runner.slot, "Finish"), {
-    url: htmlDataUrl(buildFinishHtml(runner)),
-    width: finishSize.width,
-    height: finishSize.height
+    url: built.url,
+    width: built.size.width,
+    height: built.size.height
   });
 }
 
@@ -5550,6 +6784,34 @@ async function updateCommentatorsInput() {
   });
 }
 
+function mediaLayerSourceSize(layer) {
+  return {
+    width: Math.max(1, Math.round(STAGE.width * (Number(layer.rect?.width) || 0.1))),
+    height: Math.max(1, Math.round(STAGE.height * (Number(layer.rect?.height) || 0.1)))
+  };
+}
+
+async function updateMediaLayerInput(layer) {
+  const size = mediaLayerSourceSize(layer);
+  await setBrowserInputSettings(mediaPartName(layer), {
+    url: htmlDataUrl(buildMediaLayerHtml(layer)),
+    width: size.width,
+    height: size.height
+  });
+}
+
+async function ensureManagedMediaSources() {
+  for (const layer of state.layout.mediaLayers) {
+    const inputName = `${MANAGED_PREFIX}${mediaPartName(layer)}`;
+    try {
+      await getSceneItemId(inputName);
+    } catch {
+      const size = mediaLayerSourceSize(layer);
+      await createBrowserInput(mediaPartName(layer), obsBridge.sceneName, htmlDataUrl(buildMediaLayerHtml(layer)), size.width, size.height, layer.visible !== false);
+    }
+  }
+}
+
 async function ensureManagedRunnerSources() {
   let createdAny = false;
   for (const runner of state.runners) {
@@ -5628,22 +6890,27 @@ async function enforceSceneLayerOrder() {
     index += 1;
   };
 
-  pushLayer("Background");
-
-  for (const runner of state.runners) {
-    // Keep each runner's visible chrome above the live feed. This matters most
-    // with high-radius generated borders, where the feed can otherwise cover
-    // the rounded border stroke in OBS even though the preview clip looks OK.
-    for (const part of ["Feed", "Border", "Name", "Finish"]) {
-      pushLayer(runnerPart(runner.slot, part));
+  for (const id of normalizedLayerOrder()) {
+    if (id === "background") pushLayer("Background");
+    else if (id === "title") pushLayer("TitleBar");
+    else if (id === "timerText") pushLayer("TimerText");
+    else if (id === "timerFrame") pushLayer("TimerBorder");
+    else if (id === "commentators") pushLayer("Commentators");
+    else if (id === "finished") pushLayer("FinishedScreen");
+    else if (id === "runners") {
+      for (const runner of state.runners) {
+        // Keep each runner's visible chrome above the live feed. This matters most
+        // with high-radius generated borders, where the feed can otherwise cover
+        // the rounded border stroke in OBS even though the preview clip looks OK.
+        for (const part of ["Feed", "Border", "Name", "Finish"]) {
+          pushLayer(runnerPart(runner.slot, part));
+        }
+      }
+    } else if (id.startsWith("media:")) {
+      const layer = getMediaLayer(id.slice("media:".length));
+      if (layer) pushLayer(mediaPartName(layer));
     }
   }
-
-  pushLayer("TitleBar");
-  pushLayer("TimerText");
-  pushLayer("TimerBorder");
-  pushLayer("Commentators");
-  pushLayer("FinishedScreen");
 
   await obsBatch(requests);
 }
@@ -5990,6 +7257,13 @@ function buildBackgroundHtml() {
   return `<!doctype html><html><body><div class="bg"></div></body><style>${baseHtmlCss()} .bg{width:100vw;height:100vh;background:linear-gradient(135deg,rgba(45,198,163,.25),transparent 38%),linear-gradient(315deg,rgba(240,184,74,.2),transparent 38%),#11161a;}</style></html>`;
 }
 
+function buildMediaLayerHtml(layer) {
+  const tag = layer.type === "video"
+    ? `<video src="${escapeAttribute(layer.dataUrl)}" autoplay loop muted playsinline></video>`
+    : `<img src="${escapeAttribute(layer.dataUrl)}" alt="">`;
+  return `<!doctype html><html><body>${tag}</body><style>${baseHtmlCss()} body{display:grid;place-items:center;background:transparent;}img,video{display:block;width:100vw;height:100vh;object-fit:fill;background:transparent;}</style></html>`;
+}
+
 function buildTitleBarHtml() {
   const config = state.layout.raceInfo;
   const size = titleBarSourceSize();
@@ -6203,7 +7477,15 @@ function buildFeedHtml(runner) {
 }
 
 function getEditingBorderStyle() {
+  const runner = editingUniqueRunner();
+  if (runner && state.layout.borderTarget === "feed" && runner.style.borderStyle) return runner.style.borderStyle;
   return getBorderStyle(state.layout.borderTarget);
+}
+
+function getEditingBorderImage() {
+  const runner = editingUniqueRunner();
+  if (runner && state.layout.borderTarget === "feed") return runner.style.borderImage || "";
+  return getBorderImage(state.layout.borderTarget);
 }
 
 function getBorderStyle(target) {
@@ -6218,6 +7500,11 @@ function getBorderImage(target) {
 }
 
 function setEditingBorderImage(value) {
+  const runner = editingUniqueRunner();
+  if (runner && state.layout.borderTarget === "feed") {
+    runner.style.borderImage = value;
+    return;
+  }
   const key = borderTargetKey(state.layout.borderTarget);
   state.layout.borderImages ??= { feed: "", timer: "", title: "", commentators: "" };
   state.layout.borderImages[key] = value;
@@ -6393,13 +7680,15 @@ function gradientAnimationDuration(style) {
 }
 
 function buildNameHtml(runner, rect = null) {
-  const config = state.layout.nameplate;
-  const sourceSize = nameSourceSize(rect);
-  const plateImage = config.showBox && config.plateMode === "image" && config.plateImage;
-  const plateImageMarkup = plateImage ? `<img class="plate-art" src="${escapeAttribute(config.plateImage)}" alt="">` : "";
-  const textSvg = nameTextSvgMarkup(runner, sourceSize);
-  const pronounsSvg = pronounsTextSvgMarkup(runner, sourceSize);
-  return `<!doctype html><html><body><div class="bar">${plateImageMarkup}${textSvg}${pronounsSvg}</div></body><style>${baseHtmlCss()} ${nameplateAnimationCss(config, sourceSize.width, sourceSize.height)}body{font-family:${cssFontStack(config.fontFamily)};color:${config.textColor};text-rendering:geometricPrecision;-webkit-font-smoothing:antialiased;font-stretch:normal;letter-spacing:0;}.bar{${nameplateFrameCss(config, "100%", "100%", sourceSize.width, sourceSize.height)}}.plate-art{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:block;z-index:0;pointer-events:none;}.svg-text{position:absolute;inset:0;z-index:1;display:block;pointer-events:none;}</style></html>`;
+  return withRunnerStyle(runner, () => {
+    const config = state.layout.nameplate;
+    const sourceSize = nameSourceSize(rect);
+    const plateImage = config.showBox && config.plateMode === "image" && config.plateImage;
+    const plateImageMarkup = plateImage ? `<img class="plate-art" src="${escapeAttribute(config.plateImage)}" alt="">` : "";
+    const textSvg = nameTextSvgMarkup(runner, sourceSize);
+    const pronounsSvg = pronounsTextSvgMarkup(runner, sourceSize);
+    return `<!doctype html><html><body><div class="bar">${plateImageMarkup}${textSvg}${pronounsSvg}</div></body><style>${baseHtmlCss()} ${nameplateAnimationCss(config, sourceSize.width, sourceSize.height)}body{font-family:${cssFontStack(config.fontFamily)};color:${config.textColor};text-rendering:geometricPrecision;-webkit-font-smoothing:antialiased;font-stretch:normal;letter-spacing:0;}.bar{${nameplateFrameCss(config, "100%", "100%", sourceSize.width, sourceSize.height)}}.plate-art{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:block;z-index:0;pointer-events:none;}.svg-text{position:absolute;inset:0;z-index:1;display:block;pointer-events:none;}</style></html>`;
+  });
 }
 
 function nameTextSvgMarkup(runner, sourceSize) {
@@ -7440,6 +8729,54 @@ function normalizeLoadedLayout(layout) {
   next.elements.titleBar = Boolean(next.elements.titleBar);
   next.elements.builtInTimer = Boolean(next.elements.builtInTimer);
   next.elements.finishedTime = Boolean(next.elements.finishedTime);
+  next.lockedElements = Array.isArray(next.lockedElements) ? next.lockedElements.filter((x) => typeof x === "string") : [];
+  next.sceneView = next.sceneView !== false;
+  next.mediaLayers = Array.isArray(next.mediaLayers) ? next.mediaLayers.map(normalizeMediaLayer).filter(Boolean) : [];
+  next.layerOrder = Array.isArray(next.layerOrder) ? next.layerOrder.filter((id) => typeof id === "string") : [...BASE_LAYER_ORDER];
+  normalizedLayerOrderFor(next);
+  return next;
+}
+
+function normalizeMediaLayer(layer) {
+  if (!layer || typeof layer.dataUrl !== "string" || !layer.dataUrl.startsWith("data:")) return null;
+  const next = {
+    id: String(layer.id || `media${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`).replace(/[^a-zA-Z0-9_-]/g, ""),
+    name: String(layer.name || "Media layer"),
+    type: layer.type === "video" || String(layer.mimeType || "").startsWith("video/") ? "video" : "image",
+    mimeType: String(layer.mimeType || ""),
+    dataUrl: layer.dataUrl,
+    aspectRatio: normalizeNumber(layer.aspectRatio, 0.01, 100, 16 / 9),
+    visible: layer.visible !== false,
+    rect: {
+      x: Number(layer.rect?.x ?? 0.25),
+      y: Number(layer.rect?.y ?? 0.22),
+      width: Number(layer.rect?.width ?? 0.5),
+      height: Number(layer.rect?.height ?? 0.5)
+    }
+  };
+  normalizeGeometryRect(next.rect);
+  return next;
+}
+
+function normalizedLayerOrderFor(layout) {
+  const mediaIds = Array.isArray(layout.mediaLayers) ? layout.mediaLayers.map((layer) => mediaNodeId(layer.id)) : [];
+  const allowed = new Set([...BASE_LAYER_ORDER, ...mediaIds]);
+  const order = Array.isArray(layout.layerOrder) ? layout.layerOrder.filter((id) => allowed.has(id)) : [];
+  const next = [];
+  for (const id of order) {
+    if (!next.includes(id)) next.push(id);
+  }
+  for (const id of BASE_LAYER_ORDER) {
+    if (!next.includes(id)) next.push(id);
+  }
+  let insertAt = next.includes("finished") ? next.indexOf("finished") : next.length;
+  for (const id of mediaIds) {
+    if (!next.includes(id)) {
+      next.splice(insertAt, 0, id);
+      insertAt += 1;
+    }
+  }
+  layout.layerOrder = next;
   return next;
 }
 
@@ -7507,6 +8844,15 @@ function normalizeLoadedRunners(runners) {
       pronounPrimary: String(runner.pronounPrimary || ""),
       pronounSecondary: String(runner.pronounSecondary || ""),
       pronounCustom: String(runner.pronounCustom || ""),
+      unique: Boolean(runner.unique),
+      style: runner.unique
+        ? {
+          nameplate: { ...structuredClone(state.layout.nameplate), ...(runner.style?.nameplate || {}) },
+          finishedTime: { ...structuredClone(state.layout.finishedTime), ...(runner.style?.finishedTime || {}) },
+          borderStyle: runner.style?.borderStyle ? structuredClone(runner.style.borderStyle) : structuredClone(getBorderStyle("feed")),
+          borderImage: runner.style?.borderImage ?? ""
+        }
+        : (runner.style || null),
       crop: {
         left: Number(runner.crop?.left ?? 0),
         top: Number(runner.crop?.top ?? 0),
@@ -7695,7 +9041,7 @@ function syncGlobalControlsFromState() {
   els.spotlightOtherScaleValue.textContent = `${state.layout.spotlight.otherScale}%`;
   syncRangeInput(els.spotlightGap, state.layout.spotlight.gap);
   els.spotlightGapValue.textContent = `${state.layout.spotlight.gap} px`;
-  els.titleBarVisible.checked = state.layout.elements.titleBar;
+  if (els.titleBarVisible) els.titleBarVisible.checked = state.layout.elements.titleBar;
   els.raceInfoEnabled.checked = state.layout.elements.titleBar;
   els.raceTitle.value = state.layout.raceInfo.title;
   els.raceSubtitle.value = state.layout.raceInfo.subtitle;
@@ -7784,7 +9130,7 @@ function syncBorderModeSections() {
 
 function syncBorderSwatches() {
   for (const swatch of document.querySelectorAll(".swatch")) {
-    swatch.classList.toggle("active", swatch.dataset.border === state.layout.borderPreset && !getBorderImage(state.layout.borderTarget));
+    swatch.classList.toggle("active", swatch.dataset.border === state.layout.borderPreset && !getEditingBorderImage());
   }
 }
 
@@ -7896,7 +9242,7 @@ function syncTimerPlateFillSections() {
 }
 
 function syncNameplateControlsFromState() {
-  const config = state.layout.nameplate;
+  const config = activeNameplate();
   els.nameFont.value = config.fontFamily;
   els.nameFontBrowser.value = Array.from(els.nameFontBrowser.options).some((option) => option.value === config.fontFamily)
     ? config.fontFamily
@@ -7947,16 +9293,18 @@ function syncNameplateControlsFromState() {
 }
 
 function syncNameplateModeSections() {
+  const config = activeNameplate();
   for (const section of document.querySelectorAll("[data-nameplate-section]")) {
-    section.hidden = section.dataset.nameplateSection !== state.layout.nameplate.plateMode;
+    section.hidden = section.dataset.nameplateSection !== config.plateMode;
   }
 }
 
 function syncNameplateFillSections() {
+  const config = activeNameplate();
   for (const section of document.querySelectorAll("[data-nameplate-fill-section]")) {
-    section.hidden = section.dataset.nameplateFillSection !== state.layout.nameplate.plateFillMode;
+    section.hidden = section.dataset.nameplateFillSection !== config.plateFillMode;
   }
-  els.namePlateGradientSpeedRow.hidden = !(state.layout.nameplate.plateFillMode === "gradient" && state.layout.nameplate.plateAnimateGradientAngle);
+  els.namePlateGradientSpeedRow.hidden = !(config.plateFillMode === "gradient" && config.plateAnimateGradientAngle);
 }
 
 function syncPronounsTextControlsFromState() {
@@ -7983,7 +9331,7 @@ function syncPronounsTextControlsFromState() {
 }
 
 function syncFinishedTimeControlsFromState() {
-  const config = state.layout.finishedTime;
+  const config = activeFinishedTime();
   els.finishLockToNameplate.checked = config.lockToNameplate;
   els.finishFont.value = config.fontFamily;
   els.finishFontBrowser.value = Array.from(els.finishFontBrowser.options).some((option) => option.value === config.fontFamily)

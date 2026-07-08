@@ -35,6 +35,8 @@
             <button type="button" disabled>Crop Preview Mode</button>
             <hr class="menu-divider">
             <button id="viewFinishedScreen" type="button">Finished Screen</button>
+            <hr class="menu-divider">
+            <button id="sceneViewToggle" type="button">Hide Scene Tree</button>
           </div>
         </details>
       </nav>
@@ -46,12 +48,38 @@
 
     <main class="workspace">
       <section class="controls-panel" aria-label="Race controls">
-        <div class="section-heading edit-only">
-          <h2>Runner Slots</h2>
-          <span id="activeCount">2 active</span>
+        <div class="left-edit-tabs edit-only">
+          <div class="left-tab-list" role="tablist" aria-label="Left panel">
+            <button id="leftTabScene" class="active" type="button" role="tab" aria-selected="true" aria-controls="leftPanelScene" data-left-tab="scene">Scene</button>
+            <button id="leftTabRunners" type="button" role="tab" aria-selected="false" aria-controls="leftPanelRunners" data-left-tab="runners">Runner Slots</button>
+          </div>
+
+          <div id="leftPanelScene" class="left-tab-pane active" role="tabpanel" aria-labelledby="leftTabScene" data-left-panel="scene">
+            <div class="scene-tree-panel" id="sceneTreePanel">
+              <div class="section-heading">
+                <h2>Scene</h2>
+                <div class="add-media-menu">
+                  <button id="addMediaLayer" class="icon-button" type="button" title="Add media layer" aria-label="Add media layer" aria-expanded="false">+</button>
+                  <div id="addMediaMenu" class="add-media-popover" hidden>
+                    <button id="addImageLayer" type="button">Add Image</button>
+                    <button id="addVideoLayer" type="button">Add Video</button>
+                  </div>
+                </div>
+              </div>
+              <input id="mediaLayerFile" type="file" accept="image/*,video/*" hidden>
+              <div id="sceneTree" class="scene-tree" role="tree" aria-label="Scene elements"></div>
+            </div>
+          </div>
+
+          <div id="leftPanelRunners" class="left-tab-pane" role="tabpanel" aria-labelledby="leftTabRunners" data-left-panel="runners" hidden>
+            <div class="section-heading">
+              <h2>Runner Slots</h2>
+              <span id="activeCount">2 active</span>
+            </div>
+            <button id="resetAllFinishes" class="secondary-button wide-button" type="button">Reset All Finishes</button>
+            <div id="runnerControls" class="runner-controls"></div>
+          </div>
         </div>
-        <button id="resetAllFinishes" class="secondary-button wide-button edit-only" type="button">Reset All Finishes</button>
-        <div id="runnerControls" class="runner-controls edit-only"></div>
 
         <section id="raceControlPanel" class="race-control-panel control-only" aria-label="Race control mode">
           <div class="section-heading">
@@ -83,6 +111,7 @@
         <div class="stage-wrap">
           <div id="stage" class="stage" aria-label="OBS canvas preview">
             <div class="background-grid"></div>
+            <div id="mediaLayer" class="media-layer" aria-label="Media layers"></div>
             <div id="snapGuideV" class="snap-guide snap-guide-v" aria-hidden="true"></div>
             <div id="snapGuideH" class="snap-guide snap-guide-h" aria-hidden="true"></div>
             <div id="titleBarPreview" class="title-bar-preview drag-target hidden-element" data-drag-target="title">
@@ -117,45 +146,51 @@
       </section>
 
       <aside class="settings-panel" aria-label="Layout settings">
-        <div class="section-heading">
-          <h2>OBS Bridge</h2>
-          <span id="connectionState">Disconnected</span>
-        </div>
+        <details class="obs-bridge-details" open>
+          <summary>
+            <div class="section-heading">
+              <h2>OBS Bridge</h2>
+              <span id="connectionState">Disconnected</span>
+            </div>
+          </summary>
 
-        <div class="obs-grid">
-          <label>
-            Host
-            <input id="obsHost" type="text" value="localhost" autocomplete="off">
-          </label>
-          <label>
-            Port
-            <input id="obsPort" type="number" value="4455" min="1" max="65535">
-          </label>
-        </div>
+          <div class="obs-bridge-body">
+            <div class="obs-grid">
+              <label>
+                Host
+                <input id="obsHost" type="text" value="localhost" autocomplete="off">
+              </label>
+              <label>
+                Port
+                <input id="obsPort" type="number" value="4455" min="1" max="65535">
+              </label>
+            </div>
 
-        <label>
-          Password
-          <input id="obsPassword" type="password" autocomplete="current-password">
-        </label>
+            <label>
+              Password
+              <input id="obsPassword" type="password" autocomplete="current-password">
+            </label>
 
-        <label>
-          Scene Name
-          <input id="obsSceneName" type="text" value="ORM__Default" autocomplete="off">
-        </label>
+            <label>
+              Scene Name
+              <input id="obsSceneName" type="text" value="ORM__Default" autocomplete="off">
+            </label>
 
-        <div class="obs-actions">
-          <button id="connectObs" type="button">Connect</button>
-          <button id="createObsScene" type="button">Create / Repair</button>
-          <button id="applyObsLayout" type="button">Apply Layout</button>
-          <button id="cleanupObsScene" type="button">Clean Up</button>
-        </div>
+            <div class="obs-actions">
+              <button id="connectObs" type="button">Connect</button>
+              <button id="createObsScene" type="button">Create / Repair</button>
+              <button id="applyObsLayout" type="button">Apply Layout</button>
+              <button id="cleanupObsScene" type="button">Clean Up</button>
+            </div>
 
-        <label class="toggle-row obs-toggle">
-          <input id="autoApplyObs" type="checkbox" checked>
-          <span>Auto apply changes to OBS</span>
-        </label>
+            <label class="toggle-row obs-toggle">
+              <input id="autoApplyObs" type="checkbox" checked>
+              <span>Auto apply changes to OBS</span>
+            </label>
 
-        <div id="obsLog" class="obs-log" aria-live="polite">Ready for OBS connection. Use OBS Program Preview as the live crop monitor.</div>
+            <div id="obsLog" class="obs-log" aria-live="polite">Ready for OBS connection. Use OBS Program Preview as the live crop monitor.</div>
+          </div>
+        </details>
 
         <section class="properties-section" aria-label="Properties">
           <div class="section-heading compact">
@@ -168,6 +203,7 @@
             <button type="button" data-settings-target="positions">Item Positions</button>
             <button type="button" data-settings-target="nameText">Name Text</button>
             <button type="button" data-settings-target="nameplates">Nameplates</button>
+            <button type="button" data-settings-target="nameplateBorders">Nameplate Borders</button>
             <button type="button" data-settings-target="commentators">Commentators</button>
             <button type="button" data-settings-target="borders">Borders</button>
             <button type="button" data-settings-target="theme">Theme</button>
@@ -177,6 +213,18 @@
             <button type="button" data-settings-target="spotlight">Spotlight</button>
             <button type="button" data-settings-target="finishedScreen">Finished Screen</button>
           </nav>
+          <div id="globalTabs" class="global-tabs" aria-label="Global settings">
+            <button type="button" data-global="layout">Layout</button>
+            <button type="button" data-global="spotlight">Spotlight</button>
+            <button type="button" data-global="finishedScreen">Finished Screen</button>
+          </div>
+          <div id="inspectorHeader" class="inspector-header">
+            <span id="inspectorTitle">Scene</span>
+          </div>
+          <label id="runnerUniqueRow" class="toggle-row obs-toggle" style="display:none;">
+            <input id="runnerUnique" type="checkbox">
+            <span>Make unique &mdash; give this runner its own style</span>
+          </label>
         </section>
 
         <details class="settings-group" data-settings-panel="hotkeys">
@@ -201,9 +249,9 @@
             <span>Snap while dragging/resizing</span>
           </label>
           <label>
-            Aspect preset
+            Aspect Ratio
             <select id="aspectPreset">
-              <option value="4:3">4:3 classic speedgame</option>
+              <option value="4:3">4:3</option>
               <option value="16:9">16:9 widescreen</option>
             </select>
           </label>
@@ -231,31 +279,6 @@
             Panel gap
             <input id="gapSize" type="range" min="8" max="48" value="20">
             <output id="gapValue">20 px</output>
-          </label>
-          <div class="section-subhead">Item Visibility</div>
-          <label class="toggle-row obs-toggle">
-            <input id="feedVisible" type="checkbox" checked>
-            <span>Show game feeds</span>
-          </label>
-          <label class="toggle-row obs-toggle">
-            <input id="feedBorderVisible" type="checkbox" checked>
-            <span>Show game feed borders</span>
-          </label>
-          <label class="toggle-row obs-toggle">
-            <input id="nameVisible" type="checkbox" checked>
-            <span>Show runner names</span>
-          </label>
-          <label class="toggle-row obs-toggle">
-            <input id="finishedTimeVisible" type="checkbox" checked>
-            <span>Show finished times</span>
-          </label>
-          <label class="toggle-row obs-toggle">
-            <input id="titleBarVisible" type="checkbox">
-            <span>Show title bar</span>
-          </label>
-          <label class="toggle-row obs-toggle">
-            <input id="timerBorderEnabled" type="checkbox" checked>
-            <span>Show timer border</span>
           </label>
         </details>
 
@@ -1318,26 +1341,10 @@
                 </label>
               </div>
             </section>
-            <label class="toggle-row obs-toggle">
-              <input id="nameShowBorder" type="checkbox" checked>
-              <span>Show plate border</span>
-            </label>
             <div class="obs-grid">
               <label>
                 Plate opacity
                 <input id="namePlateBackgroundOpacity" type="number" min="0" max="100" step="1" value="82">
-              </label>
-              <label>
-                Border color
-                <input id="namePlateBorderColor" type="color" value="#ffffff">
-              </label>
-              <label>
-                Border opacity
-                <input id="namePlateBorderOpacity" type="number" min="0" max="100" step="1" value="18">
-              </label>
-              <label>
-                Border width
-                <input id="namePlateBorderWidth" type="number" min="0" max="20" step="1" value="2">
               </label>
               <label>
                 Radius
@@ -1358,6 +1365,28 @@
             <button id="clearNameplateImage" class="secondary-button" type="button">Clear Nameplate Image</button>
             <div class="note compact-note">Transparent PNGs render with transparency in both preview and OBS.</div>
           </section>
+        </details>
+
+        <details class="settings-group" data-settings-panel="nameplateBorders">
+          <summary>Nameplate Borders</summary>
+          <label class="toggle-row obs-toggle">
+            <input id="nameShowBorder" type="checkbox" checked>
+            <span>Show plate border</span>
+          </label>
+          <div class="obs-grid">
+            <label>
+              Border color
+              <input id="namePlateBorderColor" type="color" value="#ffffff">
+            </label>
+            <label>
+              Border opacity
+              <input id="namePlateBorderOpacity" type="number" min="0" max="100" step="1" value="18">
+            </label>
+            <label>
+              Border width
+              <input id="namePlateBorderWidth" type="number" min="0" max="20" step="1" value="2">
+            </label>
+          </div>
         </details>
 
         <details class="settings-group" data-settings-panel="finishedTime">
@@ -1628,7 +1657,7 @@
 
         <details class="settings-group" data-settings-panel="borders">
           <summary>Borders</summary>
-          <label>
+          <label id="borderTargetRow">
             Editing
             <select id="borderTarget">
               <option value="feed">Game feed borders</option>
