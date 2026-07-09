@@ -911,6 +911,131 @@
               </div>
             </div>
           </details>
+
+          <details class="nested-settings" style="margin-top: 10px;">
+            <summary>Runner Icon</summary>
+            <div style="margin-top: 10px; display: grid; gap: 10px;">
+              <label class="toggle-row obs-toggle">
+                <input id="finishedScreenRunnerIcons" type="checkbox">
+                <span>Show runner icons</span>
+              </label>
+              <div class="note compact-note">Uses each runner's own icon (assigned in the runner panel under "Runner Icon").</div>
+              <label>
+                Placement
+                <select id="finishedScreenRunnerIconPlacement">
+                  <option value="before">Before name</option>
+                  <option value="after">After name</option>
+                </select>
+              </label>
+            </div>
+          </details>
+
+          <details class="nested-settings" style="margin-top: 10px;">
+            <summary>Personal Best Comparison</summary>
+            <div style="margin-top: 10px; display: grid; gap: 10px;">
+              <label class="toggle-row obs-toggle">
+                <input id="finishedScreenPbShow" type="checkbox">
+                <span>Show delta to runner's PB</span>
+              </label>
+              <div class="note compact-note">Compares each finisher's time to their PB (set per runner). Use <code>{delta}</code> in the text fields to place the time difference.</div>
+              <label>
+                Show
+                <select id="finishedScreenPbMode">
+                  <option value="always">Always</option>
+                  <option value="threshold">Only if off PB by&hellip;</option>
+                </select>
+              </label>
+              <label id="finishedScreenPbThresholdRow">
+                Threshold (seconds off PB)
+                <input id="finishedScreenPbThreshold" type="number" min="0" step="1" value="10">
+              </label>
+              <label>
+                Behind-PB text
+                <input id="finishedScreenPbDeltaText" type="text" value="+{delta} against PB">
+              </label>
+              <label>
+                New-PB text
+                <input id="finishedScreenPbNewText" type="text" value="New PB by {delta}!">
+              </label>
+              <label>
+                Font
+                <input id="finishedScreenPbFont" list="finishedScreenFontChoices" type="text" value="Segoe UI" placeholder="Installed font face">
+              </label>
+              <label>
+                Font size
+                <input id="finishedScreenPbFontSize" type="number" min="1" step="1" value="28">
+              </label>
+              <label>
+                Color
+                <input id="finishedScreenPbColor" type="color" value="#f0b84a">
+              </label>
+              <label class="toggle-row obs-toggle">
+                <input id="finishedScreenPbStrokeEnabled" type="checkbox">
+                <span>Text stroke</span>
+              </label>
+              <div class="obs-grid">
+                <label>
+                  Stroke color
+                  <input id="finishedScreenPbStrokeColor" type="color" value="#000000">
+                </label>
+                <label>
+                  Stroke width
+                  <input id="finishedScreenPbStrokeWidth" type="number" min="0" max="20" step="1" value="2">
+                </label>
+              </div>
+              <label class="toggle-row obs-toggle">
+                <input id="finishedScreenPbShadowEnabled" type="checkbox" checked>
+                <span>Drop shadow</span>
+              </label>
+              <div class="obs-grid">
+                <label>
+                  Shadow color
+                  <input id="finishedScreenPbShadowColor" type="color" value="#000000">
+                </label>
+                <label>
+                  Blur
+                  <input id="finishedScreenPbShadowBlur" type="number" min="0" max="60" step="1" value="8">
+                </label>
+                <label>
+                  X
+                  <input id="finishedScreenPbShadowX" type="number" min="-40" max="40" step="1" value="0">
+                </label>
+                <label>
+                  Y
+                  <input id="finishedScreenPbShadowY" type="number" min="-40" max="40" step="1" value="2">
+                </label>
+              </div>
+            </div>
+          </details>
+
+          <details class="nested-settings" style="margin-top: 10px;">
+            <summary>Leaderboard Motion</summary>
+            <div style="margin-top: 10px; display: grid; gap: 10px;">
+              <label class="toggle-row obs-toggle">
+                <input id="finishedScreenBob" type="checkbox">
+                <span>Bob the leaderboard plates</span>
+              </label>
+              <label>
+                Amount (height)
+                <input id="finishedScreenBobAmp" type="range" min="0" max="30" step="1" value="6">
+                <output id="finishedScreenBobAmpValue">6 px</output>
+              </label>
+              <label>
+                Speed (cycle time)
+                <input id="finishedScreenBobSpeed" type="range" min="0.5" max="8" step="0.1" value="3">
+                <output id="finishedScreenBobSpeedValue">3.0 s</output>
+              </label>
+              <label>
+                Smoothness
+                <input id="finishedScreenBobSmoothness" type="range" min="0" max="100" step="1" value="100">
+                <output id="finishedScreenBobSmoothnessValue">100 %</output>
+              </label>
+              <label class="toggle-row obs-toggle">
+                <input id="finishedScreenBobStagger" type="checkbox" checked>
+                <span>Stagger (wave across plates)</span>
+              </label>
+            </div>
+          </details>
         </details>
 
         <details class="settings-group" data-settings-panel="positions">
@@ -1887,6 +2012,28 @@
           Finished time
           <input data-field="finalTimeText" type="text" placeholder="00:00:00">
         </label>
+
+        <details class="nested-settings" style="margin-top: 10px;">
+          <summary>Extra Info</summary>
+          <div style="margin-top: 10px; display: grid; gap: 10px;">
+            <label>
+              Personal best (PB)
+              <input data-field="pb" type="text" placeholder="00:00:00">
+            </label>
+          </div>
+        </details>
+
+        <details class="nested-settings" style="margin-top: 10px; margin-bottom: 10px;">
+          <summary>Runner Icon</summary>
+          <div style="margin-top: 10px; display: grid; gap: 10px;">
+            <div class="note compact-note">Optional image shown inside this runner's nameplate. Adjust where it sits via "Runner icons" in the scene tree (shared placement for all runners).</div>
+            <input data-role="iconFile" type="file" accept="image/*">
+            <div class="font-picker">
+              <img data-role="iconPreview" class="fs-icon-preview" alt="Runner icon preview" hidden>
+              <button data-action="clearIcon" type="button">Clear</button>
+            </div>
+          </div>
+        </details>
 
         <details class="nested-settings" style="margin-top: 10px; margin-bottom: 10px;">
           <summary>Crop</summary>

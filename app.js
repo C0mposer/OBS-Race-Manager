@@ -3,7 +3,7 @@ const MANAGED_PREFIX = "ORM__";
 const MAX_RUNNERS = 20;
 const RUNNER_PARTS = ["Feed", "Border", "Name", "Finish"];
 const GLOBAL_PARTS = ["Background", "TitleBar", "TimerBorder", "TimerText", "Commentators", "FinishedScreen"];
-const BASE_LAYER_ORDER = ["background", "runners", "title", "timerText", "timerFrame", "commentators", "finished"];
+const BASE_LAYER_ORDER = ["background", "runners", "timerText", "timerFrame", "commentators", "title", "finished"];
 const NAME_FONT_HEIGHT_RATIO = 0.48;
 const COMMON_FONT_FACES = [
   "Segoe UI",
@@ -49,6 +49,8 @@ const DEFAULT_ELEMENTS = {
   feed: true,
   feedBorder: true,
   name: true,
+  nameText: true,
+  runnerIcon: true,
   titleBar: true,
   timerBorder: true,
   builtInTimer: true,
@@ -107,6 +109,21 @@ const DEFAULT_FINISHED_TIME = {
   shadowX: 0,
   shadowY: 2
 };
+// Default placement (fraction of the nameplate box) for a runner's icon — a
+// square-ish slot on the left side of the plate. Icons keep their aspect ratio
+// (object-fit: contain), so this rect is just the bounding area.
+const DEFAULT_RUNNER_ICON_RECT = { x: 0.03, y: 0.12, width: 0.16, height: 0.76 };
+
+// A neutral placeholder shown (preview only) while positioning Runner Icons for
+// runners that don't have an icon set yet.
+const DEFAULT_RUNNER_ICON_PLACEHOLDER =
+  "data:image/svg+xml;utf8," + encodeURIComponent(
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>" +
+    "<rect width='100' height='100' rx='14' fill='rgba(240,184,74,0.22)' stroke='rgba(240,184,74,0.85)' stroke-width='4'/>" +
+    "<circle cx='50' cy='38' r='16' fill='rgba(255,255,255,0.85)'/>" +
+    "<path d='M22 82c0-15 12-24 28-24s28 9 28 24z' fill='rgba(255,255,255,0.85)'/></svg>"
+  );
+
 const DEFAULT_FINISHED_SCREEN = {
   accentColor: "#f0b84a",
   backdropColor: "#080b10",
@@ -120,6 +137,32 @@ const DEFAULT_FINISHED_SCREEN = {
   showGaps: false,
   showUnderline: true,
   showOnlyBackground: false,
+  // Runner icons (uses each runner's assigned icon)
+  showRunnerIcons: false,
+  runnerIconPlacement: "before", // "before" | "after" the name
+  // Personal-best comparison
+  pbShowDelta: false,
+  pbShowMode: "always", // "always" | "threshold"
+  pbThresholdSec: 10,
+  pbDeltaText: "+{delta} against PB", // {delta} => the time difference
+  pbNewText: "New PB by {delta}!",
+  pbFontFamily: "Segoe UI",
+  pbFontSize: 28,
+  pbColor: "#f0b84a",
+  pbStrokeEnabled: false,
+  pbStrokeColor: "#000000",
+  pbStrokeWidth: 2,
+  pbShadowEnabled: true,
+  pbShadowColor: "#000000",
+  pbShadowBlur: 8,
+  pbShadowX: 0,
+  pbShadowY: 2,
+  // Leaderboard plate bobbing
+  bobEnabled: false,
+  bobAmplitude: 6, // px of vertical travel (each direction)
+  bobSpeed: 3, // seconds per full bob cycle
+  bobSmoothness: 100, // 0 = linear/mechanical, 100 = smooth ease-in-out
+  bobStagger: true, // offset each plate's phase for a gentle wave
   // Header text
   heading: "FINAL RESULTS",
   headingFontFamily: "Segoe UI",
@@ -190,19 +233,28 @@ const DEFAULT_COMMENTATORS = {
 };
 const DEFAULT_PRONOUNS_TEXT = {
   enabled: true,
-  fontFamily: "Bangers",
-  fontSize: 40,
-  textColor: "#00ffcc",
+  fontFamily: "Segoe UI",
+  fontSize: 28,
+  textColor: "#ffffff",
   textX: 0,
   textY: 0,
-  strokeEnabled: true,
+  strokeEnabled: false,
+  strokeColor: "#000000",
+  strokeWidth: 2,
+  shadowEnabled: true,
+  shadowColor: "#000000",
+  shadowBlur: 8,
+  shadowX: 0,
+  shadowY: 2
+};
+// The old playful defaults (Bangers/teal/red-stroke/green-shadow). Projects that
+// never customised pronoun text still carry this exact signature, so we migrate
+// them to the clean defaults on load (see normalizeLoadedLayout).
+const LEGACY_PRONOUNS_TEXT_SIGNATURE = {
+  fontFamily: "Bangers",
+  textColor: "#00ffcc",
   strokeColor: "#ff0000",
-  strokeWidth: 3,
-  shadowEnabled: false,
-  shadowColor: "#2bff00",
-  shadowBlur: 0,
-  shadowX: 10,
-  shadowY: 10
+  shadowColor: "#2bff00"
 };
 const BORDER_PRESETS = {
   graphite: {
@@ -403,6 +455,7 @@ const state = {
       shadowY: 2
     },
     pronounsText: { ...DEFAULT_PRONOUNS_TEXT },
+    runnerIcon: { rect: { ...DEFAULT_RUNNER_ICON_RECT } },
     borderPreset: "graphite",
     borderTarget: "feed",
     borderModeSource: "generated",
@@ -488,7 +541,7 @@ document.addEventListener("DOMContentLoaded", () => {
 function createDefaultRunners() {
   return Array.from({ length: MAX_RUNNERS }, (_, index) => {
     const slot = index + 1;
-    const runner = createRunner(slot, `Runner ${slot}`, `runner_${slot}_feed`, slot <= 2, zeroCrop());
+    const runner = createRunner(slot, `Runner ${slot}`, "", slot <= 2, zeroCrop());
     runner.collapsed = true;
     return runner;
   });
@@ -512,6 +565,8 @@ function createRunner(slot, name, source, active, crop) {
     pronounPrimary: "",
     pronounSecondary: "",
     pronounCustom: "",
+    icon: "",
+    pb: "",
     unique: false,
     style: null
   };
@@ -1072,6 +1127,33 @@ function bindElements() {
   els.finishedScreenBackdropOpacityValue = document.getElementById("finishedScreenBackdropOpacityValue");
   els.finishedScreenRowSpeed = document.getElementById("finishedScreenRowSpeed");
   els.finishedScreenRowSpeedValue = document.getElementById("finishedScreenRowSpeedValue");
+  els.finishedScreenRunnerIcons = document.getElementById("finishedScreenRunnerIcons");
+  els.finishedScreenRunnerIconPlacement = document.getElementById("finishedScreenRunnerIconPlacement");
+  els.finishedScreenPbShow = document.getElementById("finishedScreenPbShow");
+  els.finishedScreenPbMode = document.getElementById("finishedScreenPbMode");
+  els.finishedScreenPbThreshold = document.getElementById("finishedScreenPbThreshold");
+  els.finishedScreenPbThresholdRow = document.getElementById("finishedScreenPbThresholdRow");
+  els.finishedScreenPbDeltaText = document.getElementById("finishedScreenPbDeltaText");
+  els.finishedScreenPbNewText = document.getElementById("finishedScreenPbNewText");
+  els.finishedScreenPbFont = document.getElementById("finishedScreenPbFont");
+  els.finishedScreenPbFontSize = document.getElementById("finishedScreenPbFontSize");
+  els.finishedScreenPbColor = document.getElementById("finishedScreenPbColor");
+  els.finishedScreenPbStrokeEnabled = document.getElementById("finishedScreenPbStrokeEnabled");
+  els.finishedScreenPbStrokeColor = document.getElementById("finishedScreenPbStrokeColor");
+  els.finishedScreenPbStrokeWidth = document.getElementById("finishedScreenPbStrokeWidth");
+  els.finishedScreenPbShadowEnabled = document.getElementById("finishedScreenPbShadowEnabled");
+  els.finishedScreenPbShadowColor = document.getElementById("finishedScreenPbShadowColor");
+  els.finishedScreenPbShadowBlur = document.getElementById("finishedScreenPbShadowBlur");
+  els.finishedScreenPbShadowX = document.getElementById("finishedScreenPbShadowX");
+  els.finishedScreenPbShadowY = document.getElementById("finishedScreenPbShadowY");
+  els.finishedScreenBob = document.getElementById("finishedScreenBob");
+  els.finishedScreenBobAmp = document.getElementById("finishedScreenBobAmp");
+  els.finishedScreenBobAmpValue = document.getElementById("finishedScreenBobAmpValue");
+  els.finishedScreenBobSpeed = document.getElementById("finishedScreenBobSpeed");
+  els.finishedScreenBobSpeedValue = document.getElementById("finishedScreenBobSpeedValue");
+  els.finishedScreenBobSmoothness = document.getElementById("finishedScreenBobSmoothness");
+  els.finishedScreenBobSmoothnessValue = document.getElementById("finishedScreenBobSmoothnessValue");
+  els.finishedScreenBobStagger = document.getElementById("finishedScreenBobStagger");
   els.finishedScreenRowStagger = document.getElementById("finishedScreenRowStagger");
   els.finishedScreenRowStaggerValue = document.getElementById("finishedScreenRowStaggerValue");
   els.finishedScreenIcons = document.getElementById("finishedScreenIcons");
@@ -2330,7 +2412,16 @@ function bindPreviewDragging() {
       : event.target.closest("[data-drag-target]");
     if (!target) return;
 
-    const kind = handle?.dataset.resizeHandle || target.dataset.dragTarget;
+    let kind = handle?.dataset.resizeHandle || target.dataset.dragTarget;
+    let dragHandle = handle;
+    // Name / pronoun text lives inside the nameplate and its hitbox often spills
+    // outside the plate. So clicking anywhere on the nameplate moves the PLATE by
+    // default; the text only moves when it's the currently selected element
+    // (selected via the scene tree under Nameplates).
+    if ((kind === "nameText" || kind === "pronounsText" || kind === "runnerIcon") && selection.elementId !== kind) {
+      kind = "name";
+      dragHandle = null;
+    }
     const elementId = dragKindToElementId(kind, target);
     if (isDragKindLocked(kind) || isElementLocked(elementId)) {
       setSelectedElement(elementId);
@@ -2355,7 +2446,7 @@ function bindPreviewDragging() {
       textBounds,
       original: { ...rect },
       current: { ...rect },
-      mode: textDrag ? "moveText" : handle ? "resize" : "move"
+      mode: textDrag ? "moveText" : dragHandle ? "resize" : "move"
     };
     beginContinuousHistory(`${drag.mode}-${kind}`);
 
@@ -2408,12 +2499,26 @@ function bindPreviewDragging() {
   els.stage.addEventListener("pointerup", endPreviewDrag);
   els.stage.addEventListener("pointercancel", endPreviewDrag);
   els.stage.addEventListener("dblclick", (event) => {
-    const target = event.target.closest("[data-drag-target='nameText']");
-    if (!target) return;
-    const slot = Number(target.closest(".runner-panel")?.dataset.slot);
-    if (!slot) return;
-    focusRunnerName(slot);
-    event.preventDefault();
+    const nameTarget = event.target.closest("[data-drag-target='nameText']");
+    if (nameTarget) {
+      const slot = Number(nameTarget.closest(".runner-panel")?.dataset.slot);
+      if (slot) {
+        focusRunnerName(slot);
+        event.preventDefault();
+      }
+      return;
+    }
+    if (event.target.closest("[data-drag-target='title']")) {
+      const editSub = Boolean(event.target.closest(".title-sub"));
+      focusInspectorField("title", "raceInfo", editSub ? els.raceSubtitle : els.raceTitle);
+      event.preventDefault();
+      return;
+    }
+    if (event.target.closest("[data-drag-target='commentators']")) {
+      const editLabel = Boolean(event.target.closest(".c-label"));
+      focusInspectorField("commentators", "commentators", editLabel ? els.commLabel : els.commNames);
+      event.preventDefault();
+    }
   });
 
   function endPreviewDrag(event) {
@@ -2451,6 +2556,8 @@ function bindPreviewDragging() {
               ? "commentators"
               : drag.kind === "media"
                 ? "media"
+              : drag.kind === "runnerIcon"
+                ? "nameplate"
             : drag.kind === "name"
               ? "geometry"
               : "drag-end";
@@ -2471,9 +2578,38 @@ function focusRunnerName(slot) {
   input?.select();
 }
 
+// Double-clicking a global element's text (title bar, commentators) jumps
+// straight to editing its text field: select the element so its inspector shows,
+// open the relevant panel, then focus the input.
+function focusInspectorField(elementId, panelName, input) {
+  setSelectedElement(elementId);
+  const panel = document.querySelector(`[data-settings-panel='${panelName}']`);
+  if (panel) {
+    if ("open" in panel) panel.open = true;
+    panel.scrollIntoView?.({ block: "nearest" });
+  }
+  if (!input) return;
+  input.focus();
+  if (typeof input.select === "function" && input.tagName !== "TEXTAREA") input.select();
+}
+
 function getDragContainer(kind, target) {
-  if (kind === "timer" || kind === "title" || kind === "commentators" || kind === "media") return els.stage.getBoundingClientRect();
-  if (kind === "nameText" || kind === "pronounsText") return target.closest(".runner-nameplate").getBoundingClientRect();
+  if (kind === "media") {
+    const layer = getMediaLayer(target?.dataset.mediaId || "");
+    const parents = layer ? mediaParentRects(layer.parentId) : null;
+    const stageRect = els.stage.getBoundingClientRect();
+    if (parents && parents[0]) {
+      const p = parents[0];
+      const left = stageRect.left + p.x * stageRect.width;
+      const top = stageRect.top + p.y * stageRect.height;
+      const width = p.width * stageRect.width;
+      const height = p.height * stageRect.height;
+      return { left, top, width, height, right: left + width, bottom: top + height };
+    }
+    return stageRect;
+  }
+  if (kind === "timer" || kind === "title" || kind === "commentators") return els.stage.getBoundingClientRect();
+  if (kind === "nameText" || kind === "pronounsText" || kind === "runnerIcon") return target.closest(".runner-nameplate").getBoundingClientRect();
   return target.closest(".runner-panel").getBoundingClientRect();
 }
 
@@ -2536,6 +2672,7 @@ function getDragRect(kind, target = null) {
   if (kind === "name") return state.layout.panelGeometry.name;
   if (kind === "title") return state.layout.raceInfo.rect;
   if (kind === "commentators") return state.layout.commentators.rect;
+  if (kind === "runnerIcon") return state.layout.runnerIcon.rect;
   if (kind === "media") return getMediaLayer(target?.dataset.mediaId || "")?.rect || { x: 0, y: 0, width: 0.1, height: 0.1 };
   if (kind === "finish") {
     const slot = Number(target?.closest(".runner-panel")?.dataset.slot);
@@ -2561,8 +2698,13 @@ function normalizeGeometryRect(rect) {
 
 function applyMediaAspectResize(drag, dx, dy) {
   const layer = getMediaLayer(drag.mediaId);
-  const aspect = Number(layer?.aspectRatio) || (drag.original.width * STAGE.width) / Math.max(1, drag.original.height * STAGE.height) || 16 / 9;
-  const stageRatio = STAGE.width / STAGE.height;
+  const aspect = Number(layer?.aspectRatio) || 16 / 9;
+  // Aspect ratio of the coordinate space the rect lives in (the stage for a
+  // free layer, the parent's box for a nested one). The on-screen container
+  // preserves that box's aspect, so derive it from the container.
+  const stageRatio = (drag.container?.width && drag.container?.height)
+    ? drag.container.width / drag.container.height
+    : STAGE.width / STAGE.height;
   if (Math.abs(dy) > Math.abs(dx)) {
     drag.current.width = drag.current.height * aspect / stageRatio;
   } else {
@@ -2730,22 +2872,49 @@ function paintDragPreview(kind, rect) {
   if (kind === "timer") {
     applyNormalizedStyle(els.timerBorder, rect);
     applyNormalizedStyle(els.timerTextPreview, rect);
+    repaintNestedMediaLive("timerFrame", rect);
     return;
   }
 
   if (kind === "title") {
     applyNormalizedStyle(els.titleBarPreview, rect);
+    repaintNestedMediaLive("title", rect);
     return;
   }
 
   if (kind === "commentators") {
     applyNormalizedStyle(els.commentatorsPreview, rect);
+    repaintNestedMediaLive("commentators", rect);
+    return;
+  }
+
+  if (kind === "runnerIcon") {
+    for (const node of els.runnerLayer.querySelectorAll(".runner-icon-drag")) {
+      node.style.left = `${rect.x * 100}%`;
+      node.style.top = `${rect.y * 100}%`;
+      node.style.width = `${rect.width * 100}%`;
+      node.style.height = `${rect.height * 100}%`;
+    }
     return;
   }
 
   if (kind === "media") {
-    const target = els.stage.querySelector(".media-preview.dragging");
-    if (target) applyNormalizedStyle(target, rect);
+    const dragging = els.stage.querySelector(".media-preview.dragging");
+    const id = dragging?.dataset.mediaId || "";
+    const layer = getMediaLayer(id);
+    const parents = layer ? mediaParentRects(layer.parentId) : null;
+    if (parents) {
+      const nodes = els.mediaLayer.querySelectorAll(`.media-preview[data-media-id='${id}']`);
+      nodes.forEach((node, i) => {
+        const parent = parents[i] || parents[0];
+        if (parent) {
+          node.style.transitionDuration = "0ms"; // track the drag 1:1 (no easing lag)
+          applyNormalizedStyle(node, nestRect(parent, rect));
+        }
+      });
+    } else if (dragging) {
+      applyNormalizedStyle(dragging, rect);
+    }
     return;
   }
 
@@ -2949,6 +3118,164 @@ function mediaLayerIds() {
   return state.layout.mediaLayers.map((layer) => mediaNodeId(layer.id));
 }
 
+// --- Media nesting -----------------------------------------------------------
+// A media layer may nest inside a parent element. When nested, layer.rect is
+// interpreted as a fraction *of the parent's box* (0..1) instead of the stage,
+// so the media stays glued to the parent as it moves/resizes. Shared parents
+// (game feeds, nameplates) resolve to one instance per active runner.
+
+const MEDIA_PARENT_LABELS = {
+  title: "Title bar",
+  commentators: "Commentators",
+  timerFrame: "Timer frame",
+  feed: "Game feeds",
+  nameplate: "Nameplates"
+};
+
+// Which parent ids are shared across every active runner (multi-instance).
+function isSharedMediaParent(parentId) {
+  return parentId === "feed" || parentId === "nameplate";
+}
+
+// Validate/clean a stored parentId (used on load).
+function normalizeMediaParentId(parentId) {
+  if (typeof parentId !== "string" || !parentId) return null;
+  if (MEDIA_PARENT_LABELS[parentId]) return parentId;
+  if (/^runner:\d+$/.test(parentId)) return parentId;
+  return null;
+}
+
+// Map a scene-tree node id to the media parentId it represents (or undefined
+// when the node is not a valid nesting target). "scene" un-nests.
+function mediaParentFromNodeId(nodeId) {
+  if (nodeId === "scene") return null;
+  if (nodeId === "title" || nodeId === "commentators" || nodeId === "timerFrame") return nodeId;
+  if (nodeId === "layer:feed") return "feed";
+  if (nodeId === "layer:name") return "nameplate";
+  if (/^runner:\d+$/.test(nodeId)) return nodeId;
+  return undefined;
+}
+
+// Map a media parentId back to the scene-tree node it should nest under.
+function mediaParentToNodeId(parentId) {
+  if (parentId === "feed") return "layer:feed";
+  if (parentId === "nameplate") return "layer:name";
+  if (parentId === "title" || parentId === "commentators" || parentId === "timerFrame") return parentId;
+  if (typeof parentId === "string" && parentId.startsWith("runner:")) return parentId;
+  return null;
+}
+
+function mediaParentLabel(parentId) {
+  if (MEDIA_PARENT_LABELS[parentId]) return MEDIA_PARENT_LABELS[parentId];
+  if (typeof parentId === "string" && parentId.startsWith("runner:")) {
+    const slot = Number(parentId.split(":")[1]);
+    const runner = state.runners.find((r) => r.slot === slot);
+    return runner ? `Runner ${runner.placement || slot}` : `Runner ${slot}`;
+  }
+  return "";
+}
+
+function normalizeStageRect(rect) {
+  return {
+    x: rect.x / STAGE.width,
+    y: rect.y / STAGE.height,
+    width: rect.width / STAGE.width,
+    height: rect.height / STAGE.height
+  };
+}
+
+// Normalized (stage-fraction) rect(s) of a parent element. Returns an array so
+// shared parents can yield one rect per active runner. null => no/unknown
+// parent (layer is free/stage-anchored).
+function mediaParentRects(parentId) {
+  if (!parentId) return null;
+  if (parentId === "title") return [state.layout.raceInfo.rect];
+  if (parentId === "commentators") return [state.layout.commentators.rect];
+  if (parentId === "timerFrame") return [state.layout.timerBorder];
+  const rectBySlot = getCurrentRectBySlot(); // slot -> stage px panel rect
+  if (parentId === "feed") {
+    const feedGeo = gameFeedViewportGeometry();
+    return [...rectBySlot.values()].map((panel) => normalizeStageRect(viewportRect(panel, feedGeo)));
+  }
+  if (parentId === "nameplate") {
+    const nameGeo = nameTransformGeometry();
+    return [...rectBySlot.values()].map((panel) => normalizeStageRect(viewportRect(panel, nameGeo)));
+  }
+  if (parentId.startsWith("runner:")) {
+    const slot = Number(parentId.split(":")[1]);
+    const panel = rectBySlot.get(slot);
+    return panel ? [normalizeStageRect(panel)] : [];
+  }
+  return null;
+}
+
+// A centered, aspect-preserving rect (parent-relative, 0..1) that fits a media
+// layer of the given native aspect ratio inside a parent box without stretching.
+function fitRectInParent(aspectRatio, parent) {
+  const aspect = Number(aspectRatio) || 16 / 9;
+  const parentPxW = Math.max(1, parent.width * STAGE.width);
+  const parentPxH = Math.max(1, parent.height * STAGE.height);
+  let relW = 1;
+  let relH = (relW * parentPxW / aspect) / parentPxH;
+  if (relH > 1) { relH = 1; relW = (relH * parentPxH * aspect) / parentPxW; }
+  const scale = 0.9; // small inset so it doesn't butt against the parent edges
+  relW *= scale;
+  relH *= scale;
+  return { x: (1 - relW) / 2, y: (1 - relH) / 2, width: relW, height: relH };
+}
+
+// Reposition a single-instance parent's nested media live during that parent's
+// drag, so the child tracks the box in real time (not just on release).
+function repaintNestedMediaLive(parentId, parentRect) {
+  if (!els.mediaLayer) return;
+  for (const layer of state.layout.mediaLayers) {
+    if (layer.parentId !== parentId) continue;
+    const node = els.mediaLayer.querySelector(`[data-media-key='${layer.id}#0']`);
+    if (node) {
+      // Kill the tween while the parent is being dragged so the child tracks it
+      // 1:1 instead of easing behind and catching up. renderMediaLayers restores
+      // the transition duration once the drag ends.
+      node.style.transitionDuration = "0ms";
+      applyNormalizedStyle(node, nestRect(parentRect, layer.rect));
+    }
+  }
+}
+
+// Compose a child's parent-relative rect with a parent's absolute rect.
+function nestRect(parent, rel) {
+  return {
+    x: parent.x + rel.x * parent.width,
+    y: parent.y + rel.y * parent.height,
+    width: rel.width * parent.width,
+    height: rel.height * parent.height
+  };
+}
+
+// All normalized stage rects a media layer should render at (1 for free/single
+// parents, N for shared parents; [] when a shared/runner parent has no active
+// instances).
+function mediaLayerNormRects(layer) {
+  if (!layer) return [];
+  const parents = mediaParentRects(layer.parentId);
+  if (!parents) return [layer.rect];
+  return parents.map((parent) => nestRect(parent, layer.rect));
+}
+
+// OBS input part name for the i-th instance of a media layer. Instance 0 keeps
+// the legacy name for backward compatibility.
+function mediaInstancePartName(layer, index) {
+  return index === 0 ? mediaPartName(layer) : `${mediaPartName(layer)}_${index}`;
+}
+
+// OBS instances to realise for a media layer: [{ partName, rect }].
+function mediaLayerObsInstances(layer) {
+  return mediaLayerNormRects(layer).map((rect, index) => ({
+    partName: mediaInstancePartName(layer, index),
+    rect,
+    index
+  }));
+}
+
 function normalizedLayerOrder() {
   return normalizedLayerOrderFor(state.layout);
 }
@@ -2968,6 +3295,7 @@ async function addMediaLayerFromFile(file, dataUrl) {
     dataUrl,
     aspectRatio,
     visible: true,
+    parentId: null,
     rect: { x: 0.25, y: 0.22, width: defaultWidth, height: defaultHeight }
   };
   pushHistory("add media layer");
@@ -3050,6 +3378,8 @@ async function removeManagedMediaInput(layer) {
 }
 
 let sceneTreeDragId = "";
+let sceneTreeDropMode = "";
+let sceneTreeDropTargetId = "";
 
 function moveLayerOrderItem(draggedId, targetId, placeAfter = false) {
   if (!draggedId || !targetId || draggedId === targetId || draggedId === "background") return;
@@ -3107,6 +3437,21 @@ function buildOrderedSceneTree() {
     nodes.push({ id: "layer:feed", label: "Game feeds", indent: 2, vis: elementFlagVis("feed", "feed-visible") });
     nodes.push({ id: "layer:feedBorder", label: "Feed borders", indent: 2, vis: elementFlagVis("feedBorder", "feed-border-visible") });
     nodes.push({ id: "layer:name", label: "Nameplates", indent: 2, vis: elementFlagVis("name", "name-visible") });
+    nodes.push({ id: "nameText", label: "Name text", indent: 3, selectable: true, vis: elementFlagVis("nameText", "nameplate") });
+    nodes.push({
+      id: "pronounsText", label: "Pronouns text", indent: 3, selectable: true,
+      vis: {
+        get: () => Boolean(state.layout.pronounsText.enabled),
+        toggle: () => {
+          pushHistory("pronouns visibility");
+          state.layout.pronounsText.enabled = !state.layout.pronounsText.enabled;
+          if (els.pronounsEnabled) els.pronounsEnabled.checked = state.layout.pronounsText.enabled;
+          update();
+          scheduleObsApply("pronounsText", 120);
+        }
+      }
+    });
+    nodes.push({ id: "runnerIcon", label: "Runner icons", indent: 3, selectable: true, vis: elementFlagVis("runnerIcon", "nameplate") });
     nodes.push({ id: "layer:finishedTime", label: "Finish times", indent: 2, vis: elementFlagVis("finishedTime", "finish-visible") });
   };
 
@@ -3156,30 +3501,57 @@ function buildOrderedSceneTree() {
       });
     } else if (id.startsWith("media:")) {
       const layer = getMediaLayer(id.slice("media:".length));
-      if (layer) {
-        nodes.push({
-          id,
-          label: layer.name || "Media layer",
-          kind: "media",
-          indent: 0,
-          orderId: id,
-          drag: "media",
-          lockable: true,
-          removable: true,
-          vis: {
-            get: () => layer.visible !== false,
-            toggle: () => {
-              pushHistory("media visibility");
-              layer.visible = layer.visible === false;
-              update();
-              scheduleObsApply("media", 80);
-            }
-          }
-        });
-      }
+      // Nested media are relocated under their parent node below, so skip them
+      // in the flat z-order pass.
+      if (layer && !layer.parentId) nodes.push(buildMediaSceneNode(layer, 0));
     }
   }
+  insertNestedMediaNodes(nodes);
   return nodes;
+}
+
+function buildMediaSceneNode(layer, indent) {
+  return {
+    id: mediaNodeId(layer.id),
+    label: layer.name || "Media layer",
+    kind: "media",
+    indent,
+    orderId: mediaNodeId(layer.id),
+    drag: "media",
+    lockable: true,
+    removable: true,
+    nestable: true,
+    vis: {
+      get: () => layer.visible !== false,
+      toggle: () => {
+        pushHistory("media visibility");
+        layer.visible = layer.visible === false;
+        update();
+        scheduleObsApply("media", 80);
+      }
+    }
+  };
+}
+
+// Place each nested media layer as an indented child directly under the tree
+// node it is nested inside.
+function insertNestedMediaNodes(nodes) {
+  for (const layer of state.layout.mediaLayers) {
+    if (!layer.parentId) continue;
+    const parentNodeId = mediaParentToNodeId(layer.parentId);
+    const parentIdx = nodes.findIndex((n) => n.id === parentNodeId);
+    if (parentIdx === -1) {
+      // Parent not currently in the tree; show at top level so it stays reachable.
+      nodes.push(buildMediaSceneNode(layer, 0));
+      continue;
+    }
+    const parentIndent = nodes[parentIdx].indent || 0;
+    const node = buildMediaSceneNode(layer, parentIndent + 1);
+    node.parentNodeId = parentNodeId;
+    let insertAt = parentIdx + 1;
+    while (insertAt < nodes.length && nodes[insertAt].parentNodeId === parentNodeId) insertAt += 1;
+    nodes.splice(insertAt, 0, node);
+  }
 }
 
 function buildSceneTree() {
@@ -3272,6 +3644,9 @@ function dragKindToElementId(kind, target) {
   if (kind === "title") return "title";
   if (kind === "timer") return "timerFrame";
   if (kind === "commentators") return "commentators";
+  if (kind === "nameText") return "nameText";
+  if (kind === "pronounsText") return "pronounsText";
+  if (kind === "runnerIcon") return "runnerIcon";
   if (kind === "media") return mediaNodeId(target?.dataset.mediaId || "");
   if (["feed", "name", "finish"].includes(kind)) {
     const slot = target?.closest?.(".runner-panel")?.dataset.slot;
@@ -3291,6 +3666,8 @@ const INSPECTOR_PANELS = {
   "layer:feed": ["positions", "animations"],
   "layer:feedBorder": ["borders"],
   "layer:name": ["nameText", "nameplates", "nameplateBorders"],
+  nameText: ["nameText"],
+  pronounsText: ["nameText"],
   "layer:finishedTime": ["finishedTime"],
   finished: ["finishedScreen"]
 };
@@ -3299,6 +3676,7 @@ const BORDER_TARGET_FOR = { title: "title", timerFrame: "timer", commentators: "
 function inspectorPanelsFor(id) {
   if (typeof id === "string" && id.startsWith("runner:")) return INSPECTOR_PANELS.runners;
   if (typeof id === "string" && id.startsWith("media:")) return [];
+  if (id === "runnerIcon") return [];
   return INSPECTOR_PANELS[id] || INSPECTOR_PANELS.scene;
 }
 
@@ -3316,7 +3694,8 @@ function inspectorTitleFor(id) {
     scene: "Scene", background: "Background", title: "Title bar", timerText: "Timer text",
     timerFrame: "Timer frame", commentators: "Commentators", runners: "Runners (shared style)",
     "layer:feed": "Game feeds", "layer:feedBorder": "Feed borders", "layer:name": "Nameplates",
-    "layer:finishedTime": "Finish times", finished: "Finished screen"
+    "layer:finishedTime": "Finish times", finished: "Finished screen",
+    nameText: "Name text", pronounsText: "Pronouns text", runnerIcon: "Runner icons"
   };
   return labels[id] || "Scene";
 }
@@ -3401,10 +3780,16 @@ function updateInspector() {
 }
 
 function setSelectedElement(id) {
+  const prev = selection.elementId;
   selection.elementId = id;
   highlightSelectedElement(id);
   updateInspector();
   renderSceneTree();
+  // Selecting/deselecting the pronoun text or runner icon toggles their
+  // editing-only preview (shown even when empty), so refresh the nameplates.
+  if (id === "pronounsText" || prev === "pronounsText" || id === "runnerIcon" || prev === "runnerIcon") {
+    schedulePreviewRefresh();
+  }
 }
 
 function highlightSelectedElement(id) {
@@ -3416,6 +3801,11 @@ function highlightSelectedElement(id) {
     commentators: els.commentatorsPreview
   };
   if (globals[id]) globals[id].classList.add("scene-selected");
+  if (id === "nameText" || id === "pronounsText" || id === "runnerIcon") {
+    for (const el of els.runnerLayer?.querySelectorAll(`[data-drag-target='${id}']`) || []) {
+      el.classList.add("scene-selected");
+    }
+  }
   if (typeof id === "string" && id.startsWith("media:")) {
     const media = els.mediaLayer?.querySelector(`[data-media-id='${id.slice("media:".length)}']`);
     if (media) media.classList.add("scene-selected");
@@ -3538,8 +3928,14 @@ function handleSceneTreeClick(event) {
 }
 
 function clearSceneTreeDropMarkers() {
-  for (const row of els.sceneTree?.querySelectorAll(".drop-above, .drop-below, .dragging") || []) {
-    row.classList.remove("drop-above", "drop-below", "dragging");
+  for (const row of els.sceneTree?.querySelectorAll(".drop-above, .drop-below, .drop-into, .dragging") || []) {
+    row.classList.remove("drop-above", "drop-below", "drop-into", "dragging");
+  }
+}
+
+function clearSceneTreeDropClasses() {
+  for (const row of els.sceneTree?.querySelectorAll(".drop-above, .drop-below, .drop-into") || []) {
+    row.classList.remove("drop-above", "drop-below", "drop-into");
   }
 }
 
@@ -3550,14 +3946,49 @@ function handleSceneTreeDragStart(event) {
     return;
   }
   sceneTreeDragId = row.dataset.orderId;
+  sceneTreeDropMode = "";
+  sceneTreeDropTargetId = "";
   row.classList.add("dragging");
   event.dataTransfer.effectAllowed = "move";
   event.dataTransfer.setData("text/plain", sceneTreeDragId);
 }
 
 function handleSceneTreeDragOver(event) {
+  if (!sceneTreeDragId) return;
+
+  // Media nodes can be dropped *into* an element (nest) or between siblings
+  // (reorder z). Everything else is reorder-only.
+  if (sceneTreeDragId.startsWith("media:")) {
+    const row = event.target.closest(".scene-node");
+    if (!row) return;
+    const parentTarget = mediaParentFromNodeId(row.dataset.id);
+    const bounds = row.getBoundingClientRect();
+    const rel = (event.clientY - bounds.top) / Math.max(1, bounds.height);
+    const canReorder = row.dataset.orderId && row.dataset.orderId !== sceneTreeDragId;
+    const inCentralBand = rel > 0.28 && rel < 0.72;
+    clearSceneTreeDropClasses();
+    if (parentTarget !== undefined && (inCentralBand || !canReorder)) {
+      event.preventDefault();
+      row.classList.add("drop-into");
+      sceneTreeDropMode = "nest";
+      sceneTreeDropTargetId = row.dataset.id;
+      event.dataTransfer.dropEffect = "move";
+      return;
+    }
+    if (canReorder) {
+      event.preventDefault();
+      const after = rel > 0.5;
+      row.classList.toggle("drop-above", !after);
+      row.classList.toggle("drop-below", after);
+      sceneTreeDropMode = "reorder";
+      sceneTreeDropTargetId = row.dataset.orderId;
+      event.dataTransfer.dropEffect = "move";
+    }
+    return;
+  }
+
   const row = event.target.closest(".scene-node[data-order-id]");
-  if (!row || !sceneTreeDragId || row.dataset.orderId === sceneTreeDragId) return;
+  if (!row || row.dataset.orderId === sceneTreeDragId) return;
   event.preventDefault();
   const bounds = row.getBoundingClientRect();
   const after = event.clientY > bounds.top + bounds.height / 2;
@@ -3566,28 +3997,76 @@ function handleSceneTreeDragOver(event) {
   }
   row.classList.toggle("drop-above", !after);
   row.classList.toggle("drop-below", after);
+  sceneTreeDropMode = "reorder";
+  sceneTreeDropTargetId = row.dataset.orderId;
   event.dataTransfer.dropEffect = "move";
 }
 
 function handleSceneTreeDragLeave(event) {
-  const row = event.target.closest(".scene-node[data-order-id]");
+  const row = event.target.closest(".scene-node");
   if (!row || row.contains(event.relatedTarget)) return;
-  row.classList.remove("drop-above", "drop-below");
+  row.classList.remove("drop-above", "drop-below", "drop-into");
 }
 
 function handleSceneTreeDrop(event) {
-  const row = event.target.closest(".scene-node[data-order-id]");
-  if (!row || !sceneTreeDragId) return;
+  if (!sceneTreeDragId) return;
   event.preventDefault();
-  const bounds = row.getBoundingClientRect();
-  const after = event.clientY > bounds.top + bounds.height / 2;
-  moveLayerOrderItem(sceneTreeDragId, row.dataset.orderId, !after);
+  if (sceneTreeDragId.startsWith("media:") && sceneTreeDropMode === "nest") {
+    setMediaLayerParent(sceneTreeDragId.slice("media:".length), mediaParentFromNodeId(sceneTreeDropTargetId));
+  } else if (sceneTreeDropMode === "reorder" && sceneTreeDropTargetId) {
+    const row = els.sceneTree.querySelector(`.scene-node[data-order-id='${sceneTreeDropTargetId}']`);
+    const bounds = row?.getBoundingClientRect();
+    const after = bounds ? event.clientY > bounds.top + bounds.height / 2 : false;
+    moveLayerOrderItem(sceneTreeDragId, sceneTreeDropTargetId, !after);
+  }
   sceneTreeDragId = "";
+  sceneTreeDropMode = "";
+  sceneTreeDropTargetId = "";
   clearSceneTreeDropMarkers();
+}
+
+function setMediaLayerParent(layerId, parentId) {
+  const layer = getMediaLayer(layerId);
+  if (!layer) return;
+  const next = parentId === undefined ? layer.parentId : (parentId || null);
+  if (next === layer.parentId) return;
+  pushHistory("nest media layer");
+  // Re-anchor so the media visually stays put where possible: convert its
+  // current effective position into the new parent's coordinate space.
+  const before = mediaLayerNormRects(layer)[0];
+  layer.parentId = next;
+  if (before) {
+    const parents = mediaParentRects(next);
+    if (parents && parents[0]) {
+      const p = parents[0];
+      const rel = {
+        x: (before.x - p.x) / Math.max(0.0001, p.width),
+        y: (before.y - p.y) / Math.max(0.0001, p.height),
+        width: before.width / Math.max(0.0001, p.width),
+        height: before.height / Math.max(0.0001, p.height)
+      };
+      // If the media doesn't fit inside the new parent, shrink it to a centered,
+      // aspect-preserving fit instead of clamping it to the box (which would
+      // stretch/distort it).
+      const overflows = rel.width > 1 || rel.height > 1 || rel.x < 0 || rel.y < 0
+        || rel.x + rel.width > 1 || rel.y + rel.height > 1;
+      layer.rect = overflows ? fitRectInParent(layer.aspectRatio, p) : rel;
+    } else {
+      layer.rect = { ...before };
+    }
+    normalizeGeometryRect(layer.rect);
+  }
+  const label = next ? mediaParentLabel(next) : "the canvas";
+  logObs(`Nested ${layer.name || "media"} into ${label}.`);
+  update();
+  renderSceneTree();
+  scheduleObsApply("media", 80);
 }
 
 function handleSceneTreeDragEnd() {
   sceneTreeDragId = "";
+  sceneTreeDropMode = "";
+  sceneTreeDropTargetId = "";
   clearSceneTreeDropMarkers();
 }
 
@@ -3705,6 +4184,21 @@ function duplicateRunner(runner) {
 
 function sceneContextActions(node) {
   const actions = [];
+  if (node.kind === "media") {
+    const layer = getMediaLayer(String(node.id).slice("media:".length));
+    if (!layer) return actions;
+    if (layer.parentId) {
+      actions.push({ label: "Unnest to canvas", run: () => setMediaLayerParent(layer.id, null) });
+      actions.push({ separator: true });
+    }
+    for (const [pid, label] of [["title", "Title bar"], ["commentators", "Commentators"], ["timerFrame", "Timer frame"], ["feed", "Game feeds"], ["nameplate", "Nameplates"]]) {
+      if (layer.parentId !== pid) actions.push({ label: `Nest into ${label}`, run: () => setMediaLayerParent(layer.id, pid) });
+    }
+    actions.push({ separator: true });
+    actions.push({ label: isElementLocked(node.id) ? "Unlock position" : "Lock position", run: () => toggleElementLock(node.id) });
+    actions.push({ label: "Remove", run: () => removeMediaLayer(layer.id) });
+    return actions;
+  }
   if (node.kind === "runner") {
     const runner = state.runners.find((r) => r.slot === node.slot);
     if (!runner) return actions;
@@ -3903,6 +4397,47 @@ function bindFinishedScreenControls() {
   bindCheck(els.finishedScreenUnderline, "showUnderline");
   bindCheck(els.finishedScreenOnlyBackground, "showOnlyBackground");
 
+  // Runner icons
+  bindCheck(els.finishedScreenRunnerIcons, "showRunnerIcons");
+  const bindSelect = (el, key) => el && el.addEventListener("change", (event) => {
+    state.layout.finishedScreen[key] = event.target.value;
+    rerender();
+  });
+  bindSelect(els.finishedScreenRunnerIconPlacement, "runnerIconPlacement");
+
+  // Personal-best comparison
+  bindCheck(els.finishedScreenPbShow, "pbShowDelta");
+  if (els.finishedScreenPbMode) els.finishedScreenPbMode.addEventListener("change", (event) => {
+    state.layout.finishedScreen.pbShowMode = event.target.value;
+    syncPbThresholdVisibility();
+    rerender();
+  });
+  bindNumber(els.finishedScreenPbThreshold, "pbThresholdSec");
+  bindText(els.finishedScreenPbDeltaText, "pbDeltaText");
+  bindText(els.finishedScreenPbNewText, "pbNewText");
+  bindText(els.finishedScreenPbFont, "pbFontFamily");
+  bindNumber(els.finishedScreenPbFontSize, "pbFontSize");
+  bindText(els.finishedScreenPbColor, "pbColor");
+  bindCheck(els.finishedScreenPbStrokeEnabled, "pbStrokeEnabled");
+  bindText(els.finishedScreenPbStrokeColor, "pbStrokeColor");
+  bindNumber(els.finishedScreenPbStrokeWidth, "pbStrokeWidth");
+  bindCheck(els.finishedScreenPbShadowEnabled, "pbShadowEnabled");
+  bindText(els.finishedScreenPbShadowColor, "pbShadowColor");
+  bindNumber(els.finishedScreenPbShadowBlur, "pbShadowBlur");
+  bindNumber(els.finishedScreenPbShadowX, "pbShadowX");
+  bindNumber(els.finishedScreenPbShadowY, "pbShadowY");
+
+  // Leaderboard bobbing
+  bindCheck(els.finishedScreenBob, "bobEnabled");
+  bindRange(els.finishedScreenBobAmp, "bobAmplitude", els.finishedScreenBobAmpValue, " px");
+  if (els.finishedScreenBobSpeed) els.finishedScreenBobSpeed.addEventListener("input", (event) => {
+    state.layout.finishedScreen.bobSpeed = Number(event.target.value);
+    if (els.finishedScreenBobSpeedValue) els.finishedScreenBobSpeedValue.textContent = `${Number(event.target.value).toFixed(1)} s`;
+    rerender();
+  });
+  bindRange(els.finishedScreenBobSmoothness, "bobSmoothness", els.finishedScreenBobSmoothnessValue, " %");
+  bindCheck(els.finishedScreenBobStagger, "bobStagger");
+
   // Top 3 icon uploads (auto-cropped to fill the badge via object-fit: cover).
   const bindIcon = (input, clearBtn, preview, key) => {
     if (input) input.addEventListener("change", (event) => {
@@ -3967,6 +4502,12 @@ function bindFinishedScreenControls() {
   window.addEventListener("resize", updateFinishedScreenScale);
 }
 
+function syncPbThresholdVisibility() {
+  if (!els.finishedScreenPbThresholdRow) return;
+  const show = (state.layout.finishedScreen?.pbShowMode || "always") === "threshold";
+  els.finishedScreenPbThresholdRow.style.display = show ? "" : "none";
+}
+
 function syncFinishedScreenControls() {
   const cfg = { ...DEFAULT_FINISHED_SCREEN, ...(state.layout.finishedScreen || {}) };
   const setVal = (el, v) => { if (el) el.value = v; };
@@ -3986,6 +4527,33 @@ function syncFinishedScreenControls() {
   setChk(els.finishedScreenGaps, cfg.showGaps === true);
   setChk(els.finishedScreenUnderline, cfg.showUnderline !== false);
   setChk(els.finishedScreenOnlyBackground, cfg.showOnlyBackground === true);
+  setChk(els.finishedScreenRunnerIcons, cfg.showRunnerIcons === true);
+  setVal(els.finishedScreenRunnerIconPlacement, cfg.runnerIconPlacement || "before");
+  setChk(els.finishedScreenPbShow, cfg.pbShowDelta === true);
+  setVal(els.finishedScreenPbMode, cfg.pbShowMode || "always");
+  setVal(els.finishedScreenPbThreshold, cfg.pbThresholdSec);
+  setVal(els.finishedScreenPbDeltaText, cfg.pbDeltaText ?? DEFAULT_FINISHED_SCREEN.pbDeltaText);
+  setVal(els.finishedScreenPbNewText, cfg.pbNewText ?? DEFAULT_FINISHED_SCREEN.pbNewText);
+  setVal(els.finishedScreenPbFont, cfg.pbFontFamily || DEFAULT_FINISHED_SCREEN.pbFontFamily);
+  setVal(els.finishedScreenPbFontSize, cfg.pbFontSize);
+  setVal(els.finishedScreenPbColor, cfg.pbColor);
+  setChk(els.finishedScreenPbStrokeEnabled, cfg.pbStrokeEnabled === true);
+  setVal(els.finishedScreenPbStrokeColor, cfg.pbStrokeColor);
+  setVal(els.finishedScreenPbStrokeWidth, cfg.pbStrokeWidth);
+  setChk(els.finishedScreenPbShadowEnabled, cfg.pbShadowEnabled !== false);
+  setVal(els.finishedScreenPbShadowColor, cfg.pbShadowColor);
+  setVal(els.finishedScreenPbShadowBlur, cfg.pbShadowBlur);
+  setVal(els.finishedScreenPbShadowX, cfg.pbShadowX);
+  setVal(els.finishedScreenPbShadowY, cfg.pbShadowY);
+  syncPbThresholdVisibility();
+  setChk(els.finishedScreenBob, cfg.bobEnabled === true);
+  setVal(els.finishedScreenBobAmp, cfg.bobAmplitude);
+  setOut(els.finishedScreenBobAmpValue, `${cfg.bobAmplitude} px`);
+  setVal(els.finishedScreenBobSpeed, cfg.bobSpeed);
+  setOut(els.finishedScreenBobSpeedValue, `${Number(cfg.bobSpeed).toFixed(1)} s`);
+  setVal(els.finishedScreenBobSmoothness, cfg.bobSmoothness);
+  setOut(els.finishedScreenBobSmoothnessValue, `${cfg.bobSmoothness} %`);
+  setChk(els.finishedScreenBobStagger, cfg.bobStagger !== false);
   updateFinishedScreenIconPreview(els.finishedScreenIcon1Preview, cfg.topIcon1);
   updateFinishedScreenIconPreview(els.finishedScreenIcon2Preview, cfg.topIcon2);
   updateFinishedScreenIconPreview(els.finishedScreenIcon3Preview, cfg.topIcon3);
@@ -4150,6 +4718,8 @@ function renderRunnerControls() {
     setInputValue(node, "pronounPrimary", runner.pronounPrimary || "");
     setInputValue(node, "pronounSecondary", runner.pronounSecondary || "");
     setInputValue(node, "pronounCustom", runner.pronounCustom || "");
+    setInputValue(node, "pb", runner.pb || "");
+    syncRunnerIconPreview(node, runner);
     syncCropOutputs(node, runner);
     syncFeedStatus(node, runner);
     syncRunnerFinishButtons(node, runner);
@@ -4222,9 +4792,41 @@ function renderStagePanels() {
   }
 }
 
+function syncRunnerIconPreview(node, runner) {
+  const preview = node.querySelector("[data-role='iconPreview']");
+  if (!preview) return;
+  if (runner.icon) {
+    preview.src = runner.icon;
+    preview.hidden = false;
+  } else {
+    preview.removeAttribute("src");
+    preview.hidden = true;
+  }
+}
+
 function handleRunnerInput(event, runner, node) {
+  // Runner icon upload (file input has a data-role, not a data-field).
+  if (event.target.dataset.role === "iconFile") {
+    readImageFile(event.target.files?.[0], (dataUrl) => {
+      pushHistory("runner icon");
+      runner.icon = dataUrl;
+      syncRunnerIconPreview(node, runner);
+      update();
+      scheduleObsApply("nameplate", 120);
+    });
+    return;
+  }
+
   const field = event.target.dataset.field;
   if (!field) return;
+
+  if (field === "pb") {
+    beginContinuousHistory(`runner-${runner.slot}-pb`);
+    runner.pb = event.target.value;
+    update();
+    scheduleObsApply("finishedScreen", 250);
+    return;
+  }
 
   if (field === "active") {
     pushHistory("runner active");
@@ -4278,6 +4880,14 @@ function handleRunnerAction(event, runner, node) {
     syncFeedStatus(node, runner);
     update();
     scheduleObsApply("vdo-clean", 0);
+  } else if (button.dataset.action === "clearIcon") {
+    pushHistory("runner icon clear");
+    runner.icon = "";
+    const fileInput = node.querySelector("[data-role='iconFile']");
+    if (fileInput) fileInput.value = "";
+    syncRunnerIconPreview(node, runner);
+    update();
+    scheduleObsApply("nameplate", 120);
   } else if (button.dataset.action === "toggleCollapse") {
     runner.collapsed = !runner.collapsed;
     renderRunnerControls();
@@ -4467,11 +5077,13 @@ async function createOrRepairObsScene() {
         logObs(`Finished screen source skipped: ${error.message}`);
       }
       for (const layer of state.layout.mediaLayers) {
-        try {
-          const size = mediaLayerSourceSize(layer);
-          await createBrowserInput(mediaPartName(layer), obsBridge.sceneName, htmlDataUrl(buildMediaLayerHtml(layer)), size.width, size.height, layer.visible !== false);
-        } catch (error) {
-          logObs(`Media layer ${layer.name || layer.id} skipped: ${error.message}`);
+        for (const instance of mediaLayerObsInstances(layer)) {
+          try {
+            const size = mediaInstanceSourceSize(instance.rect);
+            await createBrowserInput(instance.partName, obsBridge.sceneName, htmlDataUrl(buildMediaLayerHtml(layer)), size.width, size.height, layer.visible !== false);
+          } catch (error) {
+            logObs(`Media layer ${layer.name || layer.id} #${instance.index} skipped: ${error.message}`);
+          }
         }
       }
 
@@ -4544,11 +5156,22 @@ async function applyLayoutToObs(options = {}) {
     }
     await ensureManagedMediaSources();
     for (const layer of state.layout.mediaLayers) {
-      try {
-        await setSceneItemEnabled(mediaPartName(layer), layer.visible !== false);
-        await setSceneItemTransform(mediaPartName(layer), absoluteRect(layer.rect));
-      } catch (error) {
-        logObs(`Media layer ${layer.name || layer.id} skipped: ${error.message}`);
+      const instances = mediaLayerObsInstances(layer);
+      for (const instance of instances) {
+        try {
+          await setSceneItemEnabled(instance.partName, layer.visible !== false);
+          await setSceneItemTransform(instance.partName, absoluteRect(instance.rect));
+        } catch (error) {
+          logObs(`Media layer ${layer.name || layer.id} #${instance.index} skipped: ${error.message}`);
+        }
+      }
+      // Hide any leftover instances from a previously larger runner count.
+      for (let i = instances.length; i < mediaLayerMaxInstances(layer); i += 1) {
+        try {
+          await setSceneItemEnabled(mediaInstancePartName(layer, i), false);
+        } catch {
+          // Instance was never created; nothing to disable.
+        }
       }
     }
     await ensureManagedRunnerSources();
@@ -5310,37 +5933,47 @@ function renderMediaLayers() {
   if (!els.mediaLayer) return;
   const seen = new Set();
   for (const layer of state.layout.mediaLayers) {
-    seen.add(layer.id);
-    let node = els.mediaLayer.querySelector(`[data-media-id='${layer.id}']`);
-    if (!node) {
-      node = document.createElement("div");
-      node.className = "media-preview drag-target";
-      node.dataset.dragTarget = "media";
-      node.dataset.mediaId = layer.id;
-      node.innerHTML = '<span class="resize-handle" data-resize-handle="media" aria-hidden="true"></span>';
-      els.mediaLayer.appendChild(node);
-    }
-    node.classList.toggle("hidden-element", layer.visible === false);
-    node.style.transitionDuration = `${state.layout.animationMs}ms`;
-    applyNormalizedStyle(node, layer.rect);
-
-    if (node.dataset.src !== layer.dataUrl || node.dataset.type !== layer.type) {
-      const media = document.createElement(layer.type === "video" ? "video" : "img");
-      media.src = layer.dataUrl;
-      media.alt = layer.name || "Media layer";
-      if (layer.type === "video") {
-        media.autoplay = true;
-        media.loop = true;
-        media.muted = true;
-        media.playsInline = true;
+    const rects = mediaLayerNormRects(layer);
+    rects.forEach((rect, index) => {
+      const key = `${layer.id}#${index}`;
+      seen.add(key);
+      const primary = index === 0;
+      let node = els.mediaLayer.querySelector(`[data-media-key='${key}']`);
+      if (!node) {
+        node = document.createElement("div");
+        node.className = primary ? "media-preview drag-target" : "media-preview media-clone";
+        node.dataset.mediaKey = key;
+        node.dataset.mediaId = layer.id;
+        node.dataset.mediaInstance = String(index);
+        if (primary) {
+          node.dataset.dragTarget = "media";
+          node.appendChild(createResizeHandle("media"));
+        }
+        els.mediaLayer.appendChild(node);
       }
-      node.replaceChildren(media, node.querySelector(".resize-handle") || createResizeHandle("media"));
-      node.dataset.src = layer.dataUrl;
-      node.dataset.type = layer.type;
-    }
+      node.classList.toggle("hidden-element", layer.visible === false);
+      node.style.transitionDuration = `${state.layout.animationMs}ms`;
+      applyNormalizedStyle(node, rect);
+
+      if (node.dataset.src !== layer.dataUrl || node.dataset.type !== layer.type) {
+        const media = document.createElement(layer.type === "video" ? "video" : "img");
+        media.src = layer.dataUrl;
+        media.alt = layer.name || "Media layer";
+        if (layer.type === "video") {
+          media.autoplay = true;
+          media.loop = true;
+          media.muted = true;
+          media.playsInline = true;
+        }
+        const handle = primary ? (node.querySelector(".resize-handle") || createResizeHandle("media")) : null;
+        node.replaceChildren(...(handle ? [media, handle] : [media]));
+        node.dataset.src = layer.dataUrl;
+        node.dataset.type = layer.type;
+      }
+    });
   }
-  for (const node of [...els.mediaLayer.querySelectorAll("[data-media-id]")]) {
-    if (!seen.has(node.dataset.mediaId)) node.remove();
+  for (const node of [...els.mediaLayer.querySelectorAll("[data-media-key]")]) {
+    if (!seen.has(node.dataset.mediaKey)) node.remove();
   }
 }
 
@@ -5368,8 +6001,10 @@ function applySceneLayerZIndexes() {
     if (element) element.style.zIndex = zFor(id);
   }
   for (const layer of state.layout.mediaLayers) {
-    const node = els.mediaLayer?.querySelector(`[data-media-id='${layer.id}']`);
-    if (node) node.style.zIndex = zFor(mediaNodeId(layer.id));
+    const z = zFor(mediaNodeId(layer.id));
+    for (const node of els.mediaLayer?.querySelectorAll(`[data-media-id='${layer.id}']`) || []) {
+      node.style.zIndex = z;
+    }
   }
 }
 
@@ -6196,11 +6831,32 @@ function applyNameplatePreview(nameplate, runner, rect) {
   const plateImage = config.showBox && config.plateMode === "image" && config.plateImage
     ? `<img class="plate-art" src="${escapeAttribute(config.plateImage)}" alt="">`
     : "";
+  // While the pronoun text element is selected, show pronouns in the preview even
+  // if they're disabled or unset (using an example) so they can be positioned.
+  const editingPronouns = selection.elementId === "pronounsText";
   const pronounsText = getRunnerPronouns(runner);
-  const pronounsContentMarkup = pronounsText && state.layout.pronounsText.enabled
-    ? `<div class="pronouns-content" title="Drag the pronouns to move them inside the nameplate"><strong class="pronouns-text-drag" data-drag-target="pronounsText">${escapeHtml(pronounsText)}</strong></div>`
+  const pronounsDisplay = pronounsText || (editingPronouns ? EXAMPLE_PRONOUNS : "");
+  const showPronouns = pronounsDisplay && (state.layout.pronounsText.enabled || editingPronouns);
+  const pronounsContentMarkup = showPronouns
+    ? `<div class="pronouns-content" title="Drag the pronouns to move them inside the nameplate"><strong class="pronouns-text-drag" data-drag-target="pronounsText">${escapeHtml(pronounsDisplay)}</strong></div>`
     : "";
-  const markup = `${plateImage}${nameTextSvgMarkup(runner, sourceSize)}${pronounsTextSvgMarkup(runner, sourceSize)}<div class="name-content" title="Drag the text to move it inside the nameplate"><strong class="name-text-drag" data-drag-target="nameText">${escapeHtml(runner.name)}</strong></div>${pronounsContentMarkup}`;
+  // Runner icon: shown when the runner has one, or (preview only) as a
+  // placeholder while "Runner Icons" is selected so its position can be set.
+  const editingIcon = selection.elementId === "runnerIcon";
+  const iconVisible = state.layout.elements.runnerIcon !== false;
+  let iconSrc = "";
+  if (runner.icon && iconVisible) iconSrc = runner.icon;
+  else if (editingIcon) iconSrc = runner.icon || DEFAULT_RUNNER_ICON_PLACEHOLDER; // position even when hidden/empty
+  const iconRect = state.layout.runnerIcon?.rect || DEFAULT_RUNNER_ICON_RECT;
+  // z-index keeps the icon above the name text/SVG so it always wins the click
+  // (otherwise the drag falls through to the nameplate).
+  const iconMarkup = iconSrc
+    ? `<img class="runner-icon-drag${editingIcon ? " scene-selected" : ""}" data-drag-target="runnerIcon" src="${escapeAttribute(iconSrc)}" alt="" style="position:absolute;left:${iconRect.x * 100}%;top:${iconRect.y * 100}%;width:${iconRect.width * 100}%;height:${iconRect.height * 100}%;object-fit:contain;z-index:5;pointer-events:auto;">`
+    : "";
+  const nameContentMarkup = state.layout.elements.nameText === false
+    ? ""
+    : `<div class="name-content" title="Drag the text to move it inside the nameplate"><strong class="name-text-drag" data-drag-target="nameText">${escapeHtml(runner.name)}</strong></div>`;
+  const markup = `${plateImage}${nameTextSvgMarkup(runner, sourceSize)}${pronounsTextSvgMarkup(runner, sourceSize, { forceShow: editingPronouns, placeholder: EXAMPLE_PRONOUNS })}${nameContentMarkup}${pronounsContentMarkup}${iconMarkup}`;
   const markupChanged = frame.dataset.markup !== markup;
   if (markupChanged) {
     frame.dataset.markup = markup;
@@ -6443,7 +7099,11 @@ async function discoverManagedInputNames() {
 function managedInputNames() {
   const names = GLOBAL_PARTS.map((part) => `${MANAGED_PREFIX}${part}`);
   for (const layer of state.layout.mediaLayers) {
-    names.push(`${MANAGED_PREFIX}${mediaPartName(layer)}`);
+    // Include every possible instance name so shared-parent copies are cleaned
+    // up even when the active-runner count changed since they were created.
+    for (let i = 0; i < mediaLayerMaxInstances(layer); i += 1) {
+      names.push(`${MANAGED_PREFIX}${mediaInstancePartName(layer, i)}`);
+    }
   }
   for (const runner of state.runners) {
     for (const part of RUNNER_PARTS) {
@@ -6784,30 +7444,49 @@ async function updateCommentatorsInput() {
   });
 }
 
-function mediaLayerSourceSize(layer) {
+// Browser-source pixel resolution for a media instance, derived from its
+// *effective* (post-nesting) rect so nested media still render crisply.
+function mediaInstanceSourceSize(rect) {
   return {
-    width: Math.max(1, Math.round(STAGE.width * (Number(layer.rect?.width) || 0.1))),
-    height: Math.max(1, Math.round(STAGE.height * (Number(layer.rect?.height) || 0.1)))
+    width: Math.max(1, Math.round(STAGE.width * (Number(rect?.width) || 0.1))),
+    height: Math.max(1, Math.round(STAGE.height * (Number(rect?.height) || 0.1)))
   };
 }
 
+// Legacy single-rect size helper (used as a fallback before instances resolve).
+function mediaLayerSourceSize(layer) {
+  return mediaInstanceSourceSize(mediaLayerNormRects(layer)[0] || layer.rect);
+}
+
+// Upper bound on OBS instances a layer can spawn (one per runner for shared
+// parents, otherwise one). Used to clean up leftovers when the count shrinks.
+function mediaLayerMaxInstances(layer) {
+  return isSharedMediaParent(layer.parentId) ? Math.max(1, state.runners.length) : 1;
+}
+
 async function updateMediaLayerInput(layer) {
-  const size = mediaLayerSourceSize(layer);
-  await setBrowserInputSettings(mediaPartName(layer), {
-    url: htmlDataUrl(buildMediaLayerHtml(layer)),
-    width: size.width,
-    height: size.height
-  });
+  const instances = mediaLayerObsInstances(layer);
+  const url = htmlDataUrl(buildMediaLayerHtml(layer));
+  for (const instance of instances) {
+    const size = mediaInstanceSourceSize(instance.rect);
+    try {
+      await setBrowserInputSettings(instance.partName, { url, width: size.width, height: size.height });
+    } catch (error) {
+      logObs(`Media ${layer.name || layer.id} #${instance.index} refresh skipped: ${error.message}`);
+    }
+  }
 }
 
 async function ensureManagedMediaSources() {
   for (const layer of state.layout.mediaLayers) {
-    const inputName = `${MANAGED_PREFIX}${mediaPartName(layer)}`;
-    try {
-      await getSceneItemId(inputName);
-    } catch {
-      const size = mediaLayerSourceSize(layer);
-      await createBrowserInput(mediaPartName(layer), obsBridge.sceneName, htmlDataUrl(buildMediaLayerHtml(layer)), size.width, size.height, layer.visible !== false);
+    for (const instance of mediaLayerObsInstances(layer)) {
+      const inputName = `${MANAGED_PREFIX}${instance.partName}`;
+      try {
+        await getSceneItemId(inputName);
+      } catch {
+        const size = mediaInstanceSourceSize(instance.rect);
+        await createBrowserInput(instance.partName, obsBridge.sceneName, htmlDataUrl(buildMediaLayerHtml(layer)), size.width, size.height, layer.visible !== false);
+      }
     }
   }
 }
@@ -6908,7 +7587,9 @@ async function enforceSceneLayerOrder() {
       }
     } else if (id.startsWith("media:")) {
       const layer = getMediaLayer(id.slice("media:".length));
-      if (layer) pushLayer(mediaPartName(layer));
+      if (layer) {
+        for (const instance of mediaLayerObsInstances(layer)) pushLayer(instance.partName);
+      }
     }
   }
 
@@ -7687,11 +8368,16 @@ function buildNameHtml(runner, rect = null) {
     const plateImageMarkup = plateImage ? `<img class="plate-art" src="${escapeAttribute(config.plateImage)}" alt="">` : "";
     const textSvg = nameTextSvgMarkup(runner, sourceSize);
     const pronounsSvg = pronounsTextSvgMarkup(runner, sourceSize);
-    return `<!doctype html><html><body><div class="bar">${plateImageMarkup}${textSvg}${pronounsSvg}</div></body><style>${baseHtmlCss()} ${nameplateAnimationCss(config, sourceSize.width, sourceSize.height)}body{font-family:${cssFontStack(config.fontFamily)};color:${config.textColor};text-rendering:geometricPrecision;-webkit-font-smoothing:antialiased;font-stretch:normal;letter-spacing:0;}.bar{${nameplateFrameCss(config, "100%", "100%", sourceSize.width, sourceSize.height)}}.plate-art{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:block;z-index:0;pointer-events:none;}.svg-text{position:absolute;inset:0;z-index:1;display:block;pointer-events:none;}</style></html>`;
+    const iconRect = state.layout.runnerIcon?.rect || DEFAULT_RUNNER_ICON_RECT;
+    const iconMarkup = runner.icon && state.layout.elements.runnerIcon !== false
+      ? `<img class="runner-icon" src="${escapeAttribute(runner.icon)}" style="left:${iconRect.x * 100}%;top:${iconRect.y * 100}%;width:${iconRect.width * 100}%;height:${iconRect.height * 100}%;">`
+      : "";
+    return `<!doctype html><html><body><div class="bar">${plateImageMarkup}${textSvg}${pronounsSvg}${iconMarkup}</div></body><style>${baseHtmlCss()} ${nameplateAnimationCss(config, sourceSize.width, sourceSize.height)}body{font-family:${cssFontStack(config.fontFamily)};color:${config.textColor};text-rendering:geometricPrecision;-webkit-font-smoothing:antialiased;font-stretch:normal;letter-spacing:0;}.bar{${nameplateFrameCss(config, "100%", "100%", sourceSize.width, sourceSize.height)}}.plate-art{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:block;z-index:0;pointer-events:none;}.svg-text{position:absolute;inset:0;z-index:1;display:block;pointer-events:none;}.runner-icon{position:absolute;object-fit:contain;display:block;z-index:2;pointer-events:none;}</style></html>`;
   });
 }
 
 function nameTextSvgMarkup(runner, sourceSize) {
+  if (state.layout.elements.nameText === false) return "";
   const config = state.layout.nameplate;
   const fontSize = nameTextIsUnframed()
     ? Math.max(1, Number(config.fontSize) || state.layout.nameplate.fontSize)
@@ -7713,11 +8399,18 @@ function nameTextSvgMarkup(runner, sourceSize) {
   });
 }
 
-function pronounsTextSvgMarkup(runner, sourceSize) {
-  const config = state.layout.pronounsText;
-  if (!config || !config.enabled) return "";
+const EXAMPLE_PRONOUNS = "they/them";
 
-  const text = getRunnerPronouns(runner);
+function pronounsTextSvgMarkup(runner, sourceSize, options = {}) {
+  const config = state.layout.pronounsText;
+  if (!config) return "";
+  // In the preview, when the pronoun text element is being edited, force it to
+  // show even if pronouns are disabled or empty (with a placeholder) so it can
+  // be positioned easily. OBS output never passes forceShow, so it's unaffected.
+  const forceShow = Boolean(options.forceShow);
+  if (!config.enabled && !forceShow) return "";
+
+  const text = getRunnerPronouns(runner) || (forceShow ? (options.placeholder || EXAMPLE_PRONOUNS) : "");
   if (!text) return "";
 
   const fontSize = nameTextIsUnframed()
@@ -7787,6 +8480,46 @@ function runnerFinishMs(runner) {
   return ((hours * 60 + minutes) * 60 + seconds) * 1000 + millis;
 }
 
+// Parse a clock string (H:MM:SS(.mmm) or M:SS(.mmm)) to milliseconds, or null.
+function parseClockToMs(text) {
+  const match = /^(?:(\d+):)?(\d{1,2}):(\d{2})(?:[.,](\d{1,3}))?$/.exec(String(text || "").trim());
+  if (!match) return null;
+  const hours = Number(match[1] || 0);
+  const minutes = Number(match[2] || 0);
+  const seconds = Number(match[3] || 0);
+  const millis = Number((match[4] || "0").padEnd(3, "0"));
+  return ((hours * 60 + minutes) * 60 + seconds) * 1000 + millis;
+}
+
+// Signed delta vs PB, formatted like "-1:23" (ahead) / "+0:12" (behind).
+function formatPbDelta(deltaMs) {
+  const sign = deltaMs < 0 ? "-" : "+";
+  const total = Math.abs(Math.round(deltaMs));
+  const hours = Math.floor(total / 3600000);
+  const minutes = Math.floor((total % 3600000) / 60000);
+  const seconds = Math.floor((total % 60000) / 1000);
+  const pad = (n) => String(n).padStart(2, "0");
+  return hours > 0 ? `${sign}${hours}:${pad(minutes)}:${pad(seconds)}` : `${sign}${minutes}:${pad(seconds)}`;
+}
+
+// Unsigned clock magnitude, e.g. "1:23" or "1:02:03".
+function formatClockMagnitude(ms) {
+  const total = Math.abs(Math.round(ms));
+  const hours = Math.floor(total / 3600000);
+  const minutes = Math.floor((total % 3600000) / 60000);
+  const seconds = Math.floor((total % 60000) / 1000);
+  const pad = (n) => String(n).padStart(2, "0");
+  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
+}
+
+// Whether a runner's PB delta should be shown in the finished screen, per config.
+function shouldShowPbDelta(cfg, deltaMs) {
+  if (!cfg.pbShowDelta || deltaMs === null) return false;
+  if (cfg.pbShowMode !== "threshold") return true;
+  const threshold = Math.max(0, Number(cfg.pbThresholdSec) || 0) * 1000;
+  return Math.abs(deltaMs) >= threshold;
+}
+
 // Ordered standings: finishers ranked by fastest time, then active runners
 // without a time as DNF.
 function finishedScreenStandings() {
@@ -7808,10 +8541,11 @@ function finishedScreenStandings() {
     name: entry.runner.name,
     time: entry.time,
     dnf: false,
-    ms: entry.ms === Number.MAX_SAFE_INTEGER ? null : entry.ms
+    ms: entry.ms === Number.MAX_SAFE_INTEGER ? null : entry.ms,
+    runner: entry.runner
   }));
   for (const entry of dnf) {
-    rows.push({ place: null, name: entry.runner.name, time: "DNF", dnf: true, ms: null });
+    rows.push({ place: null, name: entry.runner.name, time: "DNF", dnf: true, ms: null, runner: entry.runner });
   }
   return rows;
 }
@@ -7876,6 +8610,16 @@ function finishedScreenMarkup() {
   const showUnderline = cfg.showUnderline !== false;
   const showOnlyBackground = cfg.showOnlyBackground === true;
   const bgLayer = showOnlyBackground ? finishedScreenBackgroundLayerCss() : null;
+  const showRunnerIcons = cfg.showRunnerIcons === true;
+  const iconAfterName = cfg.runnerIconPlacement === "after";
+  const bobEnabled = cfg.bobEnabled === true;
+  const bobAmp = Math.max(0, Math.min(40, Number(cfg.bobAmplitude) || 0));
+  const bobDur = Math.max(0.4, Number(cfg.bobSpeed) || DEFAULT_FINISHED_SCREEN.bobSpeed);
+  const bobS = Math.max(0, Math.min(100, Number(cfg.bobSmoothness) ?? 100)) / 100;
+  const bobTiming = `cubic-bezier(${(0.42 * bobS).toFixed(3)},0,${(1 - 0.42 * bobS).toFixed(3)},1)`;
+  const bobStagger = cfg.bobStagger !== false;
+  const pbFontStack = cssFontStack(cfg.pbFontFamily || DEFAULT_FINISHED_SCREEN.pbFontFamily);
+  const pbEffect = fsTextEffectCss({ color: cfg.pbColor, strokeEnabled: cfg.pbStrokeEnabled, strokeColor: cfg.pbStrokeColor, strokeWidth: cfg.pbStrokeWidth, shadowEnabled: cfg.pbShadowEnabled, shadowColor: cfg.pbShadowColor, shadowBlur: cfg.pbShadowBlur, shadowX: cfg.pbShadowX, shadowY: cfg.pbShadowY });
 
   const gap = 16;
   const areaHeight = 720;
@@ -7887,6 +8631,8 @@ function finishedScreenMarkup() {
   const nameFont = Math.max(12, Math.round(runnerBase * rowScale));
   const timeFont = Math.max(12, Math.round(runnerBase * 1.05 * rowScale));
   const gapFont = Math.max(10, Math.round(runnerBase * 0.5 * rowScale));
+  const pbFont = Math.max(10, Math.round((Number(cfg.pbFontSize) || DEFAULT_FINISHED_SCREEN.pbFontSize) * rowScale));
+  const pbColWidth = Math.round(pbFont * 8.5); // fixed reserve so the time never shifts
   const placeFont = Math.max(12, Math.round(runnerBase * 0.85 * rowScale));
   const badgeSize = Math.round(rowHeight * 0.78);
   const headingFont = Math.max(12, Number(cfg.headingFontSize) || DEFAULT_FINISHED_SCREEN.headingFontSize);
@@ -7915,11 +8661,48 @@ function finishedScreenMarkup() {
         : "";
       gapHtml = `<div class="ofs-gap">${escapeHtml(gapText)}</div>`;
     }
+
+    const runnerIcon = showRunnerIcons && row.runner?.icon
+      ? `<img class="ofs-runner-icon" src="${escapeAttribute(row.runner.icon)}" alt="">`
+      : "";
+    // Keep the icon hugging the name: for "after" it sits right after the name
+    // text, for "before" it leads the name — not floated to the far edge.
+    const nameHtml = `<div class="ofs-name">${escapeHtml(row.name || "")}</div>`;
+    const nameSection = `<div class="ofs-nameblock">${runnerIcon && !iconAfterName ? runnerIcon : ""}${nameHtml}${runnerIcon && iconAfterName ? runnerIcon : ""}</div>`;
+
+    // When PB comparison is enabled, every row reserves a fixed-width PB column
+    // on the right so the time column stays put whether or not a given runner has
+    // a delta to show. It sits inside .ofs-rowinner, so it bobs with the plate.
+    let pbHtml = "";
+    if (cfg.pbShowDelta) {
+      let pbText = "";
+      if (!row.dnf && Number.isFinite(row.ms) && row.runner) {
+        const pbMs = parseClockToMs(row.runner.pb);
+        if (pbMs !== null) {
+          const deltaMs = row.ms - pbMs;
+          if (shouldShowPbDelta(cfg, deltaMs)) {
+            const magnitude = formatClockMagnitude(deltaMs);
+            const template = deltaMs < 0
+              ? (cfg.pbNewText ?? DEFAULT_FINISHED_SCREEN.pbNewText)
+              : (cfg.pbDeltaText ?? DEFAULT_FINISHED_SCREEN.pbDeltaText);
+            pbText = String(template).replace(/\{delta\}/g, magnitude);
+          }
+        }
+      }
+      pbHtml = `<div class="ofs-pb">${escapeHtml(pbText)}</div>`;
+    }
+
+    const bobStyle = bobEnabled && bobStagger ? ` style="animation-delay:${(-(index * 0.35)).toFixed(2)}s;"` : "";
+    // Outer element runs the entrance stagger; the inner element is the visible
+    // plate and runs the bob, so the whole plate (background included) bobs.
     return `<div class="ofs-row${row.dnf ? " ofs-dnf" : ""}${isFirst ? " ofs-first" : ""}" style="height:${rowHeight}px;animation-delay:${delay}ms;">`
+      + `<div class="ofs-rowinner"${bobStyle}>`
       + `<div class="ofs-badge ${badgeClass}">${badgeInner}</div>`
-      + `<div class="ofs-name">${escapeHtml(row.name || "")}</div>`
+      + nameSection
       + `<div class="ofs-time">${escapeHtml(row.time || "")}</div>`
       + gapHtml
+      + pbHtml
+      + `</div>`
       + `</div>`;
   }).join("");
   const emptyHtml = rows.length ? "" : `<div class="ofs-empty">Awaiting finishers…</div>`;
@@ -7937,7 +8720,11 @@ ${bgLayer ? bgLayer.css : ""}
 .ofs-heading{font-family:${headingFontStack};font-size:${headingFont}px;font-weight:900;letter-spacing:6px;text-align:center;text-transform:uppercase;margin:0 0 44px;padding-bottom:18px;position:relative;opacity:0;animation:ofsHeadIn ${speed}ms cubic-bezier(0.22,1,0.36,1) both;${headingEffect}}
 ${underlineCss}
 .ofs-rows{display:flex;flex-direction:column;gap:${gap}px;}
-.ofs-row{position:relative;display:flex;align-items:center;gap:26px;padding:0 30px;border-radius:14px;background:linear-gradient(90deg, ${hexToRgba(accent, 0.16)} 0%, rgba(255,255,255,0.05) 8%, rgba(255,255,255,0.05) 100%);border:1px solid rgba(255,255,255,0.10);box-shadow:0 8px 22px rgba(0,0,0,0.38);opacity:0;animation:ofsRowIn ${speed}ms cubic-bezier(0.34,1.4,0.5,1) both;}
+.ofs-row{position:relative;height:${rowHeight}px;opacity:0;animation:ofsRowIn ${speed}ms cubic-bezier(0.34,1.4,0.5,1) both;}
+.ofs-rowinner{height:100%;display:flex;align-items:center;gap:26px;padding:0 30px;border-radius:14px;background:linear-gradient(90deg, ${hexToRgba(accent, 0.16)} 0%, rgba(255,255,255,0.05) 8%, rgba(255,255,255,0.05) 100%);border:1px solid rgba(255,255,255,0.10);box-shadow:0 8px 22px rgba(0,0,0,0.38);box-sizing:border-box;${bobEnabled ? `animation:ofsBob ${bobDur}s ${bobTiming} infinite;` : ""}}
+.ofs-nameblock{flex:1 1 auto;display:flex;align-items:center;gap:16px;min-width:0;}
+.ofs-runner-icon{flex:0 0 auto;height:${badgeSize}px;width:${badgeSize}px;object-fit:contain;display:block;}
+.ofs-pb{flex:0 0 auto;width:${pbColWidth}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right;font-family:${pbFontStack};font-size:${pbFont}px;font-weight:800;font-variant-numeric:tabular-nums;${pbEffect}}
 .ofs-badge{flex:0 0 auto;width:${badgeSize}px;height:${badgeSize}px;display:flex;align-items:center;justify-content:center;border-radius:12px;font-size:${placeFont}px;font-weight:900;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);overflow:hidden;}
 .ofs-badge-icon{background:transparent;border:1px solid rgba(255,255,255,0.18);padding:0;}
 .ofs-badge-img{width:100%;height:100%;object-fit:contain;display:block;}
@@ -7945,10 +8732,10 @@ ${underlineCss}
 .ofs-badge-2{background:linear-gradient(145deg,#eef1f6,#a9b4c2);color:#26303a;border:1px solid rgba(255,255,255,0.55);}
 .ofs-badge-3{background:linear-gradient(145deg,#e6a76b,#b06f37);color:#2e1600;border:1px solid rgba(255,255,255,0.45);}
 .ofs-badge-dnf{color:rgba(255,255,255,0.5);}
-.ofs-name{flex:1 1 auto;font-size:${nameFont}px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${nameEffect}}
+.ofs-name{flex:0 1 auto;font-size:${nameFont}px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${nameEffect}}
 .ofs-time{flex:0 0 auto;font-size:${timeFont}px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:1px;${timeEffect}}
 .ofs-gap{flex:0 0 auto;min-width:120px;text-align:right;font-size:${gapFont}px;font-weight:700;font-variant-numeric:tabular-nums;color:${hexToRgba(accent, 0.7)};}
-.ofs-first{background:linear-gradient(90deg, ${hexToRgba(accent, 0.42)} 0%, ${hexToRgba(accent, 0.16)} 58%, ${hexToRgba(accent, 0.07)} 100%);border:2px solid ${hexToRgba(accent, 0.85)};animation:ofsRowIn ${speed}ms cubic-bezier(0.34,1.4,0.5,1) both, ofsFirstGlow 2.6s ease-in-out infinite;}
+.ofs-first .ofs-rowinner{background:linear-gradient(90deg, ${hexToRgba(accent, 0.42)} 0%, ${hexToRgba(accent, 0.16)} 58%, ${hexToRgba(accent, 0.07)} 100%);border:2px solid ${hexToRgba(accent, 0.85)};animation:${bobEnabled ? `ofsBob ${bobDur}s ${bobTiming} infinite, ` : ""}ofsFirstGlow 2.6s ease-in-out infinite;}
 .ofs-first .ofs-name{font-size:${Math.round(nameFont * 1.1)}px;font-weight:800;}
 .ofs-first .ofs-time{font-size:${Math.round(timeFont * 1.1)}px;}
 .ofs-dnf{filter:saturate(0.6);}
@@ -7957,6 +8744,7 @@ ${underlineCss}
 .ofs-empty{text-align:center;font-size:34px;font-weight:700;color:#ffffff;opacity:0.7;padding:60px 0;}
 @keyframes ofsRowIn{from{opacity:0;transform:translateY(46px) scale(0.96);}to{opacity:1;transform:translateY(0) scale(1);}}
 @keyframes ofsHeadIn{from{opacity:0;transform:translateY(-26px);}to{opacity:1;transform:translateY(0);}}
+@keyframes ofsBob{0%,100%{transform:translateY(${(-bobAmp).toFixed(1)}px);}50%{transform:translateY(${bobAmp.toFixed(1)}px);}}
 @keyframes ofsFirstGlow{0%,100%{box-shadow:0 10px 34px ${hexToRgba(accent, 0.3)}, inset 0 0 24px ${hexToRgba(accent, 0.1)};}50%{box-shadow:0 12px 46px ${hexToRgba(accent, 0.55)}, inset 0 0 34px ${hexToRgba(accent, 0.18)};}}
 `;
 
@@ -8726,6 +9514,8 @@ function normalizeLoadedLayout(layout) {
   next.elements.feed = Boolean(next.elements.feed);
   next.elements.feedBorder = Boolean(next.elements.feedBorder);
   next.elements.name = Boolean(next.elements.name);
+  next.elements.nameText = next.elements.nameText !== false;
+  next.elements.runnerIcon = next.elements.runnerIcon !== false;
   next.elements.titleBar = Boolean(next.elements.titleBar);
   next.elements.builtInTimer = Boolean(next.elements.builtInTimer);
   next.elements.finishedTime = Boolean(next.elements.finishedTime);
@@ -8733,8 +9523,50 @@ function normalizeLoadedLayout(layout) {
   next.sceneView = next.sceneView !== false;
   next.mediaLayers = Array.isArray(next.mediaLayers) ? next.mediaLayers.map(normalizeMediaLayer).filter(Boolean) : [];
   next.layerOrder = Array.isArray(next.layerOrder) ? next.layerOrder.filter((id) => typeof id === "string") : [...BASE_LAYER_ORDER];
+  next.runnerIcon = {
+    rect: {
+      x: Number(next.runnerIcon?.rect?.x ?? DEFAULT_RUNNER_ICON_RECT.x),
+      y: Number(next.runnerIcon?.rect?.y ?? DEFAULT_RUNNER_ICON_RECT.y),
+      width: Number(next.runnerIcon?.rect?.width ?? DEFAULT_RUNNER_ICON_RECT.width),
+      height: Number(next.runnerIcon?.rect?.height ?? DEFAULT_RUNNER_ICON_RECT.height)
+    }
+  };
+  normalizeGeometryRect(next.runnerIcon.rect);
+  next.layerOrder = migrateTitleAboveCommentators(next.layerOrder);
+  if (isLegacyDefaultPronounsText(next.pronounsText)) {
+    next.pronounsText = {
+      ...DEFAULT_PRONOUNS_TEXT,
+      enabled: next.pronounsText.enabled,
+      textX: next.pronounsText.textX,
+      textY: next.pronounsText.textY
+    };
+  }
   normalizedLayerOrderFor(next);
   return next;
+}
+
+// One-time migration: projects created before Title was reordered above
+// Commentators still list the globals in the old default sequence. If that
+// untouched sequence is detected, move Title just above Commentators (i.e. after
+// it in z-order). Once migrated, the sequence no longer matches, so a user's own
+// ordering is never overridden.
+function migrateTitleAboveCommentators(order) {
+  const globals = ["runners", "title", "timerText", "timerFrame", "commentators"];
+  const sub = order.filter((id) => globals.includes(id));
+  const legacySequence = ["runners", "title", "timerText", "timerFrame", "commentators"];
+  if (JSON.stringify(sub) !== JSON.stringify(legacySequence)) return order;
+  const without = order.filter((id) => id !== "title");
+  const at = without.indexOf("commentators");
+  without.splice(at + 1, 0, "title");
+  return without;
+}
+
+function isLegacyDefaultPronounsText(cfg) {
+  return Boolean(cfg)
+    && cfg.fontFamily === LEGACY_PRONOUNS_TEXT_SIGNATURE.fontFamily
+    && cfg.textColor === LEGACY_PRONOUNS_TEXT_SIGNATURE.textColor
+    && cfg.strokeColor === LEGACY_PRONOUNS_TEXT_SIGNATURE.strokeColor
+    && cfg.shadowColor === LEGACY_PRONOUNS_TEXT_SIGNATURE.shadowColor;
 }
 
 function normalizeMediaLayer(layer) {
@@ -8747,6 +9579,7 @@ function normalizeMediaLayer(layer) {
     dataUrl: layer.dataUrl,
     aspectRatio: normalizeNumber(layer.aspectRatio, 0.01, 100, 16 / 9),
     visible: layer.visible !== false,
+    parentId: normalizeMediaParentId(layer.parentId),
     rect: {
       x: Number(layer.rect?.x ?? 0.25),
       y: Number(layer.rect?.y ?? 0.22),
@@ -8832,7 +9665,7 @@ function normalizeLoadedRunners(runners) {
       slot,
       active: Boolean(runner.active ?? slot <= 2),
       name: String(runner.name ?? `Runner ${slot}`),
-      source: String(runner.source ?? `runner_${slot}_feed`),
+      source: String(runner.source ?? "") === `runner_${slot}_feed` ? "" : String(runner.source ?? ""),
       feedMode: ["live", "brb", "tech", "black", "standby"].includes(runner.feedMode) ? runner.feedMode : "live",
       placement: Number(runner.placement ?? slot),
       done: Boolean(runner.done),
@@ -8844,6 +9677,8 @@ function normalizeLoadedRunners(runners) {
       pronounPrimary: String(runner.pronounPrimary || ""),
       pronounSecondary: String(runner.pronounSecondary || ""),
       pronounCustom: String(runner.pronounCustom || ""),
+      icon: typeof runner.icon === "string" && runner.icon.startsWith("data:") ? runner.icon : "",
+      pb: String(runner.pb || ""),
       unique: Boolean(runner.unique),
       style: runner.unique
         ? {
